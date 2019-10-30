@@ -1,0 +1,461 @@
+namespace com.ibm.amoeba.common.network.protocol;
+
+
+//---------------------------------------------------------------------------
+//- Object
+//---------------------------------------------------------------------------
+struct UUID {
+  mostSigBits: long;
+  leastSigBits: long;
+}
+
+table Replication {
+  width: int;
+  write_threshold: int;
+}
+
+table ReedSolomon {
+  width: int;
+  read_threshold: int;
+  write_threshold: int;
+}
+
+union IDA { Replication, ReedSolomon }
+
+struct ObjectRevision {
+  mostSigBits: long;
+  leastSigBits: long;
+}
+
+struct ObjectRefcount {
+  update_serial: int;
+  refcount: int;
+}
+
+table StorePointer {
+  store_index: byte;
+  data: [byte];
+}
+
+enum ObjectType:byte { 
+    Data,
+    KeyValue
+}
+
+table ObjectPointer {
+  uuid: UUID;
+  pool_uuid: UUID;
+  size: int;
+  store_pointers: [StorePointer];
+  ida: IDA;
+  object_type: ObjectType;
+}
+
+//---------------------------------------------------------------------------
+//- Transaction Description
+//---------------------------------------------------------------------------
+enum TransactionStatus:byte { 
+    Unresolved,
+    Committed,
+    Aborted 
+}
+
+enum TransactionDisposition:byte {
+    Undetermined,
+    VoteCommit,
+    VoteAbort
+}
+
+enum UpdateError:byte
+{
+    MissingUpdateData, 
+    ObjectMismatch,    
+    InvalidLocalPointer,
+    RevisionMismatch,
+    RefcountMismatch,
+    TransactionCollision,
+    RebuildCollision,
+    CorruptedObject,
+    InsufficientFreeSpace,
+    InvalidObjectType,
+    KeyValueRequirementError,
+    TransactionTimestampError,
+    LocalTimeError
+}
+
+enum DataUpdateOperation:byte {
+  Append,
+  Overwrite
+}
+
+enum KeyValueUpdateType:byte {
+  Update
+}
+
+enum KeyValueTimestampRequirementEnum:byte {
+  Equals,
+  LessThan,
+  Exists,
+  DoesNotExist
+}
+
+table DataUpdate {
+  object_pointer: ObjectPointer;
+  required_revision: ObjectRevision;
+  operation: DataUpdateOperation;
+}
+
+table RefcountUpdate {
+  object_pointer: ObjectPointer;
+  required_refcount: ObjectRefcount;
+  new_refcount: ObjectRefcount;
+}
+
+table VersionBump {
+  object_pointer: ObjectPointer;
+  required_revision: ObjectRevision;
+}
+
+table RevisionLock {
+  object_pointer: ObjectPointer;
+  required_revision: ObjectRevision;
+}
+
+table KVReq {
+  tsRequirement: KeyValueTimestampRequirementEnum;
+  timestamp: long;
+  key: [byte];
+}
+
+table KeyValueUpdate {
+  object_pointer: ObjectPointer;
+  update_type: KeyValueUpdateType;
+  required_revision: ObjectRevision;
+  requirements: [KVReq];
+  timestamp: long;
+}
+
+enum LocalTimeRequirementEnum:byte {
+  LessThan,
+  GreaterThan
+}
+
+
+table LocalTimeRequirement {
+  timestamp: long;
+  requirement: LocalTimeRequirementEnum;
+}
+
+table TransactionRequirement {
+  data_update: DataUpdate;
+  refcount_update: RefcountUpdate;
+  version_bump: VersionBump;
+  revision_lock: RevisionLock;
+  kv_update: KeyValueUpdate;
+  localtime: LocalTimeRequirement;
+}
+
+table SerializedFinalizationAction {
+  type_uuid: UUID;
+  data: [byte];
+}
+
+table TransactionDescription {
+  transaction_uuid: UUID;
+  start_timestamp: long;
+  primary_object: ObjectPointer;
+  designated_leader_uid: byte;
+  requirements: [TransactionRequirement];
+  finalization_actions: [SerializedFinalizationAction];
+  originating_client: [byte];
+  notify_on_resolution: [DataStoreID];
+  notes: [byte];
+}
+
+//---------------------------------------------------------------------------
+//- Transaction Messages
+//---------------------------------------------------------------------------
+struct ProposalID {
+  number: int;
+  uid: byte;
+}
+
+table DataStoreID {
+  storage_pool_uuid: UUID;
+  storage_pool_index: byte;
+}
+
+enum TxPrepareResponseType:byte {
+  Promise,
+  Nack
+}
+
+table UpdateErrorResponse {
+  object_uuid: UUID;
+  update_error: UpdateError;
+  current_revision: ObjectRevision;
+  current_refcount: ObjectRefcount;
+  colliding_transaction: [byte]; // 16-byte UUID + 8-byte timestamp
+}
+
+table TxPrepare {
+  to: DataStoreID;
+  from: DataStoreID;
+  txd: TransactionDescription;
+  proposal_id: ProposalID;
+}
+
+table TxPrepareResponse {
+  to: DataStoreID;
+  from: DataStoreID;
+  transaction_uuid: UUID;
+  response_type: TxPrepareResponseType;
+  proposal_id: ProposalID;
+  promised_id: ProposalID;      // Valid for Nack responses
+  last_accepted_id: ProposalID; // Valid for Promise responses
+  last_accepted_value: bool;    // Valid for Promise responses
+  disposition: TransactionDisposition;
+  errors: [UpdateErrorResponse];
+}
+
+table TxAccept {
+  to: DataStoreID;
+  from: DataStoreID;
+  transaction_uuid: UUID;
+  proposal_id: ProposalID;
+  value: bool;
+}
+
+table TxAcceptResponse {
+  to: DataStoreID;
+  from: DataStoreID;
+  transaction_uuid: UUID;
+  proposal_id: ProposalID;
+  is_nack: bool;
+  promised_id: ProposalID;      // Valid for Nack responses
+  value: bool;                  // Valid for Accepted responses
+}
+
+table TxResolved {
+  to: DataStoreID;
+  from: DataStoreID;
+  transaction_uuid: UUID;
+  committed: bool;
+}
+
+table TxCommitted {
+  to: DataStoreID;
+  from: DataStoreID;
+  transaction_uuid: UUID;
+  object_commit_errors: [byte]; // sequence of 16-byte UUIDs
+}
+
+table TxFinalized {
+  to: DataStoreID;
+  from: DataStoreID;
+  transaction_uuid: UUID;
+  committed: bool;
+}
+
+table TxHeartbeat {
+   to: DataStoreID;
+   from: DataStoreID;
+   transaction_uuid: UUID;
+}
+
+table TxStatusRequest {
+   to: DataStoreID;
+   from: DataStoreID;
+   transaction_uuid: UUID;
+   request_uuid: UUID;
+}
+
+table TxStatusResponse {
+   to: DataStoreID;
+   from: DataStoreID;
+   transaction_uuid: UUID;
+   request_uuid: UUID;
+   status: TransactionStatus;
+   have_status: bool;
+   is_finalized: bool;
+}
+
+//---------------------------------------------------------------------------
+//- Read Messages
+//---------------------------------------------------------------------------
+enum ObjectReadError:byte
+{ 
+    ObjectMismatch,    
+    InvalidLocalPointer,
+    CorruptedObject
+}
+
+enum LockType:byte
+{
+  RevisionWriteLock,
+  RevisionReadLock,
+  RefcountWriteLock,
+  RefcountReadLock
+}
+
+enum KeyComparison:byte
+{
+  ByteArray,
+  Integer,
+  Lexical
+}
+
+enum ReadType:byte {
+  MetadataOnly,
+  FullObject,
+  ByteRange,
+  SingleKey,
+  LargestKeyLessThan,
+  LargestKeyLessThanOrEqualTo,
+  KeyRange,
+}
+
+table Lock {
+   type: LockType;
+   txd: TransactionDescription;
+}
+
+table Read {
+   toStore: DataStoreID;
+   fromClient: [byte];
+   readUUID: UUID;
+   objectPointer: ObjectPointer;
+   readType: ReadType;
+   key: [byte];
+   min: [byte];
+   max: [byte];
+   comparison: KeyComparison;
+   offset: int;
+   length: int;
+}
+
+table ReadResponse {
+  fromStore: DataStoreID;
+  readUUID: UUID;
+  revision: ObjectRevision;
+  refcount: ObjectRefcount;
+  timestamp: long;
+  readTime: long;
+  sizeOnStore: int;
+  haveData: bool;
+  objectData: [byte];
+  lockedWriteTransactions: [byte]; // Sequence of UUIDs
+  readError: ObjectReadError;
+}
+    
+table OpportunisticRebuild {
+   toStore: DataStoreID;
+   fromClient: [byte];
+   pointer: ObjectPointer;
+   revision: ObjectRevision;
+   refcount: ObjectRefcount;
+   timestamp: long;
+   data: [byte];
+}
+
+table TransactionCompletionQuery {
+  toStore: DataStoreID;
+  fromClient: [byte];
+  queryUUID: UUID;
+  transactionUUID: UUID;
+}
+
+table TransactionCompletionResponse {
+  fromStore: DataStoreID;
+  queryUUID: UUID;
+  isComplete: bool;
+}
+
+//---------------------------------------------------------------------------
+//- Allocation Messages
+//---------------------------------------------------------------------------
+
+table Allocate {
+  toStore: DataStoreID;
+  fromClient: [byte];
+  newObjectUUID: UUID;
+  objectType: ObjectType;
+  objectSize: int;
+  initialRefcount: ObjectRefcount;
+  objectData: [byte];
+  timestamp: long;
+  allocationTransactionUUID: UUID;
+  allocatingObject: ObjectPointer;
+  allocatingObjectRevision: ObjectRevision;
+  allocatingObjectKey: [byte];
+  isKeyGuard: bool;
+}
+
+enum AllocationError:byte {
+  InsufficientSpace
+}
+
+table AllocateResponseAllocated {
+  
+  storePointer: StorePointer;
+}
+
+table AllocateResponse {
+  fromStoreID: DataStoreID;
+  allocationTransactionUUID: UUID;
+  newObjectUUID: UUID;
+  allocatedStorePointer: StorePointer;
+  resultError: AllocationError;
+}
+
+table AllocationStatusRequest {
+   to: DataStoreID;
+   from: DataStoreID;
+   primaryObject: ObjectPointer;
+   allocationTransactionUUID: UUID;
+   newObjectUUID: UUID;
+}
+
+table AllocationStatusReply {
+   to: DataStoreID;
+   from: DataStoreID;
+   allocation_transaction_uuid: UUID;
+   newObjectUUID: UUID;
+   known: byte; // 1 if transaction is known. 0 if not
+   transactionStatus: TransactionStatus;
+   objectStatus: AllocationObjectStatus;
+}
+
+table AllocationObjectStatus {
+  objectUUID: UUID;
+  readError: ObjectReadError;
+  revision: ObjectRevision;
+  refcount: ObjectRefcount;
+  locks: [Lock];
+}
+
+
+//---------------------------------------------------------------------------
+//- Root Message
+//---------------------------------------------------------------------------
+table Message {
+  prepare: TxPrepare;
+  prepare_response: TxPrepareResponse;
+  accept: TxAccept;
+  accept_response: TxAcceptResponse;
+  resolved: TxResolved;
+  committed: TxCommitted;
+  finalized: TxFinalized;
+  heartbeat: TxHeartbeat;
+  allocate: Allocate;
+  allocate_response: AllocateResponse;
+  allocateStatus: AllocationStatusRequest;
+  allocateStatusResponse: AllocationStatusReply;
+  read: Read;
+  read_response: ReadResponse;
+  opportunisticRebuild: OpportunisticRebuild;
+  transactionCompletionQuery: TransactionCompletionQuery;
+  transactionCompletionResponse: TransactionCompletionResponse;
+}
+
+root_type Message;

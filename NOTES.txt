@@ -1,0 +1,9 @@
+* Port the flatbuffers encoding.
+
+* Use encoding for TXD on recovery only
+    |-> CRL always uses serialized variant (no need to ever use the content, keep serialized)
+    |-> Simplifies testing too
+
+* When pruning, add all pruned Tx/Alloc to a separate list
+* Then on loop, pull all items from this list before looking at the new items from the concurrent queue
+** Allows for easy interleaving between streams and eliminates file size problems

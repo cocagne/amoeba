@@ -1,11 +1,5 @@
 
-package com.ibm.amoeba
 
+package object amoeba {
 
-object amoeba {
-  
-
-  def main(args: Array[String]): Unit = {
-    println("Hello, world2!")
-  }
 }
