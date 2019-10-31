@@ -3,7 +3,7 @@ package com.ibm.amoeba.server.crl.sweeper
 import com.ibm.amoeba.common.store.StoreId
 import com.ibm.amoeba.common.transaction.TransactionId
 
-final class TxId(val storeId: StoreId, val transactionId: TransactionId) {
+final case class TxId(storeId: StoreId, transactionId: TransactionId) {
 
   override def equals(other: Any): Boolean = {
     other match {

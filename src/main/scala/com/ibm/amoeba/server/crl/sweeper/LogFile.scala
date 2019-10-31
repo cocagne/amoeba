@@ -55,7 +55,7 @@ class LogFile(path: Path, val fileId: FileId, val maxSize: Long) {
       val testUUID = readUUID(offset - 16)
 
       if (testUUID == fileUUID) {
-        val entryOffset = offset - Entry.StaticEntrySize
+        val entryOffset = offset - Entry.StaticEntryFooterSize
         val bb = ByteBuffer.allocate(8)
         channel.read(bb, entryOffset)
         bb.position(0)

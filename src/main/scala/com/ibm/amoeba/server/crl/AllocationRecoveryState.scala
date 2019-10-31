@@ -3,7 +3,7 @@ package com.ibm.amoeba.server.crl
 import java.util.UUID
 
 import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp}
-import com.ibm.amoeba.common.objects.{AllocationRevisionGuard, ObjectRefcount, ObjectType}
+import com.ibm.amoeba.common.objects.{ObjectRefcount, ObjectType}
 import com.ibm.amoeba.common.store.{StoreId, StorePointer}
 import com.ibm.amoeba.common.transaction.TransactionId
 
@@ -17,5 +17,5 @@ case class AllocationRecoveryState(
                                     initialRefcount: ObjectRefcount,
                                     timestamp: HLCTimestamp,
                                     allocationTransactionId: TransactionId,
-                                    revisionGuard: AllocationRevisionGuard
+                                    serializedRevisionGuard: DataBuffer
                                   )

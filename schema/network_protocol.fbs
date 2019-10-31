@@ -66,30 +66,9 @@ enum TransactionDisposition:byte {
     VoteAbort
 }
 
-enum UpdateError:byte
-{
-    MissingUpdateData, 
-    ObjectMismatch,    
-    InvalidLocalPointer,
-    RevisionMismatch,
-    RefcountMismatch,
-    TransactionCollision,
-    RebuildCollision,
-    CorruptedObject,
-    InsufficientFreeSpace,
-    InvalidObjectType,
-    KeyValueRequirementError,
-    TransactionTimestampError,
-    LocalTimeError
-}
-
 enum DataUpdateOperation:byte {
   Append,
   Overwrite
-}
-
-enum KeyValueUpdateType:byte {
-  Update
 }
 
 enum KeyValueTimestampRequirementEnum:byte {
@@ -129,7 +108,6 @@ table KVReq {
 
 table KeyValueUpdate {
   object_pointer: ObjectPointer;
-  update_type: KeyValueUpdateType;
   required_revision: ObjectRevision;
   requirements: [KVReq];
   timestamp: long;
@@ -168,7 +146,7 @@ table TransactionDescription {
   requirements: [TransactionRequirement];
   finalization_actions: [SerializedFinalizationAction];
   originating_client: [byte];
-  notify_on_resolution: [DataStoreID];
+  notify_on_resolution: [StoreId];
   notes: [byte];
 }
 
@@ -180,7 +158,7 @@ struct ProposalID {
   uid: byte;
 }
 
-table DataStoreID {
+table StoreId {
   storage_pool_uuid: UUID;
   storage_pool_index: byte;
 }
@@ -190,24 +168,16 @@ enum TxPrepareResponseType:byte {
   Nack
 }
 
-table UpdateErrorResponse {
-  object_uuid: UUID;
-  update_error: UpdateError;
-  current_revision: ObjectRevision;
-  current_refcount: ObjectRefcount;
-  colliding_transaction: [byte]; // 16-byte UUID + 8-byte timestamp
-}
-
 table TxPrepare {
-  to: DataStoreID;
-  from: DataStoreID;
+  to: StoreId;
+  from: StoreId;
   txd: TransactionDescription;
   proposal_id: ProposalID;
 }
 
 table TxPrepareResponse {
-  to: DataStoreID;
-  from: DataStoreID;
+  to: StoreId;
+  from: StoreId;
   transaction_uuid: UUID;
   response_type: TxPrepareResponseType;
   proposal_id: ProposalID;
@@ -215,20 +185,19 @@ table TxPrepareResponse {
   last_accepted_id: ProposalID; // Valid for Promise responses
   last_accepted_value: bool;    // Valid for Promise responses
   disposition: TransactionDisposition;
-  errors: [UpdateErrorResponse];
 }
 
 table TxAccept {
-  to: DataStoreID;
-  from: DataStoreID;
+  to: StoreId;
+  from: StoreId;
   transaction_uuid: UUID;
   proposal_id: ProposalID;
   value: bool;
 }
 
 table TxAcceptResponse {
-  to: DataStoreID;
-  from: DataStoreID;
+  to: StoreId;
+  from: StoreId;
   transaction_uuid: UUID;
   proposal_id: ProposalID;
   is_nack: bool;
@@ -237,42 +206,42 @@ table TxAcceptResponse {
 }
 
 table TxResolved {
-  to: DataStoreID;
-  from: DataStoreID;
+  to: StoreId;
+  from: StoreId;
   transaction_uuid: UUID;
   committed: bool;
 }
 
 table TxCommitted {
-  to: DataStoreID;
-  from: DataStoreID;
+  to: StoreId;
+  from: StoreId;
   transaction_uuid: UUID;
   object_commit_errors: [byte]; // sequence of 16-byte UUIDs
 }
 
 table TxFinalized {
-  to: DataStoreID;
-  from: DataStoreID;
+  to: StoreId;
+  from: StoreId;
   transaction_uuid: UUID;
   committed: bool;
 }
 
 table TxHeartbeat {
-   to: DataStoreID;
-   from: DataStoreID;
+   to: StoreId;
+   from: StoreId;
    transaction_uuid: UUID;
 }
 
 table TxStatusRequest {
-   to: DataStoreID;
-   from: DataStoreID;
+   to: StoreId;
+   from: StoreId;
    transaction_uuid: UUID;
    request_uuid: UUID;
 }
 
 table TxStatusResponse {
-   to: DataStoreID;
-   from: DataStoreID;
+   to: StoreId;
+   from: StoreId;
    transaction_uuid: UUID;
    request_uuid: UUID;
    status: TransactionStatus;
@@ -321,7 +290,7 @@ table Lock {
 }
 
 table Read {
-   toStore: DataStoreID;
+   toStore: StoreId;
    fromClient: [byte];
    readUUID: UUID;
    objectPointer: ObjectPointer;
@@ -335,7 +304,7 @@ table Read {
 }
 
 table ReadResponse {
-  fromStore: DataStoreID;
+  fromStore: StoreId;
   readUUID: UUID;
   revision: ObjectRevision;
   refcount: ObjectRefcount;
@@ -349,7 +318,7 @@ table ReadResponse {
 }
     
 table OpportunisticRebuild {
-   toStore: DataStoreID;
+   toStore: StoreId;
    fromClient: [byte];
    pointer: ObjectPointer;
    revision: ObjectRevision;
@@ -359,14 +328,14 @@ table OpportunisticRebuild {
 }
 
 table TransactionCompletionQuery {
-  toStore: DataStoreID;
+  toStore: StoreId;
   fromClient: [byte];
   queryUUID: UUID;
   transactionUUID: UUID;
 }
 
 table TransactionCompletionResponse {
-  fromStore: DataStoreID;
+  fromStore: StoreId;
   queryUUID: UUID;
   isComplete: bool;
 }
@@ -376,7 +345,7 @@ table TransactionCompletionResponse {
 //---------------------------------------------------------------------------
 
 table Allocate {
-  toStore: DataStoreID;
+  toStore: StoreId;
   fromClient: [byte];
   newObjectUUID: UUID;
   objectType: ObjectType;
@@ -401,7 +370,7 @@ table AllocateResponseAllocated {
 }
 
 table AllocateResponse {
-  fromStoreID: DataStoreID;
+  fromStoreID: StoreId;
   allocationTransactionUUID: UUID;
   newObjectUUID: UUID;
   allocatedStorePointer: StorePointer;
@@ -409,16 +378,16 @@ table AllocateResponse {
 }
 
 table AllocationStatusRequest {
-   to: DataStoreID;
-   from: DataStoreID;
+   to: StoreId;
+   from: StoreId;
    primaryObject: ObjectPointer;
    allocationTransactionUUID: UUID;
    newObjectUUID: UUID;
 }
 
 table AllocationStatusReply {
-   to: DataStoreID;
-   from: DataStoreID;
+   to: StoreId;
+   from: StoreId;
    allocation_transaction_uuid: UUID;
    newObjectUUID: UUID;
    known: byte; // 1 if transaction is known. 0 if not
