@@ -5,6 +5,8 @@ import java.nio.channels.FileChannel
 import java.nio.file.{Path, StandardOpenOption}
 import java.util.UUID
 
+import com.ibm.amoeba.common.DataBuffer
+
 class LogFile(path: Path, val fileId: FileId, val maxSize: Long) {
 
   private val channel = FileChannel.open(path,
@@ -19,12 +21,28 @@ class LogFile(path: Path, val fileId: FileId, val maxSize: Long) {
 
   channel.position(channel.size)
 
-  private var fileUUID = readUUID(0)
+  var fileUUID: UUID = readUUID(0)
 
   def size: Long = channel.size()
 
   def write(buffers: Array[ByteBuffer]): Unit = {
     channel.write(buffers)
+  }
+
+  def read(offset: Long, nbytes: Int): ByteBuffer = {
+    if (offset + nbytes > size)
+      throw new CorruptedEntry(s"Invalid File Location. Exceeds File Size offset $offset, nbytes $nbytes")
+    val arr = new Array[Byte](nbytes)
+    val bb = ByteBuffer.wrap(arr)
+    channel.read(bb, offset)
+    DataBuffer(arr)
+  }
+
+  def read(offset: Long, arr: Array[Byte]): Unit = {
+    if (offset + arr.length > size)
+      throw new CorruptedEntry(s"Invalid File Location. Exceeds File Size offset $offset, nbytes ${arr.length}")
+    val bb = ByteBuffer.wrap(arr)
+    channel.read(bb, offset)
   }
 
   private def readUUID(pos: Long): UUID = {

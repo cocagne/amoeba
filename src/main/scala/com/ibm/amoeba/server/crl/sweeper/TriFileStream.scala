@@ -2,6 +2,7 @@ package com.ibm.amoeba.server.crl.sweeper
 
 import java.nio.ByteBuffer
 import java.nio.file.Path
+import java.util.UUID
 
 private sealed abstract class Index {
   val index: Int
@@ -16,27 +17,21 @@ private object Two extends Index {
   val index: Int = 2
 }
 
-object TriFileStream {
 
-  def createLogFile(directory: Path, fileId: FileId, maxSize: Long): LogFile = {
-    new LogFile(directory.resolve(s"${fileId.number}"), fileId, maxSize)
-  }
+class TriFileStream(file0: LogFile, file1: LogFile, file2: LogFile) {
 
-}
-
-class TriFileStream(directory: Path, startingFileId: FileId, val maxSize: Long) {
-  import TriFileStream._
+  val maxSize: Long = file0.maxSize
 
   val files = new Array[LogFile](3)
-  files(0) = createLogFile(directory, startingFileId, maxSize)
-  files(1) = createLogFile(directory, new FileId(startingFileId.number + 1), maxSize)
-  files(2) = createLogFile(directory, new FileId(startingFileId.number + 2), maxSize)
+  files(0) = file0
+  files(1) = file1
+  files(2) = file2
 
   private var active: Index = Zero
 
   {
     var highest = files(0).findLastValidEntry() match {
-      case None => new LogEntrySerialNumber(0)
+      case None => LogEntrySerialNumber(0)
       case Some(n) => n._1
     }
     highest = files(1).findLastValidEntry() match {
@@ -59,13 +54,15 @@ class TriFileStream(directory: Path, startingFileId: FileId, val maxSize: Long) 
     }
   }
 
-  def status(): (FileId, Long) = {
+  def status(): (FileId, UUID) = {
     val f = files(active.index)
-    (f.fileId, f.size)
+    (f.fileId, f.fileUUID)
   }
 
-  def write(buffers: Array[ByteBuffer]): Unit = {
+  /// Returns true if the files should be rotated
+  def write(buffers: Array[ByteBuffer]): Boolean = {
     files(active.index).write(buffers)
+    files(active.index).size < maxSize - 4096*2
   }
 
   def rotateFiles(): FileId = {

@@ -4,15 +4,15 @@ import java.nio.ByteBuffer
 import java.util.UUID
 
 import com.ibm.amoeba.common.objects.ObjectType
-import com.ibm.amoeba.common.paxos.ProposalId
 import com.ibm.amoeba.common.transaction.TransactionDisposition
+import com.ibm.amoeba.server.crl.{SaveCompletion, CrashRecoveryLogClient, TxSaveId}
 
 import scala.collection.immutable.HashMap
 
-class Entry(val fileId: FileId, val maxSize: Int, initialFileSize: Long) {
+class Entry(val maxSize: Int, initialFileSize: Long) {
   import Entry._
 
-  var requests: HashMap[TxId, Completion] = new HashMap()
+  var requests: HashMap[TxId, SaveCompletion] = new HashMap()
   var txs: HashMap[TxId, Tx] = new HashMap()
   var txDeletions: List[TxId] = Nil
   var allocations: List[Alloc] = Nil
@@ -22,10 +22,18 @@ class Entry(val fileId: FileId, val maxSize: Int, initialFileSize: Long) {
   var offset: Long = initialFileSize
   private var full: Boolean = haveRoomFor(SubEntry(0, 4096))
 
+  var txSaveRequests: List[(CrashRecoveryLogClient, TxId, TxSaveId)] = Nil
+  var allocSaveRequests: List[(CrashRecoveryLogClient, TxId)] = Nil
+
+  def isEmpty: Boolean = {
+    txs.isEmpty && allocations.isEmpty && txDeletions.isEmpty && allocDeletions.isEmpty
+  }
+
   def commit(serial: LogEntrySerialNumber,
              earliestNeeded: LogEntrySerialNumber,
              fileUUID: UUID,
-             previousEntryLocation: FileLocation): Array[ByteBuffer] = {
+             fileId: FileId,
+             previousEntryFooterLocation: FileLocation): (Array[ByteBuffer], FileLocation) = {
 
     val padding = padTo4kAlignment(offset, dataSize, entrySize)
     val entryBuffer = ByteBuffer.allocate(entrySize + padding)
@@ -46,10 +54,6 @@ class Entry(val fileId: FileId, val maxSize: Int, initialFileSize: Long) {
       entryBuffer.putShort(loc.fileId.number.asInstanceOf[Short])
       entryBuffer.putLong(loc.offset)
       entryBuffer.putInt(loc.length)
-    }
-    def putProposalId(p: ProposalId): Unit = {
-      entryBuffer.putInt(p.number)
-      entryBuffer.put(p.peer)
     }
 
     // Transaction Entry
@@ -155,7 +159,7 @@ class Entry(val fileId: FileId, val maxSize: Int, initialFileSize: Long) {
       putTxId(TxId(alloc.state.storeId, alloc.state.allocationTransactionId))
       entryBuffer.putInt(alloc.state.storePointer.encodedSize())
       entryBuffer.put(alloc.state.storePointer.encode())
-      putUUID(alloc.state.newObjectUUID)
+      putUUID(alloc.state.newObjectId.uuid)
       val kind = alloc.state.objectType match {
         case ObjectType.Data => 0
         case ObjectType.KeyValue => 1
@@ -192,7 +196,7 @@ class Entry(val fileId: FileId, val maxSize: Int, initialFileSize: Long) {
     entryBuffer.putInt(allocations.size)
     entryBuffer.putInt(txDeletions.size)
     entryBuffer.putInt(allocDeletions.size)
-    putFileLocation(previousEntryLocation)
+    putFileLocation(previousEntryFooterLocation)
     putUUID(fileUUID)
 
     entryBuffer.position(0)
@@ -201,7 +205,7 @@ class Entry(val fileId: FileId, val maxSize: Int, initialFileSize: Long) {
 
     offset += buffers.foldLeft(0L){ (sz, b) => sz + b.remaining() }
 
-    buffers.reverse.toArray
+    (buffers.reverse.toArray, FileLocation(fileId, entryOffset, StaticEntryFooterSize))
   }
 
   def isFull: Boolean = {
@@ -243,8 +247,12 @@ class Entry(val fileId: FileId, val maxSize: Int, initialFileSize: Long) {
 
   def allocDeleteSize(): SubEntry = SubEntry(0, TxidSize)
 
-  def addTransaction(tx: Tx): Boolean = {
+  def addTransaction(tx: Tx, req: Option[(CrashRecoveryLogClient, TxSaveId)]): Boolean = {
+
     if (txs.contains(tx.id)) {
+      req.foreach { t =>
+        txSaveRequests = (t._1, tx.id, t._2) :: txSaveRequests
+      }
       true
     } else {
       val sub = txWriteSize(tx)
@@ -252,6 +260,9 @@ class Entry(val fileId: FileId, val maxSize: Int, initialFileSize: Long) {
         dataSize += sub.dataSize
         entrySize += sub.entrySize
         txs += (tx.id -> tx)
+        req.foreach { t =>
+          txSaveRequests = (t._1, tx.id, t._2) :: txSaveRequests
+        }
         true
       } else {
         full = true
@@ -260,12 +271,15 @@ class Entry(val fileId: FileId, val maxSize: Int, initialFileSize: Long) {
     }
   }
 
-  def addAllocation(alloc: Alloc): Boolean = {
+  def addAllocation(alloc: Alloc, req: Option[(CrashRecoveryLogClient, TxId)]): Boolean = {
     val sub = allocWriteSize(alloc)
     if (haveRoomFor(sub)) {
       dataSize += sub.dataSize
       entrySize += sub.entrySize
       allocations = alloc :: allocations
+      req.foreach { t =>
+        allocSaveRequests = t :: allocSaveRequests
+      }
       true
     } else {
       full = true
