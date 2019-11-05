@@ -4,7 +4,11 @@ import com.ibm.amoeba.common.objects.ObjectId
 import com.ibm.amoeba.common.store.StoreId
 import com.ibm.amoeba.common.transaction.TransactionId
 
-sealed abstract class SaveCompletion
+sealed abstract class SaveCompletion {
+  val clientId: CrashRecoveryLogClient
+  val storeId: StoreId
+  val transactionId: TransactionId
+}
 
 case class TxSaveComplete( clientId: CrashRecoveryLogClient,
                            storeId: StoreId,

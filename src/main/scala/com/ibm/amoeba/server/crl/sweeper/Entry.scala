@@ -5,14 +5,14 @@ import java.util.UUID
 
 import com.ibm.amoeba.common.objects.ObjectType
 import com.ibm.amoeba.common.transaction.TransactionDisposition
-import com.ibm.amoeba.server.crl.{SaveCompletion, CrashRecoveryLogClient, TxSaveId}
+import com.ibm.amoeba.server.crl.{AllocSaveComplete, CrashRecoveryLogClient, SaveCompletion, TxSaveComplete, TxSaveId}
 
 import scala.collection.immutable.HashMap
 
-class Entry(val maxSize: Int, initialFileSize: Long) {
+class Entry(val maxSize: Long, initialFileSize: Long) {
   import Entry._
 
-  var requests: HashMap[TxId, SaveCompletion] = new HashMap()
+  private var completions: List[SaveCompletion] = Nil
   var txs: HashMap[TxId, Tx] = new HashMap()
   var txDeletions: List[TxId] = Nil
   var allocations: List[Alloc] = Nil
@@ -20,10 +20,7 @@ class Entry(val maxSize: Int, initialFileSize: Long) {
   var entrySize: Int = StaticEntryFooterSize
   var dataSize: Long = 0
   var offset: Long = initialFileSize
-  private var full: Boolean = haveRoomFor(SubEntry(0, 4096))
-
-  var txSaveRequests: List[(CrashRecoveryLogClient, TxId, TxSaveId)] = Nil
-  var allocSaveRequests: List[(CrashRecoveryLogClient, TxId)] = Nil
+  private var full: Boolean = !haveRoomFor(SubEntry(0, 4096))
 
   def isEmpty: Boolean = {
     txs.isEmpty && allocations.isEmpty && txDeletions.isEmpty && allocDeletions.isEmpty
@@ -33,7 +30,7 @@ class Entry(val maxSize: Int, initialFileSize: Long) {
              earliestNeeded: LogEntrySerialNumber,
              fileUUID: UUID,
              fileId: FileId,
-             previousEntryFooterLocation: FileLocation): (Array[ByteBuffer], FileLocation) = {
+             previousEntryFooterLocation: FileLocation): (Array[ByteBuffer], List[SaveCompletion], FileLocation) = {
 
     val padding = padTo4kAlignment(offset, dataSize, entrySize)
     val entryBuffer = ByteBuffer.allocate(entrySize + padding)
@@ -205,7 +202,15 @@ class Entry(val maxSize: Int, initialFileSize: Long) {
 
     offset += buffers.foldLeft(0L){ (sz, b) => sz + b.remaining() }
 
-    (buffers.reverse.toArray, FileLocation(fileId, entryOffset, StaticEntryFooterSize))
+    txs = txs.empty
+    allocations = Nil
+    txDeletions = Nil
+    allocDeletions = Nil
+
+    val clist = completions
+    completions = Nil
+
+    (buffers.reverse.toArray, clist, FileLocation(fileId, entryOffset, StaticEntryFooterSize))
   }
 
   def isFull: Boolean = {
@@ -247,11 +252,13 @@ class Entry(val maxSize: Int, initialFileSize: Long) {
 
   def allocDeleteSize(): SubEntry = SubEntry(0, TxidSize)
 
-  def addTransaction(tx: Tx, req: Option[(CrashRecoveryLogClient, TxSaveId)]): Boolean = {
+  def addTransaction(tx: Tx,
+                     contentQueue: LogContentQueue,
+                     req: Option[(CrashRecoveryLogClient, TxSaveId)]): Boolean = {
 
     if (txs.contains(tx.id)) {
       req.foreach { t =>
-        txSaveRequests = (t._1, tx.id, t._2) :: txSaveRequests
+        completions = TxSaveComplete(t._1, tx.id.storeId, tx.id.transactionId, t._2) :: completions
       }
       true
     } else {
@@ -260,8 +267,9 @@ class Entry(val maxSize: Int, initialFileSize: Long) {
         dataSize += sub.dataSize
         entrySize += sub.entrySize
         txs += (tx.id -> tx)
+        contentQueue.moveToHead(tx)
         req.foreach { t =>
-          txSaveRequests = (t._1, tx.id, t._2) :: txSaveRequests
+          completions = TxSaveComplete(t._1, tx.id.storeId, tx.id.transactionId, t._2) :: completions
         }
         true
       } else {
@@ -271,14 +279,19 @@ class Entry(val maxSize: Int, initialFileSize: Long) {
     }
   }
 
-  def addAllocation(alloc: Alloc, req: Option[(CrashRecoveryLogClient, TxId)]): Boolean = {
+  def addAllocation(alloc: Alloc,
+                    contentQueue: LogContentQueue,
+                    req: Option[(CrashRecoveryLogClient, TxId)]): Boolean = {
+
     val sub = allocWriteSize(alloc)
     if (haveRoomFor(sub)) {
       dataSize += sub.dataSize
       entrySize += sub.entrySize
       allocations = alloc :: allocations
+      contentQueue.moveToHead(alloc)
       req.foreach { t =>
-        allocSaveRequests = t :: allocSaveRequests
+        val txid = t._2
+        completions = AllocSaveComplete(t._1, txid.transactionId, txid.storeId, alloc.state.newObjectId) :: completions
       }
       true
     } else {

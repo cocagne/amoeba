@@ -1,7 +1,11 @@
 package com.ibm.amoeba.server.crl.sweeper
 
-case class LogEntrySerialNumber(number: Long) extends AnyVal {
+case class LogEntrySerialNumber(number: Long) extends Ordered[LogEntrySerialNumber] {
   def next(): LogEntrySerialNumber = {
-    new LogEntrySerialNumber(number + 1)
+    LogEntrySerialNumber(number + 1)
+  }
+
+  def compare(that: LogEntrySerialNumber): Int = {
+    (this.number - that.number).asInstanceOf[Int]
   }
 }

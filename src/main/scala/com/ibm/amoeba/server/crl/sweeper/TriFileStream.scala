@@ -1,7 +1,6 @@
 package com.ibm.amoeba.server.crl.sweeper
 
 import java.nio.ByteBuffer
-import java.nio.file.Path
 import java.util.UUID
 
 private sealed abstract class Index {
@@ -52,6 +51,10 @@ class TriFileStream(file0: LogFile, file1: LogFile, file2: LogFile) {
       else
         highest
     }
+  }
+
+  def activeFileSize(): Long = {
+    files(active.index).size
   }
 
   def status(): (FileId, UUID) = {
