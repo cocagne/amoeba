@@ -27,7 +27,10 @@ class Entry(val maxSize: Long, initialFileSize: Long) {
     full
   }
 
-  private[sweeper] def setOffset(newOffset: Long): Unit = offset = newOffset
+  private[sweeper] def rotated(): Unit = {
+    full = false
+    offset = 16
+  }
 
   def isEmpty: Boolean = {
     txs.isEmpty && allocations.isEmpty && txDeletions.isEmpty && allocDeletions.isEmpty
@@ -43,12 +46,14 @@ class Entry(val maxSize: Long, initialFileSize: Long) {
              fileId: FileId,
              previousEntryFooterLocation: FileLocation): (Array[ByteBuffer], List[SaveCompletion], FileLocation) = {
 
-    staticSize += StaticEntryFooterSize // Add space for the static footer at the end of the buffer
+    val padding = padTo4kAlignment(offset, dataSize, staticSize + StaticEntryFooterSize)
 
-    val padding = padTo4kAlignment(offset, dataSize, staticSize)
-
-    val entryBuffer = ByteBuffer.allocate(staticSize + padding)
+    val entryBuffer = ByteBuffer.allocate(staticSize + padding + StaticEntryFooterSize)
     val entryOffset = offset + dataSize
+    val footerOffset = entryOffset + staticSize + padding
+
+    //println(s"offset $offset entry offset $entryOffset staticSize $staticSize padding $padding footer $footerOffset. Footer size $StaticEntryFooterSize")
+
     var buffers: List[ByteBuffer] = Nil
     var off = offset
 
@@ -168,6 +173,7 @@ class Entry(val maxSize: Long, initialFileSize: Long) {
     //     timestamp: HLCTimestamp, 8
     //     serialized_revision_guard: DataBuffer <== 4 + nbytes
     //
+
     allocations.foreach { alloc =>
       alloc.lastEntrySerial = serial
 
@@ -183,8 +189,8 @@ class Entry(val maxSize: Long, initialFileSize: Long) {
       }
 
       putTxId(TxId(alloc.state.storeId, alloc.state.allocationTransactionId))
-      entryBuffer.putInt(alloc.state.storePointer.encodedSize())
-      entryBuffer.put(alloc.state.storePointer.encode())
+      entryBuffer.putInt(alloc.state.storePointer.data.length)
+      entryBuffer.put(alloc.state.storePointer.data)
       putUUID(alloc.state.newObjectId.uuid)
       val kind = alloc.state.objectType match {
         case ObjectType.Data => 0
@@ -226,6 +232,7 @@ class Entry(val maxSize: Long, initialFileSize: Long) {
     putFileLocation(previousEntryFooterLocation)
     putUUID(fileUUID)
 
+    //println(s"Write serial $serial ntx ${txs.size} nall ${allocations.size} ntxd ${txDeletions.size} ad ${allocDeletions.size}")
     entryBuffer.position(0)
 
     buffers = entryBuffer :: buffers
@@ -242,7 +249,10 @@ class Entry(val maxSize: Long, initialFileSize: Long) {
     val clist = completions
     completions = Nil
 
-    (buffers.reverse.toArray, clist, FileLocation(fileId, entryOffset, StaticEntryFooterSize))
+    val entryLocation = FileLocation(fileId, footerOffset, StaticEntryFooterSize)
+
+    //println(s"Entry location for $serial: $entryLocation. Previous loc: $previousEntryFooterLocation")
+    (buffers.reverse.toArray, clist, entryLocation)
   }
 
   def addTransaction(tx: Tx,
@@ -399,7 +409,7 @@ object Entry {
     if (alloc.dataLocation.isEmpty)
       data += alloc.state.objectData.size
 
-    stat += alloc.state.storePointer.encodedSize()
+    stat += alloc.state.storePointer.data.length
     stat += alloc.state.serializedRevisionGuard.size
 
     SubEntry(data, StaticArsSize + stat)

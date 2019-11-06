@@ -253,6 +253,7 @@ class Sweeper(directory: Path,
       }
     } catch {
       case ExitThread => // Exit requested
+      case e => println(s"Error!: $e")
     }
   }
 
@@ -362,6 +363,7 @@ class Sweeper(directory: Path,
                         earliestSerial: Option[Long],
                         lastSerial: LogEntrySerialNumber): Unit = {
 
+    //println(s"Reading log entry file:serial $file:$lastSerial at offset $offset")
     val footer = files(file.number).read(offset, Entry.StaticEntryFooterSize)
     val serial = footer.getLong()
     val entryOffset = footer.getLong()
@@ -371,6 +373,8 @@ class Sweeper(directory: Path,
     val numTxDeletions = footer.getInt()
     val numAllocDeletions = footer.getInt()
     val prevEntryLocation = getFileLocation(footer)
+
+    //println(s"Loading serial $serial ntx $numTx nall $numAlloc ntxd $numTxDeletions nad $numAllocDeletions earliest: $thisEarliest prevEntry: $prevEntryLocation")
 
     val entry = files(file.number).read(entryOffset, (offset - entryOffset).asInstanceOf[Int])
 
@@ -421,9 +425,9 @@ class Sweeper(directory: Path,
     for (_ <- 0 until numAlloc) {
       val txid = getTxId(entry)
       val keep = !state.allocations.contains(txid) && !state.deletedAlloc.contains(txid)
-      val sparr = new Array[Byte](entry.getInt())
+      val spLen = entry.getInt()
+      val sparr = new Array[Byte](spLen)
       entry.get(sparr)
-      val transactionId = TransactionId(getUUID(entry))
       val storePointer = StorePointer(txid.storeId.poolIndex, sparr)
       val id = ObjectId(getUUID(entry))
       val objectType = entry.get() match {
@@ -444,7 +448,7 @@ class Sweeper(directory: Path,
       if (keep) {
         val data = files(dataLoc.fileId.number).read(dataLoc.offset, dataLoc.length)
         val ars = AllocationRecoveryState(txid.storeId, storePointer, id, objectType, size,
-          DataBuffer(data), refcount, timestamp, transactionId, serializedRevisionGuard)
+          DataBuffer(data), refcount, timestamp, txid.transactionId, serializedRevisionGuard)
 
         val alloc = new Alloc(Some(dataLoc), ars, LogEntrySerialNumber(serial))
 

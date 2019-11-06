@@ -20,14 +20,14 @@ class SweeperCRL(sweeper: Sweeper,
   }
 
   override def dropTransactionObjectData(storeId: StoreId, txid: TransactionId): Unit = {
-    DropTxData(TxId(storeId, txid))
+    sweeper.enqueue(DropTxData(TxId(storeId, txid)))
   }
 
   override def deleteTransaction(storeId: StoreId, txid: TransactionId): Unit = {
-    DeleteTx(TxId(storeId, txid))
+    sweeper.enqueue(DeleteTx(TxId(storeId, txid)))
   }
 
   override def deleteAllocation(storeId: StoreId, txid: TransactionId): Unit = {
-    DeleteAlloc(TxId(storeId, txid))
+    sweeper.enqueue(DeleteAlloc(TxId(storeId, txid)))
   }
 }

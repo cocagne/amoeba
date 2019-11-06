@@ -66,7 +66,6 @@ class TriFileStream(maxFileSize: Long, file0: LogFile, file1: LogFile, file2: Lo
 
   /// Returns true if the files should be rotated
   def write(buffers: Array[ByteBuffer]): Unit = {
-    println(s"Writing ${buffers} to file ${files(active.index).fileId}")
     files(active.index).write(buffers)
   }
 
@@ -81,7 +80,7 @@ class TriFileStream(maxFileSize: Long, file0: LogFile, file1: LogFile, file2: Lo
     active = new_active
     files(active.index).resetFile()
 
-    entry.setOffset(16)
+    entry.rotated()
 
     files(retire.index).fileId
   }
