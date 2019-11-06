@@ -69,7 +69,7 @@ class Sweeper(directory: Path,
   private val streams = new Array[TriFileStream](numStreams)
 
   for (i <- streams.indices)
-    streams(i) = new TriFileStream(files(i), files(i+1), files(i+2))
+    streams(i) = new TriFileStream(maxFileSize, files(i), files(i+1), files(i+2))
 
   val contentQueue = new LogContentQueue
 
@@ -92,12 +92,11 @@ class Sweeper(directory: Path,
   private var pendingNotifications = new HashMap[LogEntrySerialNumber, List[SaveCompletion]]
   private var lastNotified: LogEntrySerialNumber = LogEntrySerialNumber(nextEntrySerialNumber.number-1)
 
-  private var threadPool = Executors.newFixedThreadPool(numStreams)
+  private val threadPool = Executors.newFixedThreadPool(numStreams)
 
   for (i <- streams.indices) {
     val stream = streams(i)
-    val entry = new Entry(maxFileSize, stream.activeFileSize())
-    threadPool.submit(new Runnable { override def run(): Unit = ioThread(stream, entry) })
+    threadPool.submit(new Runnable { override def run(): Unit = ioThread(stream) })
   }
 
   def shutdown(): Unit = {
@@ -116,22 +115,19 @@ class Sweeper(directory: Path,
     queue.put(req)
   }
 
-  def ioThread(stream: TriFileStream, entry: Entry): Unit = {
-    var pruneId: Option[FileId] = if (entry.isFull)
+  def ioThread(stream: TriFileStream): Unit = {
+    var pruneId: Option[FileId] = if (stream.entry.isFull)
       Some(stream.rotateFiles())
     else
       None
     var pruned: List[Either[Tx,Alloc]] = Nil
-    println("IOThread Started")
+
     try {
       while (true) {
 
         val (commitBuffers, serial, completions) = synchronized {
 
-          println("IOThread Lock Obtained!")
-
           val serial = nextEntrySerialNumber
-          nextEntrySerialNumber = LogEntrySerialNumber(nextEntrySerialNumber.number + 1)
 
           // Move forward all data stored in the to-be-pruned file
           pruneId.foreach { fileId =>
@@ -162,10 +158,10 @@ class Sweeper(directory: Path,
             }
           }
 
-          while (!entry.isFull && pruned.nonEmpty) {
+          while (!stream.entry.isFull && pruned.nonEmpty) {
             val success = pruned.head match {
-              case Left(tx) => entry.addTransaction(tx, contentQueue, None)
-              case Right(a) => entry.addAllocation(a, contentQueue, None)
+              case Left(tx) => stream.entry.addTransaction(tx, contentQueue, None)
+              case Right(a) => stream.entry.addAllocation(a, contentQueue, None)
             }
             if (success)
               pruned = pruned.tail
@@ -173,17 +169,17 @@ class Sweeper(directory: Path,
 
           // Migrate entries behind the entry window to the front of the queue
           def migrateStaleEntries(oe: Option[LogContent]): Unit = {
-            if (!entry.isFull) {
+            if (!stream.entry.isFull) {
               oe.foreach {
                 case tx: Tx =>
                   if (tx.lastEntrySerial.number < nextEntrySerialNumber.number - maxEarliestWindow) {
-                    entry.addTransaction(tx, contentQueue, None)
+                    stream.entry.addTransaction(tx, contentQueue, None)
                     migrateStaleEntries(contentQueue.tail)
                   }
 
                 case a: Alloc =>
                   if (a.lastEntrySerial.number < nextEntrySerialNumber.number - maxEarliestWindow) {
-                    entry.addAllocation(a, contentQueue, None)
+                    stream.entry.addAllocation(a, contentQueue, None)
                     migrateStaleEntries(contentQueue.tail)
                   }
               }
@@ -194,46 +190,49 @@ class Sweeper(directory: Path,
 
           nextRequest.foreach { req =>
             nextRequest = None
-            handleRequest(req, entry)
+            handleRequest(req, stream.entry)
           }
 
-          println(s"Entering Poll loop: entry is full ${entry.isFull}")
           var wouldBlock = false
 
-          while (!entry.isFull && !wouldBlock) {
+          while (!stream.entry.isFull && !wouldBlock) {
             // read until the entry is full or would block
-            val req = if (entry.isEmpty) {
-              println(s"IoThread waiting on take. Nothing to do")
-              val r = queue.take() // block until we have something to do
-              println("Woke from sleep, took value")
-              r
-            } else {
-              println("Polling")
+            val req = if (stream.entry.isEmpty)
+              queue.take() // block until we have something to do
+            else
               queue.poll(0, TimeUnit.MICROSECONDS)
-            }
 
-            if (req == null) {
+            if (req == null)
               wouldBlock = true
-              println(s"Would block: $wouldBlock")
-            } else
-              handleRequest(req, entry)
+            else
+              handleRequest(req, stream.entry)
           }
 
           val (fileId, fileUUID) = stream.status()
 
-          val (buffers, completions, entryLocation) = entry.commit(serial, earliestNeeded, fileUUID, fileId, lastEntryLocation)
+          val (buffers, completions, entryLocation) = try {
+            val (buffers, completions, entryLocation) = stream.entry.commit(serial, earliestNeeded, fileUUID, fileId, lastEntryLocation)
+            (buffers, completions, entryLocation)
+          } catch {
+            case e: Throwable => throw e
+          }
 
           lastEntryLocation = entryLocation
+
+          nextEntrySerialNumber = LogEntrySerialNumber(nextEntrySerialNumber.number + 1)
 
           (buffers, serial, completions)
         } // End synchronized block
 
-        if (stream.write(commitBuffers)) {
+        stream.write(commitBuffers)
+
+        // If the entry is still full after being written, rotate the files
+        if (stream.entry.isFull) {
           pruneId = Some(stream.rotateFiles())
         }
 
         synchronized {
-          println(s"Num Completions: ${completions.length}. Serial ${serial}")
+
           pendingNotifications += (serial -> completions)
 
           def notify(c: SaveCompletion): Unit = clients.get(c.clientId).foreach(h => h.saveComplete(c))
@@ -300,7 +299,6 @@ class Sweeper(directory: Path,
         nextRequest = Some(req)
 
     case f: GetFullStoreState =>
-      println(s"GETTIN FULL STATE")
       val t = transactions.valuesIterator.filter(tx => tx.state.storeId == f.storeId).map(tx => tx.state).toList
       val a = allocations.valuesIterator.filter(a => a.state.storeId == f.storeId).map(a => a.state).toList
       f.response.put((t,a))
@@ -311,9 +309,9 @@ class Sweeper(directory: Path,
 
   def getFullRecoveryState(storeId: StoreId): (List[TransactionRecoveryState], List[AllocationRecoveryState]) = {
     val responder = new LinkedBlockingQueue[(List[TransactionRecoveryState], List[AllocationRecoveryState])]
-    println("REQUESTING FULL STORE STATE")
+
     enqueue(GetFullStoreState(storeId, responder))
-    println("CLIENT BLOCKING ON TAKE")
+
     responder.take()
   }
 

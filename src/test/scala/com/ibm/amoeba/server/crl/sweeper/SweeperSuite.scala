@@ -51,11 +51,9 @@ class SweeperSuite extends FileBasedTests {
     try {
       val crl = s.createCRL(h)
 
-      println("Saving CRL state")
       crl.save(txid, trs, saveId)
-      println("Awaiting Completion of save")
+
       h.completions.take()
-      println("SAve complete")
 
     } finally {
       e: Throwable =>
@@ -70,6 +68,19 @@ class SweeperSuite extends FileBasedTests {
       val (txs, alloc) = crl.getFullRecoveryState(storeId)
 
       assert(txs.length == 1)
+
+      val t = txs.head
+
+      assert(t.storeId == storeId)
+      assert(t.serializedTxd.asReadOnlyBuffer() == txd.asReadOnlyBuffer())
+      assert(t.objectUpdates.length == 2)
+      assert(t.objectUpdates.head.objectUUID == ou2.objectUUID)
+      assert(t.objectUpdates.head.data.asReadOnlyBuffer() == ou2.data.asReadOnlyBuffer())
+      assert(t.objectUpdates.tail.head.objectUUID == ou1.objectUUID)
+      assert(t.objectUpdates.tail.head.data.asReadOnlyBuffer() == ou1.data.asReadOnlyBuffer())
+      assert(t.disposition == disp)
+      assert(t.status == status)
+      assert(t.paxosAcceptorState == pax)
 
     } finally {
       e: Throwable =>

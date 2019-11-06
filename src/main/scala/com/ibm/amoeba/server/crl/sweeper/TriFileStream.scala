@@ -17,7 +17,7 @@ private object Two extends Index {
 }
 
 
-class TriFileStream(file0: LogFile, file1: LogFile, file2: LogFile) {
+class TriFileStream(maxFileSize: Long, file0: LogFile, file1: LogFile, file2: LogFile) {
 
   val maxSize: Long = file0.maxSize
 
@@ -53,6 +53,8 @@ class TriFileStream(file0: LogFile, file1: LogFile, file2: LogFile) {
     }
   }
 
+  val entry: Entry = new Entry(maxFileSize, activeFileSize())
+
   def activeFileSize(): Long = {
     files(active.index).size
   }
@@ -63,9 +65,9 @@ class TriFileStream(file0: LogFile, file1: LogFile, file2: LogFile) {
   }
 
   /// Returns true if the files should be rotated
-  def write(buffers: Array[ByteBuffer]): Boolean = {
+  def write(buffers: Array[ByteBuffer]): Unit = {
+    println(s"Writing ${buffers} to file ${files(active.index).fileId}")
     files(active.index).write(buffers)
-    files(active.index).size < maxSize - 4096*2
   }
 
   def rotateFiles(): FileId = {
@@ -78,6 +80,8 @@ class TriFileStream(file0: LogFile, file1: LogFile, file2: LogFile) {
 
     active = new_active
     files(active.index).resetFile()
+
+    entry.setOffset(16)
 
     files(retire.index).fileId
   }

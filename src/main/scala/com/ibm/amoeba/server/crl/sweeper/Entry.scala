@@ -17,13 +17,24 @@ class Entry(val maxSize: Long, initialFileSize: Long) {
   var txDeletions: List[TxId] = Nil
   var allocations: List[Alloc] = Nil
   var allocDeletions: List[TxId] = Nil
-  var entrySize: Int = StaticEntryFooterSize
+  var staticSize: Int = 0
   var dataSize: Long = 0
   var offset: Long = initialFileSize
+
   private var full: Boolean = !haveRoomFor(SubEntry(0, 4096))
+
+  def isFull: Boolean = {
+    full
+  }
+
+  private[sweeper] def setOffset(newOffset: Long): Unit = offset = newOffset
 
   def isEmpty: Boolean = {
     txs.isEmpty && allocations.isEmpty && txDeletions.isEmpty && allocDeletions.isEmpty
+  }
+
+  private def haveRoomFor(subEntry: SubEntry): Boolean = {
+    offset + dataSize + staticSize + subEntry.totalSize + 4096 <= maxSize
   }
 
   def commit(serial: LogEntrySerialNumber,
@@ -32,8 +43,11 @@ class Entry(val maxSize: Long, initialFileSize: Long) {
              fileId: FileId,
              previousEntryFooterLocation: FileLocation): (Array[ByteBuffer], List[SaveCompletion], FileLocation) = {
 
-    val padding = padTo4kAlignment(offset, dataSize, entrySize)
-    val entryBuffer = ByteBuffer.allocate(entrySize + padding)
+    staticSize += StaticEntryFooterSize // Add space for the static footer at the end of the buffer
+
+    val padding = padTo4kAlignment(offset, dataSize, staticSize)
+
+    val entryBuffer = ByteBuffer.allocate(staticSize + padding)
     val entryOffset = offset + dataSize
     var buffers: List[ByteBuffer] = Nil
     var off = offset
@@ -118,8 +132,23 @@ class Entry(val maxSize: Long, initialFileSize: Long) {
           entryBuffer.put(t._1.peer)
       }
 
-      if (tx.objectUpdateLocations.isEmpty && tx.state.objectUpdates.nonEmpty) {
-        entryBuffer.putInt(tx.state.objectUpdates.size)
+      if (tx.keepObjectUpdates && tx.objectUpdateLocations.isEmpty) {
+        for (ou <- tx.state.objectUpdates) {
+          val sz = ou.data.size
+          val loc = FileLocation(fileId, off, sz)
+          tx.objectUpdateLocations = loc :: tx.objectUpdateLocations
+          buffers = ou.data.asReadOnlyBuffer() :: buffers
+          off += sz
+        }
+        // reverse list they match positionally for the zip operation below
+        tx.objectUpdateLocations = tx.objectUpdateLocations.reverse
+      }
+
+      val numObjectUpdates = if (tx.keepObjectUpdates) tx.state.objectUpdates.length else 0
+
+      entryBuffer.putInt(numObjectUpdates)
+
+      if (tx.keepObjectUpdates) {
         tx.objectUpdateLocations.zip(tx.state.objectUpdates).foreach { t =>
           putUUID(t._2.objectUUID)
           putFileLocation(t._1)
@@ -174,7 +203,8 @@ class Entry(val maxSize: Long, initialFileSize: Long) {
     txDeletions.foreach { txid => putTxId(txid) }
     allocDeletions.foreach { txid => putTxId(txid) }
 
-    (0 to padding).foreach { _ => entryBuffer.put(0.asInstanceOf[Byte]) }
+
+    (1 to padding).foreach { _ => entryBuffer.put(0.asInstanceOf[Byte]) }
 
     /// Entry Footer
     ///   entry_serial_number - 8
@@ -206,51 +236,14 @@ class Entry(val maxSize: Long, initialFileSize: Long) {
     allocations = Nil
     txDeletions = Nil
     allocDeletions = Nil
+    staticSize = 0
+    dataSize = 0
 
     val clist = completions
     completions = Nil
 
     (buffers.reverse.toArray, clist, FileLocation(fileId, entryOffset, StaticEntryFooterSize))
   }
-
-  def isFull: Boolean = {
-    full
-  }
-
-  private def haveRoomFor(subEntry: SubEntry): Boolean = {
-    offset + dataSize + entrySize + subEntry.totalSize + 4096 <= maxSize
-  }
-
-  def txWriteSize(tx: Tx): SubEntry = {
-    var data = 0
-    var updateCount = 0
-    if (tx.txdLocation.isEmpty)
-      data += tx.state.serializedTxd.size
-    if (tx.keepObjectUpdates && tx.objectUpdateLocations.isEmpty) {
-      tx.state.objectUpdates.foreach { ou =>
-        data += ou.data.size
-        updateCount += 1
-      }
-    }
-    SubEntry(data, StaticTxSize + updateCount * ObjectUpdateStaticSize)
-  }
-
-  def txDeleteSize(): SubEntry = SubEntry(0, TxidSize)
-
-  def allocWriteSize(alloc: Alloc): SubEntry = {
-    var data = 0
-    var stat = 0
-
-    if (alloc.dataLocation.isEmpty)
-      data += alloc.state.objectData.size
-
-    stat += alloc.state.storePointer.encodedSize()
-    stat += alloc.state.serializedRevisionGuard.size
-
-    SubEntry(data, StaticArsSize + stat)
-  }
-
-  def allocDeleteSize(): SubEntry = SubEntry(0, TxidSize)
 
   def addTransaction(tx: Tx,
                      contentQueue: LogContentQueue,
@@ -265,7 +258,7 @@ class Entry(val maxSize: Long, initialFileSize: Long) {
       val sub = txWriteSize(tx)
       if (haveRoomFor(sub)) {
         dataSize += sub.dataSize
-        entrySize += sub.entrySize
+        staticSize += sub.staticSize
         txs += (tx.id -> tx)
         contentQueue.moveToHead(tx)
         req.foreach { t =>
@@ -286,7 +279,7 @@ class Entry(val maxSize: Long, initialFileSize: Long) {
     val sub = allocWriteSize(alloc)
     if (haveRoomFor(sub)) {
       dataSize += sub.dataSize
-      entrySize += sub.entrySize
+      staticSize += sub.staticSize
       allocations = alloc :: allocations
       contentQueue.moveToHead(alloc)
       req.foreach { t =>
@@ -304,7 +297,7 @@ class Entry(val maxSize: Long, initialFileSize: Long) {
     val sub = txDeleteSize()
     if (haveRoomFor(sub)) {
       dataSize += sub.dataSize
-      entrySize += sub.entrySize
+      staticSize += sub.staticSize
       txDeletions = txid :: txDeletions
       true
     } else {
@@ -317,7 +310,7 @@ class Entry(val maxSize: Long, initialFileSize: Long) {
     val sub = txDeleteSize()
     if (haveRoomFor(sub)) {
       dataSize += sub.dataSize
-      entrySize += sub.entrySize
+      staticSize += sub.staticSize
       allocDeletions = txid :: allocDeletions
       true
     } else {
@@ -377,12 +370,45 @@ object Entry {
   //
   val StaticArsSize: Int = 17 + 16 + 4 + 16 + 1 + 4 + 14 + 8 + 8 + 4
 
-  case class SubEntry(dataSize: Long, entrySize: Int) {
-    def totalSize: Long = dataSize + entrySize
+  case class SubEntry(dataSize: Long, staticSize: Int) {
+    def totalSize: Long = dataSize + staticSize
   }
 
-  def padTo4kAlignment(offset: Long, dataSize: Long, entrySize: Long): Int = {
-    val base = offset + dataSize + entrySize
+  def txWriteSize(tx: Tx): SubEntry = {
+    var data = 0
+    val updateCount = if (tx.keepObjectUpdates) tx.state.objectUpdates.length else 0
+
+    if (tx.txdLocation.isEmpty)
+      data += tx.state.serializedTxd.size
+
+    if (tx.keepObjectUpdates && tx.objectUpdateLocations.isEmpty) {
+      tx.state.objectUpdates.foreach { ou =>
+        data += ou.data.size
+      }
+    }
+
+    SubEntry(data, StaticTxSize + (updateCount * ObjectUpdateStaticSize))
+  }
+
+  def txDeleteSize(): SubEntry = SubEntry(0, TxidSize)
+
+  def allocWriteSize(alloc: Alloc): SubEntry = {
+    var data = 0
+    var stat = 0
+
+    if (alloc.dataLocation.isEmpty)
+      data += alloc.state.objectData.size
+
+    stat += alloc.state.storePointer.encodedSize()
+    stat += alloc.state.serializedRevisionGuard.size
+
+    SubEntry(data, StaticArsSize + stat)
+  }
+
+  def allocDeleteSize(): SubEntry = SubEntry(0, TxidSize)
+
+  def padTo4kAlignment(offset: Long, dataSize: Long, staticSize: Long): Int = {
+    val base = offset + dataSize + staticSize
     if (base < 4096) {
       4096 - base.asInstanceOf[Int]
     } else {
