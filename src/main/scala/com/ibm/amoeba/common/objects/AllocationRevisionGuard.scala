@@ -10,5 +10,5 @@ case class ObjectRevisionGuard( pointer: ObjectPointer,
 case class KeyRevisionGuard(
                            pointer: KeyValueObjectPointer,
                            key: Key,
-                           requirement: KeyValueUpdate.TimestampRequirement.Value
+                           requirement: KeyValueUpdate.KeyRequirement
                            ) extends AllocationRevisionGuard

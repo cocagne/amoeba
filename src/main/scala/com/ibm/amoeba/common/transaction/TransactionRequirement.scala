@@ -11,12 +11,10 @@ case class LocalTimeRequirement(timestamp: HLCTimestamp,
 object LocalTimeRequirement {
 
   object Requirement extends Enumeration {
+    val Equals: Value = Value("Equals")
     val LessThan: Value = Value("LessThan")
     val GreaterThan: Value = Value("GreaterThan")
   }
-
-  case class Requirement(timestamp: HLCTimestamp, tsRequirement: Requirement.Value)
-
 }
 
 
@@ -49,18 +47,18 @@ sealed abstract class KeyValueTransactionRequirement extends TransactionObjectRe
 case class KeyValueUpdate(
                            objectPointer: KeyValueObjectPointer,
                            requiredRevision: Option[ObjectRevision],
-                           requirements: List[KeyValueUpdate.KVRequirement],
-                           timestamp: HLCTimestamp) extends KeyValueTransactionRequirement
+                           requirements: List[KeyValueUpdate.KeyRequirement]) extends KeyValueTransactionRequirement
 
 object KeyValueUpdate {
 
-  object TimestampRequirement extends Enumeration {
-    val Equals: Value       = Value("Equals")
-    val LessThan: Value     = Value("LessThan")
-    val Exists: Value       = Value("Exists")
-    val DoesNotExist: Value = Value("DoesNotExist")
-  }
+  sealed abstract class KeyRequirement
 
-  case class KVRequirement(key: Key, timestamp: HLCTimestamp, tsRequirement: TimestampRequirement.Value)
+  case class Exists(key: Key) extends KeyRequirement
+  case class MayExist(key: Key) extends KeyRequirement
+  case class DoesNotExist(key: Key) extends KeyRequirement
+  case class TimestampEquals(key: Key, timestamp: HLCTimestamp) extends KeyRequirement
+  case class TimestampLessThan(key: Key, timestamp: HLCTimestamp) extends KeyRequirement
+  case class TimestampGreaterThan(key: Key, timestamp: HLCTimestamp) extends KeyRequirement
+
 }
 

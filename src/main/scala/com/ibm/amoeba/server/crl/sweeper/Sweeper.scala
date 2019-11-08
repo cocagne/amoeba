@@ -253,7 +253,7 @@ class Sweeper(directory: Path,
       }
     } catch {
       case ExitThread => // Exit requested
-      case e => println(s"Error!: $e")
+      case e: Throwable => println(s"Error!: $e")
     }
   }
 
