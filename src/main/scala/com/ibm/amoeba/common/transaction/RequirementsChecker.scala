@@ -12,7 +12,7 @@ object RequirementsChecker {
   case class NonObjectErr(err: RequirementError.Value) extends Exception
 
   /**
-    * @return Tuple of object specific errors an list of non-object errors
+    * @return Tuple of object specific errors and a list of non-object errors
     */
   def check(transactionId: TransactionId,
             requirements: List[TransactionRequirement],

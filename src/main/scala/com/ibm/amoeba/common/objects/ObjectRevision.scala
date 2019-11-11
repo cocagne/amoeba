@@ -3,6 +3,8 @@ package com.ibm.amoeba.common.objects
 import java.nio.ByteBuffer
 import java.util.UUID
 
+import com.ibm.amoeba.common.transaction.TransactionId
+
 /** Object Revisions are set to the UUID of the transaction that last updated them
   *
   */
@@ -22,7 +24,7 @@ final class ObjectRevision(val lastUpdateTxUUID: UUID) extends AnyVal {
 }
 
 object ObjectRevision {
-  def apply(lastUpdateTxUUID: UUID): ObjectRevision = new ObjectRevision(lastUpdateTxUUID)
+  def apply(lastUpdateTxId: TransactionId): ObjectRevision = new ObjectRevision(lastUpdateTxId.uuid)
 
   def apply(arr: Array[Byte]): ObjectRevision = {
     val bb = ByteBuffer.wrap(arr)
@@ -35,7 +37,7 @@ object ObjectRevision {
     new ObjectRevision(new UUID(msb, lsb))
   }
 
-  val Null = ObjectRevision(new UUID(0,0))
+  val Null = ObjectRevision(TransactionId(new UUID(0,0)))
 
   val EncodedSize: Int = 16
 }
