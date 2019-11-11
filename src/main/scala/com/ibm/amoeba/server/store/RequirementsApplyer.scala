@@ -1,11 +1,10 @@
-package com.ibm.amoeba.common.transaction
+package com.ibm.amoeba.server.store
 
+import com.ibm.amoeba.common.objects._
+import com.ibm.amoeba.common.transaction._
 import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp}
-import com.ibm.amoeba.common.objects.{Delete, DeleteLeft, DeleteMax, DeleteMin, DeleteRight, Insert, Key, KeyValueOperation, ObjectId, ObjectRefcount, ObjectRevision, SetLeft, SetMax, SetMin, SetRight, Value}
-import com.ibm.amoeba.common.store.{ObjectState, ValueState}
-import com.ibm.amoeba.common.transaction.RequirementsChecker.{NonObjectErr, ObjectErr}
 
-import scala.collection.immutable.{HashMap, HashSet}
+import scala.collection.immutable.HashMap
 
 class RequirementsApplyer {
 

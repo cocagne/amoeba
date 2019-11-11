@@ -6,8 +6,9 @@ import com.ibm.amoeba.common.ida.Replication
 import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp}
 import com.ibm.amoeba.common.objects.{DataObjectPointer, Key, KeyValueObjectPointer, Metadata, ObjectId, ObjectRefcount, ObjectRevision, ObjectType, Value}
 import com.ibm.amoeba.common.pool.PoolId
-import com.ibm.amoeba.common.store.{KVObjectState, ObjectState, StorePointer, ValueState}
-import com.ibm.amoeba.common.transaction.{DataUpdate, DataUpdateOperation, KeyValueUpdate, LocalTimeRequirement, RefcountUpdate, RequirementError, RequirementsChecker, RevisionLock, TransactionId, VersionBump}
+import com.ibm.amoeba.common.store.StorePointer
+import com.ibm.amoeba.common.transaction.{DataUpdate, DataUpdateOperation, KeyValueUpdate, LocalTimeRequirement, RefcountUpdate, RequirementError, RevisionLock, TransactionId, VersionBump}
+import com.ibm.amoeba.server.store.{KVObjectState, ObjectState, RequirementsChecker, ValueState}
 import org.scalatest.{FunSuite, Matchers}
 
 import scala.collection.immutable.HashMap
@@ -15,8 +16,8 @@ import scala.collection.immutable.HashMap
 object RequirementsCheckerSuite {
   val oid1 = ObjectId(new UUID(0,1))
   val oid2 = ObjectId(new UUID(0,2))
-  val rev1 = ObjectRevision(new UUID(0, 3))
-  val rev2 = ObjectRevision(new UUID(0, 4))
+  val rev1 = ObjectRevision(TransactionId(new UUID(0, 3)))
+  val rev2 = ObjectRevision(TransactionId(new UUID(0, 4)))
   val ref1 = ObjectRefcount(1,1)
   val ref2 = ObjectRefcount(2,2)
   val ts1  = HLCTimestamp(1)

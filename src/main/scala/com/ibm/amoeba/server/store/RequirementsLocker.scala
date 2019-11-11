@@ -1,8 +1,8 @@
-package com.ibm.amoeba.common.transaction
+package com.ibm.amoeba.server.store
 
 import com.ibm.amoeba.common.objects.{ObjectId, ObjectRevision}
-import com.ibm.amoeba.common.store.{ObjectState, ValueState}
-import com.ibm.amoeba.common.transaction.RequirementsChecker.ObjectErr
+import com.ibm.amoeba.common.transaction._
+import com.ibm.amoeba.server.store.RequirementsChecker.ObjectErr
 
 import scala.collection.immutable.HashMap
 

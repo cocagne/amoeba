@@ -4,7 +4,9 @@ import java.util.UUID
 
 import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp}
 import com.ibm.amoeba.common.objects.{Metadata, ObjectId, ObjectRefcount, ObjectRevision, ObjectType}
-import com.ibm.amoeba.common.store.{ObjectState, SimpleLRUObjectCache, StorePointer}
+import com.ibm.amoeba.common.store.StorePointer
+import com.ibm.amoeba.common.transaction.TransactionId
+import com.ibm.amoeba.server.store.{ObjectState, SimpleLRUObjectCache}
 import org.scalatest.{FunSuite, Matchers}
 
 object SimpleLRUObjectCacheSuite {
@@ -14,7 +16,7 @@ object SimpleLRUObjectCacheSuite {
     val o1 = new ObjectState(
       ObjectId(new UUID(0,1)),
       StorePointer(1, new Array[Byte](0)),
-      Metadata(ObjectRevision(new UUID(0, 2)),
+      Metadata(ObjectRevision(TransactionId(new UUID(0, 2))),
         ObjectRefcount(1,1),
         HLCTimestamp(1)),
       ObjectType.Data,
@@ -25,7 +27,7 @@ object SimpleLRUObjectCacheSuite {
     val o2 = new ObjectState(
       ObjectId(new UUID(0,2)),
       StorePointer(1, new Array[Byte](0)),
-      Metadata(ObjectRevision(new UUID(0, 2)),
+      Metadata(ObjectRevision(TransactionId(new UUID(0, 2))),
         ObjectRefcount(1,1),
         HLCTimestamp(1)),
       ObjectType.Data,
@@ -36,7 +38,7 @@ object SimpleLRUObjectCacheSuite {
     val o3 = new ObjectState(
       ObjectId(new UUID(0,3)),
       StorePointer(1, new Array[Byte](0)),
-      Metadata(ObjectRevision(new UUID(0, 2)),
+      Metadata(ObjectRevision(TransactionId(new UUID(0, 2))),
         ObjectRefcount(1,1),
         HLCTimestamp(1)),
       ObjectType.Data,
@@ -47,7 +49,7 @@ object SimpleLRUObjectCacheSuite {
     val o4 = new ObjectState(
       ObjectId(new UUID(0,4)),
       StorePointer(1, new Array[Byte](0)),
-      Metadata(ObjectRevision(new UUID(0, 2)),
+      Metadata(ObjectRevision(TransactionId(new UUID(0, 2))),
         ObjectRefcount(1,1),
         HLCTimestamp(1)),
       ObjectType.Data,

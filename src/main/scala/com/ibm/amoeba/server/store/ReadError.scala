@@ -1,4 +1,4 @@
-package com.ibm.amoeba.common.store
+package com.ibm.amoeba.server.store
 
 object ReadError extends Enumeration {
   val StoreNotFound: Value = Value("StoreNotFound")

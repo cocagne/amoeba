@@ -1,8 +1,8 @@
-package com.ibm.amoeba.common.transaction
+package com.ibm.amoeba.server.store
 
-import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp}
 import com.ibm.amoeba.common.objects.{ObjectId, ObjectRefcount, ObjectRevision}
-import com.ibm.amoeba.common.store.{ObjectState, ValueState}
+import com.ibm.amoeba.common.transaction._
+import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp}
 
 import scala.collection.immutable.HashMap
 

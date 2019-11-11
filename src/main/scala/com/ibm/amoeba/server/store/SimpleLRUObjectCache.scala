@@ -1,4 +1,4 @@
-package com.ibm.amoeba.common.store
+package com.ibm.amoeba.server.store
 
 import com.ibm.amoeba.common.objects.ObjectId
 
