@@ -85,7 +85,7 @@ class RequirementsApplyer {
           case _: RevisionLock =>
         }
       } catch {
-        case e: Throwable => println(s"UNEXPECTED ERROR IN TX REQ CHECK: $e")
+        case e: Throwable => println(s"UNEXPECTED ERROR IN TX Apply: $e")
       }
     }
 

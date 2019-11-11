@@ -39,7 +39,7 @@ object RequirementsLocker {
           case r: RevisionLock => getState(r.objectPointer.id).lockedToTransaction = Some(transactionId)
         }
       } catch {
-        case e: Throwable => println(s"UNEXPECTED ERROR IN TX REQ CHECK: $e")
+        case e: Throwable => println(s"UNEXPECTED ERROR IN TX Lock: $e")
       }
     }
   }
