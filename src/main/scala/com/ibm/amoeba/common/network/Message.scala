@@ -3,10 +3,10 @@ package com.ibm.amoeba.common.network
 import java.util.UUID
 
 import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp}
-import com.ibm.amoeba.common.objects.{AllocationRevisionGuard, ObjectRefcount, ObjectType}
+import com.ibm.amoeba.common.objects.{AllocationRevisionGuard, ObjectId, ObjectRefcount, ObjectType}
 import com.ibm.amoeba.common.paxos.ProposalId
 import com.ibm.amoeba.common.store.{StoreId, StorePointer}
-import com.ibm.amoeba.common.transaction.{TransactionDescription, TransactionDisposition, TransactionStatus}
+import com.ibm.amoeba.common.transaction.{TransactionDescription, TransactionDisposition, TransactionId, TransactionStatus}
 
 sealed abstract class Message
 
@@ -20,13 +20,13 @@ sealed abstract class TxMessage extends Message {
 final case class Allocate(
                            toStore: StoreId,
                            fromClient: ClientId,
-                           newObjectUUID: UUID,
+                           newObjectId: ObjectId,
                            objectType: ObjectType.Value,
                            objectSize: Option[Int],
                            initialRefcount: ObjectRefcount,
                            objectData: DataBuffer,
                            timestamp: HLCTimestamp,
-                           allocationTransactionUUID: UUID,
+                           allocationTransactionId: TransactionId,
                            revisionGuard: AllocationRevisionGuard
                          ) extends ClientMessage {
 
@@ -34,16 +34,16 @@ final case class Allocate(
     case rhs: Allocate => toStore == rhs.toStore && fromClient == rhs.fromClient &&
       objectSize == rhs.objectSize && objectData.compareTo(rhs.objectData) == 0 &&
       initialRefcount == rhs.initialRefcount && timestamp.compareTo(rhs.timestamp) == 0 &&
-      allocationTransactionUUID == rhs.allocationTransactionUUID &&
+      allocationTransactionId == rhs.allocationTransactionId &&
       revisionGuard == rhs.revisionGuard
     case _ => false
   }
 }
 
-final case class AllocateResponse(
+final case class AllocateResponse( toClient: ClientId,
                                    fromStoreId: StoreId,
-                                   allocationTransactionUUID: UUID,
-                                   newObjectUUID: UUID,
+                                   allocationTransactionUUID: TransactionId,
+                                   newObjectId: ObjectId,
                                    result: Option[StorePointer]) extends ClientMessage
 
 
@@ -56,7 +56,7 @@ final case class TxPrepare(
 final case class TxPrepareResponse(
                                     to: StoreId,
                                     from: StoreId,
-                                    transactionUUID: UUID,
+                                    transactionId: TransactionId,
                                     response: Either[TxPrepareResponse.Nack, TxPrepareResponse.Promise],
                                     proposalId: ProposalId,
                                     disposition: TransactionDisposition.Value) extends TxMessage
@@ -69,14 +69,14 @@ object TxPrepareResponse {
 final case class TxAccept(
                            to: StoreId,
                            from: StoreId,
-                           transactionUUID: UUID,
+                           transactionId: TransactionId,
                            proposalId: ProposalId,
                            value: Boolean) extends TxMessage
 
 final case class TxAcceptResponse(
                                    to: StoreId,
                                    from: StoreId,
-                                   transactionUUID: UUID,
+                                   transactionId: TransactionId,
                                    proposalId: ProposalId,
                                    response: Either[TxAcceptResponse.Nack, TxAcceptResponse.Accepted]) extends TxMessage
 
@@ -88,37 +88,37 @@ object TxAcceptResponse {
 final case class TxResolved(
                              to: StoreId,
                              from: StoreId,
-                             transactionUUID: UUID,
+                             transactionId: TransactionId,
                              committed: Boolean) extends TxMessage
 
 final case class TxCommitted(
                               to: StoreId,
                               from: StoreId,
-                              transactionUUID: UUID,
+                              transactionId: TransactionId,
                               // List of object UUIDs that could not be committed due to transaction requirement errors
                               objectCommitErrors: List[UUID]) extends TxMessage
 
 final case class TxFinalized(
                               to: StoreId,
                               from: StoreId,
-                              transactionUUID: UUID,
+                              transactionId: TransactionId,
                               committed: Boolean) extends TxMessage
 
 final case class TxHeartbeat(
                               to: StoreId,
                               from: StoreId,
-                              transactionUUID: UUID) extends TxMessage
+                              transactionId: TransactionId) extends TxMessage
 
 final case class TxStatusRequest(
                                   to: StoreId,
                                   from: StoreId,
-                                  transactionUUID: UUID,
+                                  transactionId: TransactionId,
                                   requestUUID: UUID) extends TxMessage
 
 final case class TxStatusResponse(
                                    to: StoreId,
                                    from: StoreId,
-                                   transactionUUID: UUID,
+                                   transactionId: TransactionId,
                                    requestUUID: UUID,
                                    status: Option[TxStatusResponse.TxStatus]) extends TxMessage
 

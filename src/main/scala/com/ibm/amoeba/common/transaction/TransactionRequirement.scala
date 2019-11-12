@@ -51,7 +51,9 @@ case class KeyValueUpdate(
 
 object KeyValueUpdate {
 
-  sealed abstract class KeyRequirement
+  sealed abstract class KeyRequirement {
+    val key: Key
+  }
 
   case class Exists(key: Key) extends KeyRequirement
   case class MayExist(key: Key) extends KeyRequirement

@@ -8,7 +8,7 @@ import com.ibm.amoeba.common.store.StoreId
 
 final case class TransactionDescription (
   /** Uniquely identifies this transaction */
-  transactionUUID: UUID,
+  transactionId: TransactionId,
 
   /** Used for graceful transaction contention handling.
     *
@@ -80,7 +80,7 @@ final case class TransactionDescription (
     def shortString: String = {
       val sb = new StringBuilder
       val ol = allReferencedObjectsSet.map(_.shortString).toList.sorted
-      sb.append(s"Tx $transactionUUID: Objects: $ol")
+      sb.append(s"Tx $transactionId: Objects: $ol")
       if (notes.nonEmpty) {
         sb.append("\n")
         notes.reverse.foreach { note =>

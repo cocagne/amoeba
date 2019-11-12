@@ -1,7 +1,7 @@
 package com.ibm.amoeba.server.store
 
 import com.ibm.amoeba.common.objects.ObjectId
-import com.ibm.amoeba.common.store.{StoreId, StorePointer}
+import com.ibm.amoeba.common.store.{ReadError, ReadState, StoreId, StorePointer}
 import com.ibm.amoeba.common.transaction.TransactionId
 
 sealed abstract class Completion
