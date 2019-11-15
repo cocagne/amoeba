@@ -1,10 +1,10 @@
 package com.ibm.amoeba.server.crl
 
 import com.ibm.amoeba.common.DataBuffer
+import com.ibm.amoeba.common.network.NetworkCodec
 import com.ibm.amoeba.common.paxos.PersistentState
 import com.ibm.amoeba.common.store.StoreId
 import com.ibm.amoeba.common.transaction.{ObjectUpdate, TransactionDescription, TransactionDisposition, TransactionStatus}
-import com.ibm.aspen.core.network.NetworkCodec
 
 case class TransactionRecoveryState( storeId: StoreId,
                                      serializedTxd: DataBuffer,

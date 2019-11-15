@@ -1,10 +1,10 @@
-package com.ibm.aspen.core.network
+package com.ibm.amoeba.common.network
 
 import java.nio.charset.StandardCharsets
 import java.nio.{ByteBuffer, ByteOrder}
 import java.util.UUID
 
-import com.ibm.amoeba.common.network.{Allocate, AllocateResponse, ClientId, EncodingError,  OpportunisticRebuild, Read, ReadResponse, TransactionCompletionQuery, TransactionCompletionResponse, TxAccept, TxAcceptResponse, TxCommitted, TxFinalized, TxHeartbeat, TxPrepare, TxPrepareResponse, TxResolved, TxStatusRequest, TxStatusResponse, protocol => P}
+import com.ibm.amoeba.common.network.{protocol => P}
 import com.google.flatbuffers.FlatBufferBuilder
 import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp}
 import com.ibm.amoeba.common.ida.{IDA, ReedSolomon, Replication}
