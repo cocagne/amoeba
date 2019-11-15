@@ -43,6 +43,7 @@ object AllocationRevisionGuard {
 
 sealed abstract class AllocationRevisionGuard {
   def serialize(): DataBuffer
+  val pointer: ObjectPointer
 }
 
 case class ObjectRevisionGuard( pointer: ObjectPointer,

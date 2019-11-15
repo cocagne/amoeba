@@ -38,7 +38,6 @@ lazy val root = (project in file(".")).
       "org.apache.logging.log4j"         %% "log4j-api-scala"         % "11.0",
       "org.slf4j"                        %  "slf4j-log4j12"           % "1.8.0-beta2",
       "com.lmax"                         %  "disruptor"               % "3.3.7",
-      "com.google.protobuf"              %  "protobuf-java"           % "3.10.0"
     )
   )
   
@@ -46,7 +45,7 @@ testOptions  in Test += Tests.Argument(TestFrameworks.ScalaTest, "-W", "10", "5"
 
 //parallelExecution in Test := false
 
-/*
+
 sourceGenerators in Compile += Def.task {
   val base = (sourceManaged in Compile).value
 
@@ -69,4 +68,3 @@ sourceGenerators in Compile += Def.task {
   
   net_out_dir.listFiles().toSeq
 }.taskValue
-*/

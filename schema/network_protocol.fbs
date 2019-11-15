@@ -5,8 +5,8 @@ namespace com.ibm.amoeba.common.network.protocol;
 //- Object
 //---------------------------------------------------------------------------
 struct UUID {
-  mostSigBits: long;
-  leastSigBits: long;
+  most_sig_bits: long;
+  least_sig_bits: long;
 }
 
 table Replication {
@@ -71,11 +71,13 @@ enum DataUpdateOperation:byte {
   Overwrite
 }
 
-enum KeyValueTimestampRequirementEnum:byte {
-  Equals,
-  LessThan,
+enum KeyRequirement:byte {
   Exists,
-  DoesNotExist
+  MayExist,
+  DoesNotExist,
+  TimestampEquals,
+  TimestampLessThan,
+  TimestampGreaterThan
 }
 
 table DataUpdate {
@@ -101,7 +103,7 @@ table RevisionLock {
 }
 
 table KVReq {
-  tsRequirement: KeyValueTimestampRequirementEnum;
+  requirement: KeyRequirement;
   timestamp: long;
   key: [byte];
 }
@@ -110,7 +112,6 @@ table KeyValueUpdate {
   object_pointer: ObjectPointer;
   required_revision: ObjectRevision;
   requirements: [KVReq];
-  timestamp: long;
 }
 
 enum LocalTimeRequirementEnum:byte {
@@ -145,7 +146,7 @@ table TransactionDescription {
   designated_leader_uid: byte;
   requirements: [TransactionRequirement];
   finalization_actions: [SerializedFinalizationAction];
-  originating_client: [byte];
+  originating_client: UUID;
   notify_on_resolution: [StoreId];
   notes: [byte];
 }
@@ -255,7 +256,8 @@ table TxStatusResponse {
 enum ObjectReadError:byte
 { 
     ObjectMismatch,    
-    InvalidLocalPointer,
+    ObjectNotFound,
+    StoreNotFound,
     CorruptedObject
 }
 
@@ -284,14 +286,9 @@ enum ReadType:byte {
   KeyRange,
 }
 
-table Lock {
-   type: LockType;
-   txd: TransactionDescription;
-}
-
 table Read {
    toStore: StoreId;
-   fromClient: [byte];
+   fromClient: UUID;
    readUUID: UUID;
    objectPointer: ObjectPointer;
    readType: ReadType;
@@ -305,6 +302,7 @@ table Read {
 
 table ReadResponse {
   fromStore: StoreId;
+  toClient: UUID;
   readUUID: UUID;
   revision: ObjectRevision;
   refcount: ObjectRefcount;
@@ -319,7 +317,7 @@ table ReadResponse {
     
 table OpportunisticRebuild {
    toStore: StoreId;
-   fromClient: [byte];
+   fromClient: UUID;
    pointer: ObjectPointer;
    revision: ObjectRevision;
    refcount: ObjectRefcount;
@@ -329,13 +327,14 @@ table OpportunisticRebuild {
 
 table TransactionCompletionQuery {
   toStore: StoreId;
-  fromClient: [byte];
+  fromClient: UUID;
   queryUUID: UUID;
   transactionUUID: UUID;
 }
 
 table TransactionCompletionResponse {
   fromStore: StoreId;
+  toClient: UUID;
   queryUUID: UUID;
   isComplete: bool;
 }
@@ -346,7 +345,7 @@ table TransactionCompletionResponse {
 
 table Allocate {
   toStore: StoreId;
-  fromClient: [byte];
+  fromClient: UUID;
   newObjectUUID: UUID;
   objectType: ObjectType;
   objectSize: int;
@@ -356,8 +355,7 @@ table Allocate {
   allocationTransactionUUID: UUID;
   allocatingObject: ObjectPointer;
   allocatingObjectRevision: ObjectRevision;
-  allocatingObjectKey: [byte];
-  isKeyGuard: bool;
+  allocatingObjectKeyRequirement: KVReq;
 }
 
 enum AllocationError:byte {
@@ -370,37 +368,12 @@ table AllocateResponseAllocated {
 }
 
 table AllocateResponse {
-  fromStoreID: StoreId;
+  toClient: UUID;
+  fromStore: StoreId;
   allocationTransactionUUID: UUID;
   newObjectUUID: UUID;
   allocatedStorePointer: StorePointer;
   resultError: AllocationError;
-}
-
-table AllocationStatusRequest {
-   to: StoreId;
-   from: StoreId;
-   primaryObject: ObjectPointer;
-   allocationTransactionUUID: UUID;
-   newObjectUUID: UUID;
-}
-
-table AllocationStatusReply {
-   to: StoreId;
-   from: StoreId;
-   allocation_transaction_uuid: UUID;
-   newObjectUUID: UUID;
-   known: byte; // 1 if transaction is known. 0 if not
-   transactionStatus: TransactionStatus;
-   objectStatus: AllocationObjectStatus;
-}
-
-table AllocationObjectStatus {
-  objectUUID: UUID;
-  readError: ObjectReadError;
-  revision: ObjectRevision;
-  refcount: ObjectRefcount;
-  locks: [Lock];
 }
 
 
@@ -418,8 +391,6 @@ table Message {
   heartbeat: TxHeartbeat;
   allocate: Allocate;
   allocate_response: AllocateResponse;
-  allocateStatus: AllocationStatusRequest;
-  allocateStatusResponse: AllocationStatusReply;
   read: Read;
   read_response: ReadResponse;
   opportunisticRebuild: OpportunisticRebuild;

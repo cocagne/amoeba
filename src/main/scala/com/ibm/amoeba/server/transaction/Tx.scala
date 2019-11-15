@@ -1,8 +1,7 @@
 package com.ibm.amoeba.server.transaction
 
 import com.ibm.amoeba.common.network.{TxAccept, TxFinalized, TxHeartbeat, TxPrepare, TxResolved, TxStatusRequest}
-import com.ibm.amoeba.common.objects.ObjectId
-import com.ibm.amoeba.common.store.ReadError
+import com.ibm.amoeba.common.objects.{ObjectId, ReadError}
 import com.ibm.amoeba.server.crl.TxSaveId
 import com.ibm.amoeba.server.store.{CommitError, ObjectState}
 import org.apache.logging.log4j.scala.Logging

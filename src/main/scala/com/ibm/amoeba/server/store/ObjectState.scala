@@ -22,4 +22,16 @@ class ObjectState(val objectId: ObjectId,
 
   var kvState: Option[KVObjectState] = None
 
+  def lockedWriteTransactions: Set[TransactionId] = {
+    var s = Set[TransactionId]()
+    lockedToTransaction.foreach { t => s += t }
+    kvState.foreach { kvs =>
+      kvs.content.values.foreach { vs =>
+        vs.lockedToTransaction.foreach { txid =>
+          s += txid
+        }
+      }
+    }
+    s
+  }
 }

@@ -1,17 +1,20 @@
 package com.ibm.amoeba.server.store
 
-import com.ibm.amoeba.common.network.{Allocate, AllocateResponse, ClientId, TxAccept, TxFinalized, TxHeartbeat, TxMessage, TxPrepare, TxResolved, TxStatusRequest}
-import com.ibm.amoeba.common.objects.{Metadata, ObjectId, ObjectRevision}
-import com.ibm.amoeba.common.store.{ReadError, ReadState, StoreId, StorePointer}
+import java.util.UUID
+
+import com.ibm.amoeba.common.HLCTimestamp
+import com.ibm.amoeba.common.network.{Allocate, AllocateResponse, ClientId, ReadResponse, TxAccept, TxFinalized, TxHeartbeat, TxMessage, TxPrepare, TxResolved, TxStatusRequest}
+import com.ibm.amoeba.common.objects.{Metadata, ObjectId, ObjectRevision, ReadError}
+import com.ibm.amoeba.common.store.{ReadState, StoreId, StorePointer}
 import com.ibm.amoeba.common.transaction.TransactionId
 import com.ibm.amoeba.server.crl.{AllocSaveComplete, AllocationRecoveryState, CrashRecoveryLog, SaveCompletion, TxSaveComplete}
-import com.ibm.amoeba.server.network.{Messenger, RequestId}
+import com.ibm.amoeba.server.network.Messenger
 import com.ibm.amoeba.server.transaction.Tx
 
 
 object Frontend {
 
-  case class NetworkRead(clientId: ClientId, requestId: RequestId)
+  case class NetworkRead(clientId: ClientId, requestUUID: UUID)
 
   case class TransactionRead(transactionId: TransactionId)
 }
@@ -56,6 +59,7 @@ class Frontend(val storeId: StoreId,
         // Guaranteed to be in the cache due to the transaction reference
         val os = objectCache.get(ars.newObjectId).get
 
+        // Remove the reference count we added when this ObjectState was created
         os.transactionReferences -= 1
 
         if (m.committed) {
@@ -77,14 +81,18 @@ class Frontend(val storeId: StoreId,
       tx.commitComplete(c.objectId, c.result)
     }
   }
-  def readObjectForNetwork(clientId: ClientId, requestId: RequestId, locater: Locater): Unit = {
+  def readObjectForNetwork(clientId: ClientId, readUUID: UUID, locater: Locater): Unit = {
     objectCache.get(locater.objectId) match {
       case Some(os) =>
-        val rs = ReadState(locater.objectId, os.metadata, os.objectType, os.data)
-        net.sendReadResponse(clientId, requestId, locater.objectId, Left(rs))
+        val cs = ReadResponse.CurrentState(os.metadata.revision, os.metadata.refcount, os.metadata.timestamp,
+          os.data.size, Some(os.data), os.lockedWriteTransactions )
+
+        val rr = ReadResponse(clientId, storeId, readUUID, HLCTimestamp.now, Right(cs) )
+        net.sendClientResponse(rr)
+
 
       case None =>
-        val lnr = Left(NetworkRead(clientId, requestId))
+        val lnr = Left(NetworkRead(clientId, readUUID))
 
         pendingReads.get(locater.objectId) match {
           case Some(lst) =>
@@ -121,7 +129,13 @@ class Frontend(val storeId: StoreId,
 
         pendingReads.get(objectId).foreach { lpr =>
           lpr.foreach {
-            case Left(netRead) => net.sendReadResponse(netRead.clientId, netRead.requestId, objectId, Left(rs))
+            case Left(netRead) =>
+              val cs = ReadResponse.CurrentState(os.metadata.revision, os.metadata.refcount, os.metadata.timestamp,
+                os.data.size, Some(os.data), os.lockedWriteTransactions )
+
+              val rr = ReadResponse(netRead.clientId, storeId, netRead.requestUUID, HLCTimestamp.now, Right(cs) )
+              net.sendClientResponse(rr)
+
             case Right(tr) => transactions.get(tr.transactionId).foreach { tx => tx.objectLoaded(os) }
           }
         }
@@ -129,7 +143,10 @@ class Frontend(val storeId: StoreId,
       case Right(err) =>
         pendingReads.get(objectId).foreach { lpr =>
           lpr.foreach {
-            case Left(netRead) => net.sendReadResponse(netRead.clientId, netRead.requestId, objectId, Right(err))
+            case Left(netRead) =>
+              val rr = ReadResponse(netRead.clientId, storeId, netRead.requestUUID, HLCTimestamp.now, Left(err) )
+              net.sendClientResponse(rr)
+
             case Right(tr) => transactions.get(tr.transactionId).foreach { tx => tx.objectLoadFailed(objectId, err) }
           }
         }
@@ -146,7 +163,7 @@ class Frontend(val storeId: StoreId,
 
     case a: AllocSaveComplete =>
       pendingAllocations.get(a.transactionId).foreach { lst =>
-        lst.foreach(msg => net.sendClientMessage(msg))
+        lst.foreach(msg => net.sendClientResponse(msg))
       }
   }
 
@@ -159,7 +176,7 @@ class Frontend(val storeId: StoreId,
     either match {
       case Right(err) =>
         val r = AllocateResponse(msg.fromClient, msg.toStore, msg.allocationTransactionId, msg.newObjectId, None)
-        net.sendClientMessage(r)
+        net.sendClientResponse(r)
 
       case Left(storePointer) =>
         val r = AllocateResponse(msg.fromClient, msg.toStore, msg.allocationTransactionId, msg.newObjectId,

@@ -3,14 +3,22 @@ package com.ibm.amoeba.common.network
 import java.util.UUID
 
 import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp}
-import com.ibm.amoeba.common.objects.{AllocationRevisionGuard, ObjectId, ObjectRefcount, ObjectType}
+import com.ibm.amoeba.common.objects.{AllocationRevisionGuard, ObjectId, ObjectPointer, ObjectRefcount, ObjectRevision, ObjectType, ReadError, ReadType}
 import com.ibm.amoeba.common.paxos.ProposalId
 import com.ibm.amoeba.common.store.{StoreId, StorePointer}
 import com.ibm.amoeba.common.transaction.{TransactionDescription, TransactionDisposition, TransactionId, TransactionStatus}
 
 sealed abstract class Message
 
-sealed abstract class ClientMessage extends Message
+sealed abstract class ClientRequest extends Message {
+  val toStore: StoreId
+  val fromClient: ClientId
+}
+
+sealed abstract class ClientResponse extends Message {
+  val toClient: ClientId
+  val fromStore: StoreId
+}
 
 sealed abstract class TxMessage extends Message {
   val to: StoreId
@@ -28,7 +36,7 @@ final case class Allocate(
                            timestamp: HLCTimestamp,
                            allocationTransactionId: TransactionId,
                            revisionGuard: AllocationRevisionGuard
-                         ) extends ClientMessage {
+                         ) extends ClientRequest {
 
   override def equals(other: Any): Boolean = other match {
     case rhs: Allocate => toStore == rhs.toStore && fromClient == rhs.fromClient &&
@@ -41,10 +49,69 @@ final case class Allocate(
 }
 
 final case class AllocateResponse( toClient: ClientId,
-                                   fromStoreId: StoreId,
-                                   allocationTransactionUUID: TransactionId,
+                                   fromStore: StoreId,
+                                   allocationTransactionId: TransactionId,
                                    newObjectId: ObjectId,
-                                   result: Option[StorePointer]) extends ClientMessage
+                                   result: Option[StorePointer]) extends ClientResponse
+
+final case class Read(
+                       toStore: StoreId,
+                       fromClient: ClientId,
+                       readUUID: UUID,
+                       objectPointer: ObjectPointer,
+                       readType: ReadType) extends ClientRequest
+
+final case class ReadResponse( toClient: ClientId,
+                               fromStore: StoreId,
+                               readUUID: UUID,
+                               readTime: HLCTimestamp,
+                               result: Either[ReadError.Value, ReadResponse.CurrentState]) extends ClientResponse
+
+object ReadResponse {
+  case class CurrentState(
+                           revision: ObjectRevision,
+                           refcount: ObjectRefcount,
+                           timestamp: HLCTimestamp,
+                           sizeOnStore: Int,
+                           objectData: Option[DataBuffer],
+                           lockedWriteTransactions: Set[TransactionId]) {
+
+    override def equals(other: Any): Boolean = other match {
+      case rhs: CurrentState =>
+
+        val dmatch = (objectData, rhs.objectData) match {
+          case (Some(lhs), Some(r)) => lhs.compareTo(r) == 0
+          case (None, None) => true
+          case _ => false
+        }
+
+        revision == rhs.revision && refcount == rhs.refcount && dmatch && lockedWriteTransactions == rhs.lockedWriteTransactions
+
+      case _ => false
+    }
+  }
+}
+
+final case class OpportunisticRebuild(
+                                       toStore: StoreId,
+                                       fromClient: ClientId,
+                                       pointer: ObjectPointer,
+                                       revision: ObjectRevision,
+                                       refcount: ObjectRefcount,
+                                       timestamp: HLCTimestamp,
+                                       data: DataBuffer) extends ClientRequest
+
+final case class TransactionCompletionQuery(
+                                             toStore: StoreId,
+                                             fromClient: ClientId,
+                                             queryUUID: UUID,
+                                             transactionUUID: UUID) extends ClientRequest
+
+final case class TransactionCompletionResponse(
+                                                toClient: ClientId,
+                                                fromStore: StoreId,
+                                                queryUUID: UUID,
+                                                isComplete: Boolean) extends ClientResponse
 
 
 final case class TxPrepare(
