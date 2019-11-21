@@ -678,9 +678,9 @@ object NetworkCodec {
 
       val bb = ByteBuffer.wrap(arr)
       bb.order(ByteOrder.BIG_ENDIAN)
-      o.objectCommitErrors.foreach { uuid =>
-        bb.putLong(uuid.getMostSignificantBits)
-        bb.putLong(uuid.getLeastSignificantBits)
+      o.objectCommitErrors.foreach { id =>
+        bb.putLong(id.uuid.getMostSignificantBits)
+        bb.putLong(id.uuid.getLeastSignificantBits)
       }
 
       P.TxCommitted.createObjectCommitErrorsVector(builder, arr)
@@ -703,11 +703,11 @@ object NetworkCodec {
       case null => Nil
       case bb =>
         bb.order(ByteOrder.BIG_ENDIAN)
-        var errs: List[UUID] = Nil
+        var errs: List[ObjectId] = Nil
         while (bb.remaining() != 0) {
           val msb = bb.getLong()
           val lsb = bb.getLong()
-          errs = new UUID(msb, lsb) :: errs
+          errs = ObjectId(new UUID(msb, lsb)) :: errs
         }
         errs
     }

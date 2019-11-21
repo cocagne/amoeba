@@ -4,9 +4,7 @@ import com.ibm.amoeba.common.objects._
 import com.ibm.amoeba.common.transaction._
 import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp}
 
-import scala.collection.immutable.HashMap
-
-class RequirementsApplyer {
+object RequirementsApplyer {
 
   /**
     * @return Tuple of object specific errors and a list of non-object errors
@@ -14,8 +12,8 @@ class RequirementsApplyer {
   def apply(transactionId: TransactionId,
             timestamp: HLCTimestamp,
             requirements: List[TransactionRequirement],
-            objects: HashMap[ObjectId, ObjectState],
-            objectUpdates: HashMap[ObjectId, DataBuffer]): Set[ObjectId] = {
+            objects: Map[ObjectId, ObjectState],
+            objectUpdates: Map[ObjectId, DataBuffer]): Set[ObjectId] = {
 
     // Get a list of all objects that are unfit for accepting the changes in this transaction
     val skippedObjects = RequirementsChecker.check(transactionId, requirements, objects, objectUpdates)._1.keySet

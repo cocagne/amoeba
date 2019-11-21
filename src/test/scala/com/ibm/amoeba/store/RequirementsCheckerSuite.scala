@@ -437,7 +437,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
     val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
 
     assert(oerrs.isEmpty)
-    assert(errs.isEmpty)
+    assert(errs == List(RequirementError.LocalTimeError))
   }
 
   test("Localtime error") {
@@ -461,7 +461,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
     val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
 
     assert(oerrs.isEmpty)
-    assert(errs == List(RequirementError.LocalTimeError))
+    assert(errs.isEmpty)
   }
 
   test("KeyValues checks") {

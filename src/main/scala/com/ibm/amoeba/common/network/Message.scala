@@ -163,7 +163,7 @@ final case class TxCommitted(
                               from: StoreId,
                               transactionId: TransactionId,
                               // List of object UUIDs that could not be committed due to transaction requirement errors
-                              objectCommitErrors: List[UUID]) extends TxMessage
+                              objectCommitErrors: List[ObjectId]) extends TxMessage
 
 final case class TxFinalized(
                               to: StoreId,

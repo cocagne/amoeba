@@ -4,8 +4,6 @@ import com.ibm.amoeba.common.objects.{ObjectId, ObjectRefcount, ObjectRevision}
 import com.ibm.amoeba.common.transaction._
 import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp}
 
-import scala.collection.immutable.HashMap
-
 object RequirementsChecker {
 
   case class ObjectErr(objectId: ObjectId, err: RequirementError.Value) extends Exception
@@ -16,9 +14,9 @@ object RequirementsChecker {
     */
   def check(transactionId: TransactionId,
             requirements: List[TransactionRequirement],
-            objects: HashMap[ObjectId, ObjectState],
-            objectUpdates: HashMap[ObjectId, DataBuffer]):
-  (HashMap[ObjectId, RequirementError.Value], List[RequirementError.Value]) = {
+            objects: Map[ObjectId, ObjectState],
+            objectUpdates: Map[ObjectId, DataBuffer]):
+  (Map[ObjectId, RequirementError.Value], List[RequirementError.Value]) = {
 
     def getState(oid: ObjectId): ObjectState = {
       objects.get(oid) match {
@@ -35,7 +33,7 @@ object RequirementsChecker {
       }
     }
 
-    var objectErrors: HashMap[ObjectId, RequirementError.Value] = new HashMap()
+    var objectErrors: Map[ObjectId, RequirementError.Value] = Map()
     var nonObjectErrors: List[RequirementError.Value] = Nil
 
     for (req <- requirements) {
