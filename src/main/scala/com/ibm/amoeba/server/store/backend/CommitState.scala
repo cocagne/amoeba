@@ -1,4 +1,4 @@
-package com.ibm.amoeba.server.store
+package com.ibm.amoeba.server.store.backend
 
 import com.ibm.amoeba.common.DataBuffer
 import com.ibm.amoeba.common.objects.{Metadata, ObjectId, ObjectType}

@@ -9,6 +9,8 @@ import com.ibm.amoeba.common.store.{ReadState, StoreId, StorePointer}
 import com.ibm.amoeba.common.transaction.TransactionId
 import com.ibm.amoeba.server.crl.{AllocSaveComplete, AllocationRecoveryState, CrashRecoveryLog, SaveCompletion, TxSaveComplete}
 import com.ibm.amoeba.server.network.Messenger
+import com.ibm.amoeba.server.store.backend.{Backend, Commit, CommitState, Completion, Read}
+import com.ibm.amoeba.server.store.cache.ObjectCache
 import com.ibm.amoeba.server.transaction.Tx
 
 

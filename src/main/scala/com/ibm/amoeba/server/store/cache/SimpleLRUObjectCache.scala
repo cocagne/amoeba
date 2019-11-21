@@ -1,6 +1,7 @@
-package com.ibm.amoeba.server.store
+package com.ibm.amoeba.server.store.cache
 
 import com.ibm.amoeba.common.objects.ObjectId
+import com.ibm.amoeba.server.store.ObjectState
 
 import scala.collection.immutable.HashMap
 

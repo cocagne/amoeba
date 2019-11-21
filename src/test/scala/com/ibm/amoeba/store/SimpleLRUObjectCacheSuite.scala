@@ -6,7 +6,8 @@ import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp}
 import com.ibm.amoeba.common.objects.{Metadata, ObjectId, ObjectRefcount, ObjectRevision, ObjectType}
 import com.ibm.amoeba.common.store.StorePointer
 import com.ibm.amoeba.common.transaction.TransactionId
-import com.ibm.amoeba.server.store.{ObjectState, SimpleLRUObjectCache}
+import com.ibm.amoeba.server.store.ObjectState
+import com.ibm.amoeba.server.store.cache.SimpleLRUObjectCache
 import org.scalatest.{FunSuite, Matchers}
 
 object SimpleLRUObjectCacheSuite {

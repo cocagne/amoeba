@@ -1,11 +1,14 @@
-package com.ibm.amoeba.server.store
+package com.ibm.amoeba.server.store.backend
 
 import com.ibm.amoeba.common.DataBuffer
 import com.ibm.amoeba.common.objects.{Metadata, ObjectId, ObjectType}
-import com.ibm.amoeba.common.store.StorePointer
+import com.ibm.amoeba.common.store.{StoreId, StorePointer}
 import com.ibm.amoeba.common.transaction.TransactionId
+import com.ibm.amoeba.server.store.{AllocationError, Locater}
 
 trait Backend {
+  val storeId: StoreId
+
   def setCompletionHandler(handler: CompletionHandler)
 
   def allocate(objectId: ObjectId,
