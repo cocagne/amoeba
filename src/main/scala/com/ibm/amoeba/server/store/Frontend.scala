@@ -65,7 +65,7 @@ class Frontend(val storeId: StoreId,
         os.transactionReferences -= 1
 
         if (m.committed) {
-          val cs = CommitState(os.objectId, os.storePointer, os.metadata, os.objectType, os.data)
+          val cs = CommitState(os.objectId, os.storePointer, os.metadata, os.objectType, os.data, os.maxSize)
           backend.commit(cs, m.transactionId)
         } else {
           objectCache.remove(os.objectId)

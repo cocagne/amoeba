@@ -8,4 +8,5 @@ case class CommitState(objectId: ObjectId,
                        storePointer: StorePointer,
                        metadata: Metadata,
                        objectType: ObjectType.Value,
-                       data: DataBuffer)
+                       data: DataBuffer,
+                       maxSize: Option[Int])

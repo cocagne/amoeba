@@ -45,7 +45,7 @@ class MapBackend(val storeId: StoreId) extends Backend {
       metadata = state.metadata,
       objectType = state.objectType,
       data = state.data,
-      maxSize = m.get(state.objectId).flatMap(os => os.maxSize))
+      maxSize = state.maxSize)
     m += (state.objectId -> os)
   }
 }

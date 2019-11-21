@@ -105,7 +105,7 @@ class Tx( trs: TransactionRecoveryState,
         if (os.metadata.revision == r.requiredMetadata.revision) {
           os.metadata = r.requiredMetadata
           os.data = r.data
-          val cs = CommitState(os.objectId, os.storePointer, os.metadata, os.objectType, os.data)
+          val cs = CommitState(os.objectId, os.storePointer, os.metadata, os.objectType, os.data, os.maxSize)
           val txid = TransactionId(r.requiredMetadata.revision.lastUpdateTxUUID)
           // No need to wait for this to complete
           backend.commit(cs, txid)
@@ -151,7 +151,7 @@ class Tx( trs: TransactionRecoveryState,
 
     objects.valuesIterator.foreach { os =>
       if (!skipped.contains(os.objectId)) {
-        val cs = CommitState(os.objectId, os.storePointer, os.metadata, os.objectType, os.data)
+        val cs = CommitState(os.objectId, os.storePointer, os.metadata, os.objectType, os.data, os.maxSize)
 
         backend.commit(cs, transactionId)
       }
