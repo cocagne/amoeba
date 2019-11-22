@@ -8,7 +8,8 @@ import com.ibm.amoeba.server.store.{Locater, ObjectState}
 class MapBackend(val storeId: StoreId) extends Backend {
 
   private var chandler: Option[CompletionHandler] = None
-  private var m: Map[ObjectId, ObjectState] = Map()
+
+  var m: Map[ObjectId, ObjectState] = Map()
 
   override def setCompletionHandler(handler: CompletionHandler): Unit = {
     chandler = Some(handler)
@@ -22,12 +23,14 @@ class MapBackend(val storeId: StoreId) extends Backend {
 
     val sp = StorePointer(storeId.poolIndex, Array())
     val os = new ObjectState(objectId, sp, metadata, objectType, data, maxSize)
-    m += (objectId -> os)
+    // Do not add to store during allocation since not all store implementations will be
+    // able to do so.
+    //m += (objectId -> os)
     Left(sp)
   }
 
   override def abortAllocation(objectId: ObjectId): Unit = {
-    m -= objectId
+    //m -= objectId
   }
 
   override def read(locater: Locater): Unit = {
@@ -47,5 +50,10 @@ class MapBackend(val storeId: StoreId) extends Backend {
       data = state.data,
       maxSize = state.maxSize)
     m += (state.objectId -> os)
+    chandler.foreach { handler =>
+      handler.complete(Commit(storeId, state.objectId, transactionId, Left(())))
+    }
   }
+
+  def get(objectId: ObjectId): Option[ObjectState] = m.get(objectId)
 }

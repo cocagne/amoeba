@@ -3,7 +3,7 @@ package com.ibm.amoeba.server.store
 import java.util.UUID
 
 import com.ibm.amoeba.common.HLCTimestamp
-import com.ibm.amoeba.common.network.{Allocate, AllocateResponse, ClientId, NetworkCodec, ReadResponse, TxAccept, TxFinalized, TxHeartbeat, TxMessage, TxPrepare, TxResolved, TxStatusRequest}
+import com.ibm.amoeba.common.network.{Allocate, AllocateResponse, ClientId, ReadResponse, TxAccept, TxFinalized, TxHeartbeat, TxMessage, TxPrepare, TxResolved, TxStatusRequest}
 import com.ibm.amoeba.common.objects.{Metadata, ObjectId, ObjectRevision, ReadError}
 import com.ibm.amoeba.common.store.{ReadState, StoreId, StorePointer}
 import com.ibm.amoeba.common.transaction.TransactionId
@@ -33,6 +33,7 @@ class Frontend(val storeId: StoreId,
 
   private var pendingReads: Map[ObjectId, List[Either[NetworkRead, TransactionRead]]] = Map()
   private var pendingAllocations: Map[TransactionId, List[AllocateResponse]] = Map()
+  private var allocationCommits: Set[TransactionId] = Set()
 
   def receiveTransactionMessage(msg: TxMessage): Unit = msg match {
     case m: TxPrepare => receivePrepare(m)
@@ -48,7 +49,7 @@ class Frontend(val storeId: StoreId,
     case _ => // Other TxMessages are not relevant
   }
 
-  def receivePrepare(m: TxPrepare): Unit = transactions.get(m.txd.transactionId) match {
+  private def receivePrepare(m: TxPrepare): Unit = transactions.get(m.txd.transactionId) match {
     case Some(tx) => tx.receivePrepare(m)
     case None =>
       val trs = TransactionRecoveryState.initial(m.to, m.txd, m.objectUpdates)
@@ -56,11 +57,11 @@ class Frontend(val storeId: StoreId,
       val tx = new Tx(trs, m.txd, backend, net, crl, m.preTxRebuilds, locaters)
       transactions += (m.txd.transactionId -> tx)
       tx.receivePrepare(m)
-      locaters.foreach(locater => readObjectForTransaction(m.txd.transactionId, locater))
+      locaters.foreach(locater => readObjectForTransaction(tx, locater))
   }
 
   /** TxResolved messages are the one and only mechanism for resolving pending allocations */
-  def receiveResolved(m: TxResolved): Unit = {
+  private def receiveResolved(m: TxResolved): Unit = {
     pendingAllocations.get(m.transactionId).foreach { lst =>
       lst.foreach { ars =>
         // Guaranteed to be in the cache due to the transaction reference
@@ -71,8 +72,10 @@ class Frontend(val storeId: StoreId,
 
         if (m.committed) {
           val cs = CommitState(os.objectId, os.storePointer, os.metadata, os.objectType, os.data, os.maxSize)
+          allocationCommits += m.transactionId
           backend.commit(cs, m.transactionId)
         } else {
+          crl.deleteAllocation(storeId, m.transactionId)
           objectCache.remove(os.objectId)
           backend.abortAllocation(os.objectId)
         }
@@ -84,10 +87,17 @@ class Frontend(val storeId: StoreId,
 
   def backendOperationComplete(completion: Completion): Unit = completion match {
     case r: Read => backendReadComplete(r.objectId, r.storePointer, r.result)
-    case c: Commit => transactions.get(c.transactionId).foreach { tx =>
-      tx.commitComplete(c.objectId, c.result)
-    }
+    case c: Commit =>
+      transactions.get(c.transactionId).foreach { tx =>
+        tx.commitComplete(c.objectId, c.result)
+      }
+
+      if (allocationCommits.contains(c.transactionId)) {
+        allocationCommits -= c.transactionId
+        crl.deleteAllocation(storeId, c.transactionId)
+      }
   }
+
   def readObjectForNetwork(clientId: ClientId, readUUID: UUID, locater: Locater): Unit = {
     objectCache.get(locater.objectId) match {
       case Some(os) =>
@@ -112,16 +122,20 @@ class Frontend(val storeId: StoreId,
     }
   }
 
-  def readObjectForTransaction(transactionId: TransactionId, locater: Locater): Unit = {
-    val rtr = Right(TransactionRead(transactionId))
-
-    pendingReads.get(locater.objectId) match {
-      case Some(lst) =>
-        pendingReads += (locater.objectId -> (rtr :: lst))
-
+  private def readObjectForTransaction(transaction: Tx, locater: Locater): Unit = {
+    objectCache.get(locater.objectId) match {
+      case Some(os) => transaction.objectLoaded(os)
       case None =>
-        pendingReads += (locater.objectId -> (rtr :: Nil))
-        backend.read(locater)
+        val rtr = Right(TransactionRead(transaction.transactionId))
+
+        pendingReads.get(locater.objectId) match {
+          case Some(lst) =>
+            pendingReads += (locater.objectId -> (rtr :: lst))
+
+          case None =>
+            pendingReads += (locater.objectId -> (rtr :: Nil))
+            backend.read(locater)
+        }
     }
   }
 
@@ -181,7 +195,7 @@ class Frontend(val storeId: StoreId,
     val either = backend.allocate(msg.newObjectId, msg.objectType, metadata, msg.objectData, msg.objectSize)
 
     either match {
-      case Right(err) =>
+      case Right(_) =>
         val r = AllocateResponse(msg.fromClient, msg.toStore, msg.allocationTransactionId, msg.newObjectId, None)
         net.sendClientResponse(r)
 

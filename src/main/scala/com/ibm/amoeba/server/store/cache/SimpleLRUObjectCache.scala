@@ -13,7 +13,7 @@ object SimpleLRUObjectCache {
   }
 }
 
-class SimpleLRUObjectCache(val maxEntries: Int) {
+class SimpleLRUObjectCache(val maxEntries: Int) extends ObjectCache {
   import SimpleLRUObjectCache._
 
   var leastRecentlyUsed: Int = 0

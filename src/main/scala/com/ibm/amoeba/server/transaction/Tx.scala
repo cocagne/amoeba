@@ -34,9 +34,10 @@ class Tx( trs: TransactionRecoveryState,
 
   import Tx._
 
+  val transactionId = txd.transactionId
+
   private val storeId = trs.storeId
   private val serializedTxd = trs.serializedTxd
-  private val transactionId = txd.transactionId
   private val objectUpdates = trs.objectUpdates
   private var disposition = trs.disposition
   private var status = trs.status

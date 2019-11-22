@@ -1,3 +1,7 @@
+FIXME - Sweeper impl can only handle 1 allocation per transaction. Major changes needed to fix this.
+FiXME   Will need to include the ObjectId into the TxId
+
+
 * Port the flatbuffers encoding.
 
 * Use encoding for TXD on recovery only
