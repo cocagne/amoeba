@@ -1,22 +1,19 @@
 package com.ibm.amoeba.common.transaction
 
-import java.util.UUID
-
+import com.ibm.amoeba.common.HLCTimestamp
 import com.ibm.amoeba.common.network.ClientId
 import com.ibm.amoeba.common.objects.ObjectPointer
 import com.ibm.amoeba.common.store.StoreId
+import com.ibm.amoeba.server.store.Locater
 
 final case class TransactionDescription (
   /** Uniquely identifies this transaction */
   transactionId: TransactionId,
 
-  /** Used for graceful transaction contention handling.
-    *
-    *  DO NOT rely on this value being in any way accurate. This value is not protected
-    *  against clock skew, drift, system-clock changes, etc. Just don't use it. Pretend
-    *  it doesn't exist.
+  /** Specifies the timestamp of the transaction. After commit, the objects modified by this
+    * transaction will use this value as their last-updated timestamp.
     */
-  startTimestamp: Long,
+  startTimestamp: HLCTimestamp,
 
   /** Defines the primary object which is used for identifying the peers and quorum threshold used to resolve the transaction.
     *
@@ -56,38 +53,48 @@ final case class TransactionDescription (
     */
   notes: List[String] = Nil) {
 
-    def objectRequirements: List[TransactionObjectRequirement] = requirements.flatMap {
-      case tor: TransactionObjectRequirement => Some(tor)
-      case _ => None
-    }
+  def objectRequirements: List[TransactionObjectRequirement] = requirements.flatMap {
+    case tor: TransactionObjectRequirement => Some(tor)
+    case _ => None
+  }
 
-    def allReferencedObjectsSet: Set[ObjectPointer] = objectRequirements.map(_.objectPointer).toSet
+  def allReferencedObjectsSet: Set[ObjectPointer] = objectRequirements.map(_.objectPointer).toSet
 
-    def primaryObjectDataStores: Set[StoreId] = primaryObject.storePointers.foldLeft(Set[StoreId]())((s, sp) => s + StoreId(primaryObject.poolId, sp.poolIndex))
+  def primaryObjectDataStores: Set[StoreId] = primaryObject.storePointers.foldLeft(Set[StoreId]())((s, sp) => s + StoreId(primaryObject.poolId, sp.poolIndex))
 
-    def allDataStores: Set[StoreId] = allReferencedObjectsSet.flatMap(ptr => ptr.storePointers.map(sp => StoreId(ptr.poolId, sp.poolIndex)))
+  def allDataStores: Set[StoreId] = allReferencedObjectsSet.flatMap(ptr => ptr.storePointers.map(sp => StoreId(ptr.poolId, sp.poolIndex)))
 
-    def allHostedObjects(storeId: StoreId): List[ObjectPointer] = allReferencedObjectsSet.foldLeft(List[ObjectPointer]())((l, op) => {
-      if (op.poolId == storeId.poolId) {
-        op.storePointers.find(_.poolIndex == storeId.poolIndex) match {
-          case Some(sp) => op :: l
-          case None => l
-        }
-      } else
-        l
-    })
-
-    def shortString: String = {
-      val sb = new StringBuilder
-      val ol = allReferencedObjectsSet.map(_.shortString).toList.sorted
-      sb.append(s"Tx $transactionId: Objects: $ol")
-      if (notes.nonEmpty) {
-        sb.append("\n")
-        notes.reverse.foreach { note =>
-          sb.append(s"    $note")
-          sb.append("\n")
-        }
+  def allHostedObjects(storeId: StoreId): List[ObjectPointer] = allReferencedObjectsSet.foldLeft(List[ObjectPointer]())((l, op) => {
+    if (op.poolId == storeId.poolId) {
+      op.storePointers.find(_.poolIndex == storeId.poolIndex) match {
+        case Some(sp) => op :: l
+        case None => l
       }
-      sb.toString
+    } else
+      l
+  })
+
+  def hostedObjectLocaters(storeId: StoreId): List[Locater] = allReferencedObjectsSet.foldLeft(List[Locater]())((l, op) => {
+    if (op.poolId == storeId.poolId) {
+      op.storePointers.find(_.poolIndex == storeId.poolIndex) match {
+        case Some(sp) => Locater(op.id, sp) :: l
+        case None => l
+      }
+    } else
+      l
+  })
+
+  def shortString: String = {
+    val sb = new StringBuilder
+    val ol = allReferencedObjectsSet.map(_.shortString).toList.sorted
+    sb.append(s"Tx $transactionId: Objects: $ol")
+    if (notes.nonEmpty) {
+      sb.append("\n")
+      notes.reverse.foreach { note =>
+        sb.append(s"    $note")
+        sb.append("\n")
+      }
     }
+    sb.toString
+  }
 }

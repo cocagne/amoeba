@@ -3,7 +3,6 @@ package com.ibm.amoeba.server.store.backend
 import com.ibm.amoeba.common.objects.{ObjectId, ReadError}
 import com.ibm.amoeba.common.store.{ReadState, StoreId, StorePointer}
 import com.ibm.amoeba.common.transaction.TransactionId
-import com.ibm.amoeba.server.store.CommitError
 
 sealed abstract class Completion
 

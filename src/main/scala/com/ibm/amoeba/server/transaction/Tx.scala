@@ -3,13 +3,13 @@ package com.ibm.amoeba.server.transaction
 import com.ibm.amoeba.common.HLCTimestamp
 import com.ibm.amoeba.common.network.{TxAccept, TxAcceptResponse, TxCommitted, TxFinalized, TxHeartbeat, TxPrepare, TxPrepareResponse, TxResolved, TxStatusRequest, TxStatusResponse}
 import com.ibm.amoeba.common.objects.{ObjectId, ReadError}
-import com.ibm.amoeba.common.paxos.{Accept, Acceptor, Prepare, Promise}
+import com.ibm.amoeba.common.paxos.{Accept, Acceptor, Prepare}
 import com.ibm.amoeba.common.store.StoreId
-import com.ibm.amoeba.common.transaction.{ObjectUpdate, PreTransactionOpportunisticRebuild, TransactionDescription, TransactionDisposition, TransactionId}
+import com.ibm.amoeba.common.transaction.{ObjectUpdate, PreTransactionOpportunisticRebuild, TransactionDescription, TransactionDisposition, TransactionId, TransactionStatus}
 import com.ibm.amoeba.server.crl.{CrashRecoveryLog, TransactionRecoveryState, TxSaveId}
 import com.ibm.amoeba.server.network.Messenger
-import com.ibm.amoeba.server.store.backend.{Backend, CommitState}
-import com.ibm.amoeba.server.store.{CommitError, Locater, ObjectState, RequirementsApplyer, RequirementsChecker, RequirementsLocker}
+import com.ibm.amoeba.server.store.backend.{Backend, CommitError, CommitState}
+import com.ibm.amoeba.server.store.{Locater, ObjectState, RequirementsApplyer, RequirementsChecker, RequirementsLocker}
 import org.apache.logging.log4j.scala.Logging
 
 object Tx {
@@ -52,7 +52,6 @@ class Tx( trs: TransactionRecoveryState,
   private var lastEvent: Long = System.nanoTime()
   private var saveObjectUpdates: Boolean = true
   private var nextCrlSave: TxSaveId = TxSaveId(1)
-  private var skippedCommits: Set[ObjectId] = Set()
   private var committed: Boolean = false
   private var committing: Boolean = false
   private var locked: Boolean = false
@@ -125,7 +124,8 @@ class Tx( trs: TransactionRecoveryState,
       resolvedAndAllObjectsLoaded(resolution)
     }
 
-    // Case received prepare before we have a local disposition (this will usually be true)
+    // Case received prepare before the objects are loaded. This will always be true for the first prepare
+    // message as the receivePrepare() method is called immediately after transaction creation.
 
     delayedPrepare.response.foreach { response =>
       val r = response.copy(disposition=disposition)
@@ -137,14 +137,14 @@ class Tx( trs: TransactionRecoveryState,
     }
   }
 
-  def doCommit(): Unit = if (!committed && !committing && allObjectsLoaded) {
+  private def doCommit(): Unit = if (!committed && !committing && allObjectsLoaded) {
     committing = true
 
     unlock()
 
     val ou = objectUpdates.iterator.map(ou => ObjectId(ou.objectUUID) -> ou.data).toMap
 
-    val skipped = RequirementsApplyer.apply(transactionId, HLCTimestamp(txd.startTimestamp), txd.requirements,
+    val skipped = RequirementsApplyer.apply(transactionId, txd.startTimestamp, txd.requirements,
       objects, ou)
 
     pendingObjectCommits = objects.size - skipped.size
@@ -163,6 +163,8 @@ class Tx( trs: TransactionRecoveryState,
   private def resolvedAndAllObjectsLoaded(committed: Boolean): Unit = {
     if (committed)
       doCommit()
+    else
+      crl.deleteTransaction(storeId, transactionId)
 
     unlock() // Ensure we've unlocked the objects now that result of the Tx is known
 
@@ -175,6 +177,11 @@ class Tx( trs: TransactionRecoveryState,
 
   private def resolved(committed: Boolean): Unit = if (oresolution.isEmpty) {
     oresolution = Some(committed)
+
+    status = if (committed)
+      TransactionStatus.Committed
+    else
+      TransactionStatus.Aborted
 
     if (allObjectsLoaded)
       resolvedAndAllObjectsLoaded(committed)
@@ -226,9 +233,12 @@ class Tx( trs: TransactionRecoveryState,
     resolved(m.committed)
   }
 
-  def receiveFinalized(m: TxFinalized): Unit = {
+  def receiveFinalized(m: TxFinalized): Unit = if (ofinalized.isEmpty) {
     updateLastEvent()
     resolved(m.committed)
+    ofinalized = Some(m.committed)
+    if (m.committed)
+      crl.deleteTransaction(storeId, transactionId)
   }
 
   def receiveHeartbeat(m: TxHeartbeat): Unit = {
@@ -261,6 +271,8 @@ class Tx( trs: TransactionRecoveryState,
     pendingObjectCommits -= 1
     if (pendingObjectCommits == 0) {
       committed = true
+      saveObjectUpdates = false
+      crl.dropTransactionObjectData(storeId, transactionId)
       val m = TxCommitted(lastProposer, storeId, transactionId, objectCommitErrors)
       net.sendTransactionMessage(m)
     }

@@ -6,7 +6,7 @@ import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp}
 import com.ibm.amoeba.common.objects.{AllocationRevisionGuard, ObjectId, ObjectPointer, ObjectRefcount, ObjectRevision, ObjectType, ReadError, ReadType}
 import com.ibm.amoeba.common.paxos.ProposalId
 import com.ibm.amoeba.common.store.{StoreId, StorePointer}
-import com.ibm.amoeba.common.transaction.{TransactionDescription, TransactionDisposition, TransactionId, TransactionStatus}
+import com.ibm.amoeba.common.transaction.{ObjectUpdate, PreTransactionOpportunisticRebuild, TransactionDescription, TransactionDisposition, TransactionId, TransactionStatus}
 
 sealed abstract class Message
 
@@ -118,7 +118,9 @@ final case class TxPrepare(
                             to: StoreId,
                             from: StoreId,
                             txd: TransactionDescription,
-                            proposalId: ProposalId) extends TxMessage
+                            proposalId: ProposalId,
+                            objectUpdates: List[ObjectUpdate],
+                            preTxRebuilds: List[PreTransactionOpportunisticRebuild]) extends TxMessage
 
 final case class TxPrepareResponse(
                                     to: StoreId,

@@ -3,7 +3,7 @@ import com.ibm.amoeba.common.DataBuffer
 import com.ibm.amoeba.common.objects.{Metadata, ObjectId, ObjectType}
 import com.ibm.amoeba.common.store.{ReadState, StoreId, StorePointer}
 import com.ibm.amoeba.common.transaction.TransactionId
-import com.ibm.amoeba.server.store.{AllocationError, Locater, ObjectState}
+import com.ibm.amoeba.server.store.{Locater, ObjectState}
 
 class MapBackend(val storeId: StoreId) extends Backend {
 

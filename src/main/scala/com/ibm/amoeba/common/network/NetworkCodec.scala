@@ -426,7 +426,7 @@ object NetworkCodec {
     
     P.TransactionDescription.startTransactionDescription(builder)
     P.TransactionDescription.addTransactionUuid(builder, encode(builder, o.transactionId.uuid))
-    P.TransactionDescription.addStartTimestamp(builder, o.startTimestamp)
+    P.TransactionDescription.addStartTimestamp(builder, o.startTimestamp.asLong)
     P.TransactionDescription.addPrimaryObject(builder, primaryObject)
     P.TransactionDescription.addDesignatedLeaderUid(builder, o.designatedLeaderUID)
     P.TransactionDescription.addRequirements(builder, requirements)
@@ -481,7 +481,7 @@ object NetworkCodec {
     
     TransactionDescription(
         TransactionId(transactionUUID),
-        startTimestamp,
+        HLCTimestamp(startTimestamp),
         primaryObject,
         designatedLeaderUID,
         requirements(n.requirementsLength()-1, Nil),
@@ -535,7 +535,7 @@ object NetworkCodec {
     val txd = decode(n.txd())
     val proposalId = decode(n.proposalId())
     
-    TxPrepare(to, from, txd, proposalId)
+    TxPrepare(to, from, txd, proposalId, Nil, Nil)
   }
   
   

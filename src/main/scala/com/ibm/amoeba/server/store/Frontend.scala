@@ -3,11 +3,11 @@ package com.ibm.amoeba.server.store
 import java.util.UUID
 
 import com.ibm.amoeba.common.HLCTimestamp
-import com.ibm.amoeba.common.network.{Allocate, AllocateResponse, ClientId, ReadResponse, TxAccept, TxFinalized, TxHeartbeat, TxMessage, TxPrepare, TxResolved, TxStatusRequest}
+import com.ibm.amoeba.common.network.{Allocate, AllocateResponse, ClientId, NetworkCodec, ReadResponse, TxAccept, TxFinalized, TxHeartbeat, TxMessage, TxPrepare, TxResolved, TxStatusRequest}
 import com.ibm.amoeba.common.objects.{Metadata, ObjectId, ObjectRevision, ReadError}
 import com.ibm.amoeba.common.store.{ReadState, StoreId, StorePointer}
 import com.ibm.amoeba.common.transaction.TransactionId
-import com.ibm.amoeba.server.crl.{AllocSaveComplete, AllocationRecoveryState, CrashRecoveryLog, SaveCompletion, TxSaveComplete}
+import com.ibm.amoeba.server.crl.{AllocSaveComplete, AllocationRecoveryState, CrashRecoveryLog, SaveCompletion, TransactionRecoveryState, TxSaveComplete}
 import com.ibm.amoeba.server.network.Messenger
 import com.ibm.amoeba.server.store.backend.{Backend, Commit, CommitState, Completion, Read}
 import com.ibm.amoeba.server.store.cache.ObjectCache
@@ -51,7 +51,12 @@ class Frontend(val storeId: StoreId,
   def receivePrepare(m: TxPrepare): Unit = transactions.get(m.txd.transactionId) match {
     case Some(tx) => tx.receivePrepare(m)
     case None =>
-      // create tx
+      val trs = TransactionRecoveryState.initial(m.to, m.txd, m.objectUpdates)
+      val locaters = m.txd.hostedObjectLocaters(m.to)
+      val tx = new Tx(trs, m.txd, backend, net, crl, m.preTxRebuilds, locaters)
+      transactions += (m.txd.transactionId -> tx)
+      tx.receivePrepare(m)
+      locaters.foreach(locater => readObjectForTransaction(m.txd.transactionId, locater))
   }
 
   /** TxResolved messages are the one and only mechanism for resolving pending allocations */
