@@ -4,7 +4,9 @@ import com.ibm.amoeba.common.objects.{ObjectId, ReadError}
 import com.ibm.amoeba.common.store.{ReadState, StoreId, StorePointer}
 import com.ibm.amoeba.common.transaction.TransactionId
 
-sealed abstract class Completion
+sealed abstract class Completion {
+  val storeId: StoreId
+}
 
 case class Read(storeId: StoreId,
                 objectId: ObjectId,

@@ -3,10 +3,10 @@ package com.ibm.amoeba.server.store
 import java.util.UUID
 
 import com.ibm.amoeba.common.HLCTimestamp
-import com.ibm.amoeba.common.network.{Allocate, AllocateResponse, ClientId, ReadResponse, TxAccept, TxFinalized, TxHeartbeat, TxMessage, TxPrepare, TxResolved, TxStatusRequest}
+import com.ibm.amoeba.common.network.{Allocate, AllocateResponse, ClientId, NetworkCodec, ReadResponse, TxAccept, TxFinalized, TxHeartbeat, TxMessage, TxPrepare, TxResolved, TxStatusRequest}
 import com.ibm.amoeba.common.objects.{Metadata, ObjectId, ObjectRevision, ReadError}
 import com.ibm.amoeba.common.store.{ReadState, StoreId, StorePointer}
-import com.ibm.amoeba.common.transaction.TransactionId
+import com.ibm.amoeba.common.transaction.{TransactionDescription, TransactionId}
 import com.ibm.amoeba.server.crl.{AllocSaveComplete, AllocationRecoveryState, CrashRecoveryLog, SaveCompletion, TransactionRecoveryState, TxSaveComplete}
 import com.ibm.amoeba.server.network.Messenger
 import com.ibm.amoeba.server.store.backend.{Backend, Commit, CommitState, Completion, Read}
@@ -34,6 +34,30 @@ class Frontend(val storeId: StoreId,
   private var pendingReads: Map[ObjectId, List[Either[NetworkRead, TransactionRead]]] = Map()
   private var pendingAllocations: Map[TransactionId, List[AllocateResponse]] = Map()
   private var allocationCommits: Set[TransactionId] = Set()
+
+  {
+    val (ltrs, lalloc) = crl.getFullRecoveryState(storeId)
+
+    ltrs.foreach { trs =>
+      val txd = TransactionDescription.deserialize(trs.serializedTxd)
+      val locaters = txd.hostedObjectLocaters(storeId)
+      val tx = new Tx(trs, txd, backend, net, crl, Nil, locaters)
+      transactions += (txd.transactionId -> tx)
+    }
+
+    lalloc.foreach { ars =>
+      val msg = AllocateResponse(ClientId.Null, storeId, ars.allocationTransactionId,
+        ars.newObjectId, Some(ars.storePointer))
+      var l = pendingAllocations.get(ars.allocationTransactionId) match {
+        case None => Nil
+        case Some(lst) => lst
+      }
+
+      l = msg :: l
+
+      pendingAllocations += (ars.allocationTransactionId -> l)
+    }
+  }
 
   def receiveTransactionMessage(msg: TxMessage): Unit = msg match {
     case m: TxPrepare => receivePrepare(m)
