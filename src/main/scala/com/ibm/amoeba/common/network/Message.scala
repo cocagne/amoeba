@@ -105,7 +105,7 @@ final case class TransactionCompletionQuery(
                                              toStore: StoreId,
                                              fromClient: ClientId,
                                              queryUUID: UUID,
-                                             transactionUUID: UUID) extends ClientRequest
+                                             transactionId: TransactionId) extends ClientRequest
 
 final case class TransactionCompletionResponse(
                                                 toClient: ClientId,

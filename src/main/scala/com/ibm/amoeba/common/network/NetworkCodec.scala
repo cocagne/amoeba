@@ -1134,7 +1134,7 @@ object NetworkCodec {
     P.TransactionCompletionQuery.addToStore(builder, toStore)
     P.TransactionCompletionQuery.addFromClient(builder, encode(builder, o.fromClient.uuid))
     P.TransactionCompletionQuery.addQueryUUID(builder, encode(builder, o.queryUUID))
-    P.TransactionCompletionQuery.addTransactionUUID(builder, encode(builder, o.transactionUUID))
+    P.TransactionCompletionQuery.addTransactionUUID(builder, encode(builder, o.transactionId.uuid))
     P.TransactionCompletionQuery.endTransactionCompletionQuery(builder)
   }
 
@@ -1144,7 +1144,7 @@ object NetworkCodec {
     val queryUUID = decode(n.queryUUID())
     val transactionUUID = decode(n.transactionUUID())
 
-    TransactionCompletionQuery(toStore, ClientId(fromClient), queryUUID, transactionUUID)
+    TransactionCompletionQuery(toStore, ClientId(fromClient), queryUUID, TransactionId(transactionUUID))
   }
 
   def encode(builder:FlatBufferBuilder, o:TransactionCompletionResponse): Int = {

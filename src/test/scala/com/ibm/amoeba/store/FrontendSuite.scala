@@ -12,7 +12,7 @@ import com.ibm.amoeba.common.store.{StoreId, StorePointer}
 import com.ibm.amoeba.common.transaction.{DataUpdate, DataUpdateOperation, ObjectUpdate, TransactionDescription, TransactionId}
 import com.ibm.amoeba.server.crl.{AllocSaveComplete, AllocationRecoveryState, CrashRecoveryLog, CrashRecoveryLogClient, TransactionRecoveryState, TxSaveId}
 import com.ibm.amoeba.server.network.Messenger
-import com.ibm.amoeba.server.store.Frontend
+import com.ibm.amoeba.server.store.{Frontend, TransactionStatusCache}
 import com.ibm.amoeba.server.store.backend.MapBackend
 import com.ibm.amoeba.server.store.cache.SimpleLRUObjectCache
 import org.scalatest.{FunSuite, Matchers}
@@ -89,7 +89,7 @@ class FrontendSuite extends FunSuite with Matchers {
     val its = HLCTimestamp(1)
 
 
-    val f = new Frontend(storeId, backend, cache, net, crl)
+    val f = new Frontend(storeId, backend, cache, net, crl, new TransactionStatusCache())
 
     val ma = Allocate( toStore = storeId,
       fromClient = clientId,
@@ -143,7 +143,7 @@ class FrontendSuite extends FunSuite with Matchers {
     val its = HLCTimestamp(1)
 
 
-    val f = new Frontend(storeId, backend, cache, net, crl)
+    val f = new Frontend(storeId, backend, cache, net, crl, new TransactionStatusCache())
 
     val ma = Allocate( toStore = storeId,
       fromClient = clientId,

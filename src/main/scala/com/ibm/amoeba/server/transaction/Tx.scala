@@ -1,6 +1,5 @@
 package com.ibm.amoeba.server.transaction
 
-import com.ibm.amoeba.common.HLCTimestamp
 import com.ibm.amoeba.common.network.{TxAccept, TxAcceptResponse, TxCommitted, TxFinalized, TxHeartbeat, TxPrepare, TxPrepareResponse, TxResolved, TxStatusRequest, TxStatusResponse}
 import com.ibm.amoeba.common.objects.{ObjectId, ReadError}
 import com.ibm.amoeba.common.paxos.{Accept, Acceptor, Prepare}
@@ -9,7 +8,7 @@ import com.ibm.amoeba.common.transaction.{ObjectUpdate, PreTransactionOpportunis
 import com.ibm.amoeba.server.crl.{CrashRecoveryLog, TransactionRecoveryState, TxSaveId}
 import com.ibm.amoeba.server.network.Messenger
 import com.ibm.amoeba.server.store.backend.{Backend, CommitError, CommitState}
-import com.ibm.amoeba.server.store.{Locater, ObjectState, RequirementsApplyer, RequirementsChecker, RequirementsLocker}
+import com.ibm.amoeba.server.store.{Locater, ObjectState, RequirementsApplyer, RequirementsChecker, RequirementsLocker, TransactionStatusCache}
 import org.apache.logging.log4j.scala.Logging
 
 object Tx {
@@ -29,12 +28,13 @@ class Tx( trs: TransactionRecoveryState,
           private val backend: Backend,
           private val net: Messenger,
           private val crl: CrashRecoveryLog,
+          private val statusCache: TransactionStatusCache,
           private val preTxRebuilds: List[PreTransactionOpportunisticRebuild],
           private val objectLocaters: List[Locater]) extends Logging {
 
   import Tx._
 
-  val transactionId = txd.transactionId
+  val transactionId: TransactionId = txd.transactionId
 
   private val storeId = trs.storeId
   private val serializedTxd = trs.serializedTxd
@@ -58,6 +58,8 @@ class Tx( trs: TransactionRecoveryState,
   private var locked: Boolean = false
   private var lastProposer: StoreId = StoreId(txd.primaryObject.poolId, txd.designatedLeaderUID)
   private var objectCommitErrors: List[ObjectId] = Nil
+
+  statusCache.updateStatus(transactionId, status)
 
   private def allObjectsLoaded: Boolean = pendingObjectLoads == 0
 
@@ -184,6 +186,8 @@ class Tx( trs: TransactionRecoveryState,
     else
       TransactionStatus.Aborted
 
+    statusCache.updateStatus(transactionId, status)
+
     if (allObjectsLoaded)
       resolvedAndAllObjectsLoaded(committed)
   }
@@ -240,6 +244,7 @@ class Tx( trs: TransactionRecoveryState,
     ofinalized = Some(m.committed)
     if (m.committed)
       crl.deleteTransaction(storeId, transactionId)
+    statusCache.updateStatus(transactionId, status, finalized = true)
   }
 
   def receiveHeartbeat(m: TxHeartbeat): Unit = {

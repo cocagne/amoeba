@@ -3,7 +3,7 @@ package com.ibm.amoeba.server.store
 import java.util.UUID
 
 import com.ibm.amoeba.common.HLCTimestamp
-import com.ibm.amoeba.common.network.{Allocate, AllocateResponse, ClientId, NetworkCodec, ReadResponse, TxAccept, TxFinalized, TxHeartbeat, TxMessage, TxPrepare, TxResolved, TxStatusRequest}
+import com.ibm.amoeba.common.network.{Allocate, AllocateResponse, ClientId, NetworkCodec, OpportunisticRebuild, ReadResponse, TxAccept, TxFinalized, TxHeartbeat, TxMessage, TxPrepare, TxResolved, TxStatusRequest}
 import com.ibm.amoeba.common.objects.{Metadata, ObjectId, ObjectRevision, ReadError}
 import com.ibm.amoeba.common.store.{ReadState, StoreId, StorePointer}
 import com.ibm.amoeba.common.transaction.{TransactionDescription, TransactionId}
@@ -16,22 +16,27 @@ import com.ibm.amoeba.server.transaction.Tx
 
 object Frontend {
 
-  case class NetworkRead(clientId: ClientId, requestUUID: UUID)
+  sealed abstract class ReadKind
 
-  case class TransactionRead(transactionId: TransactionId)
+  case class NetworkRead(clientId: ClientId, requestUUID: UUID) extends ReadKind
+
+  case class TransactionRead(transactionId: TransactionId) extends ReadKind
+
+  case class OpportuneRebuild(or: OpportunisticRebuild) extends ReadKind
 }
 
 class Frontend(val storeId: StoreId,
                val backend: Backend,
                val objectCache: ObjectCache,
                val net: Messenger,
-               val crl: CrashRecoveryLog) {
+               val crl: CrashRecoveryLog,
+               val statusCache: TransactionStatusCache) {
 
   import Frontend._
 
   var transactions: Map[TransactionId, Tx] = Map()
 
-  private var pendingReads: Map[ObjectId, List[Either[NetworkRead, TransactionRead]]] = Map()
+  private var pendingReads: Map[ObjectId, List[ReadKind]] = Map()
   private var pendingAllocations: Map[TransactionId, List[AllocateResponse]] = Map()
   private var allocationCommits: Set[TransactionId] = Set()
 
@@ -41,7 +46,7 @@ class Frontend(val storeId: StoreId,
     ltrs.foreach { trs =>
       val txd = TransactionDescription.deserialize(trs.serializedTxd)
       val locaters = txd.hostedObjectLocaters(storeId)
-      val tx = new Tx(trs, txd, backend, net, crl, Nil, locaters)
+      val tx = new Tx(trs, txd, backend, net, crl, statusCache, Nil, locaters)
       transactions += (txd.transactionId -> tx)
     }
 
@@ -78,7 +83,7 @@ class Frontend(val storeId: StoreId,
     case None =>
       val trs = TransactionRecoveryState.initial(m.to, m.txd, m.objectUpdates)
       val locaters = m.txd.hostedObjectLocaters(m.to)
-      val tx = new Tx(trs, m.txd, backend, net, crl, m.preTxRebuilds, locaters)
+      val tx = new Tx(trs, m.txd, backend, net, crl, statusCache, m.preTxRebuilds, locaters)
       transactions += (m.txd.transactionId -> tx)
       tx.receivePrepare(m)
       locaters.foreach(locater => readObjectForTransaction(tx, locater))
@@ -133,15 +138,32 @@ class Frontend(val storeId: StoreId,
 
 
       case None =>
-        val lnr = Left(NetworkRead(clientId, readUUID))
+        val nr = NetworkRead(clientId, readUUID)
 
         pendingReads.get(locater.objectId) match {
           case Some(lst) =>
-            pendingReads += (locater.objectId -> (lnr :: lst))
+            pendingReads += (locater.objectId -> (nr :: lst))
 
           case None =>
-            pendingReads += (locater.objectId -> (lnr :: Nil))
+            pendingReads += (locater.objectId -> (nr :: Nil))
             backend.read(locater)
+        }
+    }
+  }
+
+  def readObjectForOpportunisticRebuild(op: OpportunisticRebuild): Unit = {
+    objectCache.get(op.pointer.id) match {
+      case Some(os) => opportunisticRebuild(op, os)
+      case None =>
+        op.pointer.getStoreLocater(storeId).foreach {locater =>
+          pendingReads.get(locater.objectId) match {
+            case Some(lst) =>
+              pendingReads += (locater.objectId -> (OpportuneRebuild(op) :: lst))
+
+            case None =>
+              pendingReads += (locater.objectId -> (OpportuneRebuild(op) :: Nil))
+              backend.read(locater)
+          }
         }
     }
   }
@@ -150,16 +172,32 @@ class Frontend(val storeId: StoreId,
     objectCache.get(locater.objectId) match {
       case Some(os) => transaction.objectLoaded(os)
       case None =>
-        val rtr = Right(TransactionRead(transaction.transactionId))
+        val tr = TransactionRead(transaction.transactionId)
 
         pendingReads.get(locater.objectId) match {
           case Some(lst) =>
-            pendingReads += (locater.objectId -> (rtr :: lst))
+            pendingReads += (locater.objectId -> (tr :: lst))
 
           case None =>
-            pendingReads += (locater.objectId -> (rtr :: Nil))
+            pendingReads += (locater.objectId -> (tr :: Nil))
             backend.read(locater)
         }
+    }
+  }
+
+  private def opportunisticRebuild(op: OpportunisticRebuild, os: ObjectState): Unit = {
+    if (os.metadata.revision == op.revision) {
+      val rc = if (op.refcount.updateSerial > os.metadata.refcount.updateSerial)
+        op.refcount
+      else
+        os.metadata.refcount
+
+      os.metadata = Metadata(op.revision, rc, op.timestamp)
+      os.data = op.data
+      val cs = CommitState(os.objectId, os.storePointer, os.metadata, os.objectType, os.data, os.maxSize)
+      val txid = TransactionId(op.revision.lastUpdateTxUUID)
+      // No need to wait for this to complete
+      backend.commit(cs, txid)
     }
   }
 
@@ -174,25 +212,29 @@ class Frontend(val storeId: StoreId,
 
         pendingReads.get(objectId).foreach { lpr =>
           lpr.foreach {
-            case Left(netRead) =>
+            case netRead: NetworkRead =>
               val cs = ReadResponse.CurrentState(os.metadata.revision, os.metadata.refcount, os.metadata.timestamp,
                 os.data.size, Some(os.data), os.lockedWriteTransactions )
 
               val rr = ReadResponse(netRead.clientId, storeId, netRead.requestUUID, HLCTimestamp.now, Right(cs) )
               net.sendClientResponse(rr)
 
-            case Right(tr) => transactions.get(tr.transactionId).foreach { tx => tx.objectLoaded(os) }
+            case tr: TransactionRead => transactions.get(tr.transactionId).foreach { tx => tx.objectLoaded(os) }
+
+            case OpportuneRebuild(op) => opportunisticRebuild(op, os)
           }
         }
 
       case Right(err) =>
         pendingReads.get(objectId).foreach { lpr =>
           lpr.foreach {
-            case Left(netRead) =>
+            case netRead: NetworkRead =>
               val rr = ReadResponse(netRead.clientId, storeId, netRead.requestUUID, HLCTimestamp.now, Left(err) )
               net.sendClientResponse(rr)
 
-            case Right(tr) => transactions.get(tr.transactionId).foreach { tx => tx.objectLoadFailed(objectId, err) }
+            case tr: TransactionRead => transactions.get(tr.transactionId).foreach { tx => tx.objectLoadFailed(objectId, err) }
+
+            case _: OpportuneRebuild => // Can't guarantee correctness so we need to ignore this
           }
         }
     }

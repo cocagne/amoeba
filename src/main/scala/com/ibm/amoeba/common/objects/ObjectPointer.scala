@@ -7,6 +7,7 @@ import com.ibm.amoeba.common.ida.IDA
 import com.ibm.amoeba.common.pool.PoolId
 import com.ibm.amoeba.common.store.{StoreId, StorePointer}
 import com.ibm.amoeba.common.util.Varint
+import com.ibm.amoeba.server.store.Locater
 
 sealed abstract class ObjectPointer(
                                      val id: ObjectId,
@@ -47,6 +48,10 @@ sealed abstract class ObjectPointer(
     storePointers.find(sp => sp.poolIndex == storeId.poolIndex)
   } else
     None
+
+  def getStoreLocater(storeId: StoreId): Option[Locater] = getStorePointer(storeId).map { sp =>
+    Locater(id, sp)
+  }
 
   def hostingStores: List[StoreId] = storePointers.iterator.map(sp => StoreId(poolId, sp.poolIndex)).toList
 

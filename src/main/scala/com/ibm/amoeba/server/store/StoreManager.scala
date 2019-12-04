@@ -3,8 +3,9 @@ package com.ibm.amoeba.server.store
 
 import java.util.concurrent.{LinkedBlockingQueue, TimeUnit}
 
-import com.ibm.amoeba.common.network.{Allocate, ClientRequest, Read, TxMessage}
+import com.ibm.amoeba.common.network.{Allocate, ClientRequest, OpportunisticRebuild, Read, TransactionCompletionQuery, TransactionCompletionResponse, TxFinalized, TxMessage, TxPrepare, TxResolved, TxStatusRequest}
 import com.ibm.amoeba.common.store.StoreId
+import com.ibm.amoeba.common.transaction.TransactionStatus
 import com.ibm.amoeba.server.crl.{CrashRecoveryLogFactory, SaveCompletion, SaveCompletionHandler}
 import com.ibm.amoeba.server.network.Messenger
 import com.ibm.amoeba.server.store.backend.{Backend, Completion, CompletionHandler}
@@ -46,6 +47,8 @@ class StoreManager(val objectCache: ObjectCache,
   private val ioHandler = new IOHandler(this)
   private val crlHandler = new CRLHandler(this)
 
+  private val txStatusCache = new TransactionStatusCache()
+
   private val crl = crlFactory.createCRL(crlHandler)
 
   private var exitThread = false
@@ -81,6 +84,34 @@ class StoreManager(val objectCache: ObjectCache,
     shutdownPromise.future
   }
 
+  private def transactionMessageHandler(msg: TxMessage): Unit = {
+
+    msg match {
+      case m: TxPrepare =>
+        txStatusCache.getStatus(m.txd.transactionId).foreach { entry =>
+          val (r, committed: Boolean) = entry.status match {
+            case TransactionStatus.Unresolved => (None, false)
+            case TransactionStatus.Aborted =>
+              (Some(TxResolved(msg.to, msg.from, m.txd.transactionId, committed = false)), false)
+            case TransactionStatus.Committed =>
+              (Some(TxResolved(msg.to, msg.from, m.txd.transactionId, committed = true)), true)
+          }
+
+          r.foreach(resolved => net.sendTransactionMessage(resolved))
+
+          if (entry.finalized)
+            net.sendTransactionMessage(TxFinalized(msg.from, msg.to, m.txd.transactionId, committed))
+        }
+
+      case _ =>
+    }
+
+    stores.get(msg.to).foreach { store =>
+      store.receiveTransactionMessage(msg)
+    }
+
+  }
+
   private def threadLoop(): Unit = while (!exitThread) {
     events.poll(5, TimeUnit.MINUTES) match {
 
@@ -92,23 +123,34 @@ class StoreManager(val objectCache: ObjectCache,
         store.crlSaveComplete(op)
       }
 
-      case TransactionMessage(msg) => stores.get(msg.to).foreach { store =>
-        store.receiveTransactionMessage(msg)
-      }
+      case TransactionMessage(msg) => transactionMessageHandler(msg)
 
       case ClientReq(msg) => stores.get(msg.toStore).foreach { store =>
         msg match {
           case a: Allocate => store.allocateObject(a)
+
           case r: Read =>
-            r.objectPointer.getStorePointer(store.storeId).foreach { sp =>
-              val locater = Locater(r.objectPointer.id, sp)
+            r.objectPointer.getStoreLocater(store.storeId).foreach { locater =>
               store.readObjectForNetwork(r.fromClient, r.readUUID, locater)
             }
+
+          case op: OpportunisticRebuild => store.readObjectForOpportunisticRebuild(op)
+
+          case s: TransactionCompletionQuery =>
+            val isComplete = txStatusCache.getStatus(s.transactionId) match {
+              case None => false
+              case Some(e) => e.status match {
+                case TransactionStatus.Unresolved => false
+                case _ => true
+              }
+            }
+            val r = TransactionCompletionResponse(s.fromClient, s.toStore, s.queryUUID, isComplete)
+            net.sendClientResponse(r)
         }
       }
 
       case LoadStore(backend) =>
-        val f = new Frontend(backend.storeId, backend, objectCache, net, crl)
+        val f = new Frontend(backend.storeId, backend, objectCache, net, crl, txStatusCache)
         backend.setCompletionHandler(ioHandler)
         stores += backend.storeId -> f
 
