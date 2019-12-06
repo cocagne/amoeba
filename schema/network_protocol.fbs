@@ -340,6 +340,20 @@ table TransactionCompletionResponse {
   isComplete: bool;
 }
 
+table TransactionResolved {
+  fromStore: StoreId;
+  toClient: UUID;
+  transaction_uuid: UUID;
+  committed: bool;
+}
+
+table TransactionFinalized {
+  fromStore: StoreId;
+  toClient: UUID;
+  transaction_uuid: UUID;
+  committed: bool;
+}
+
 //---------------------------------------------------------------------------
 //- Allocation Messages
 //---------------------------------------------------------------------------

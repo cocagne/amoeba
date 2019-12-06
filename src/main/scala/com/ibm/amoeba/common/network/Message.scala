@@ -113,6 +113,18 @@ final case class TransactionCompletionResponse(
                                                 queryUUID: UUID,
                                                 isComplete: Boolean) extends ClientResponse
 
+final case class TransactionResolved(
+                                      toClient: ClientId,
+                                      fromStore: StoreId,
+                                      transactionId: TransactionId,
+                                      committed: Boolean) extends ClientResponse
+
+final case class TransactionFinalized(
+                                       toClient: ClientId,
+                                       fromStore: StoreId,
+                                       transactionId: TransactionId,
+                                       committed: Boolean) extends ClientResponse
+
 
 final case class TxPrepare(
                             to: StoreId,

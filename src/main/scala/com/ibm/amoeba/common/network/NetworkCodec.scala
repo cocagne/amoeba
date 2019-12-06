@@ -1193,4 +1193,44 @@ object NetworkCodec {
 
     TransactionCompletionResponse(ClientId(toClient), fromStore, queryUUID, isComplete)
   }
+
+  def encode(builder:FlatBufferBuilder, o:TransactionFinalized): Int = {
+    val fromStore = encode(builder, o.fromStore)
+
+    P.TransactionFinalized.startTransactionFinalized(builder)
+    P.TransactionFinalized.addToClient(builder, encode(builder, o.toClient.uuid))
+    P.TransactionFinalized.addFromStore(builder, fromStore)
+    P.TransactionFinalized.addTransactionUuid(builder, encode(builder, o.transactionId.uuid))
+    P.TransactionFinalized.addCommitted(builder, o.committed)
+    P.TransactionFinalized.endTransactionFinalized(builder)
+  }
+
+  def decode(n: P.TransactionFinalized): TransactionFinalized = {
+    val toClient = decode(n.toClient())
+    val fromStore = decode(n.fromStore())
+    val transactionUUID = decode(n.transactionUuid())
+    val committed = n.committed()
+
+    TransactionFinalized(ClientId(toClient), fromStore, TransactionId(transactionUUID), committed)
+  }
+
+  def encode(builder:FlatBufferBuilder, o:TransactionResolved): Int = {
+    val fromStore = encode(builder, o.fromStore)
+
+    P.TransactionResolved.startTransactionResolved(builder)
+    P.TransactionResolved.addToClient(builder, encode(builder, o.toClient.uuid))
+    P.TransactionResolved.addFromStore(builder, fromStore)
+    P.TransactionResolved.addTransactionUuid(builder, encode(builder, o.transactionId.uuid))
+    P.TransactionResolved.addCommitted(builder, o.committed)
+    P.TransactionResolved.endTransactionResolved(builder)
+  }
+
+  def decode(n: P.TransactionResolved): TransactionResolved = {
+    val toClient = decode(n.toClient())
+    val fromStore = decode(n.fromStore())
+    val transactionUUID = decode(n.transactionUuid())
+    val committed = n.committed()
+
+    TransactionResolved(ClientId(toClient), fromStore, TransactionId(transactionUUID), committed)
+  }
 }

@@ -8,4 +8,6 @@ trait Messenger {
 
   def sendTransactionMessage(msg: TxMessage): Unit
 
+  def sendTransactionMessages(msg: List[TxMessage]): Unit
+
 }

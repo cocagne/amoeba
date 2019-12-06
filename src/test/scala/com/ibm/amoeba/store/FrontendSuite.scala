@@ -40,6 +40,8 @@ object FrontendSuite {
 
     override def sendTransactionMessage(msg: TxMessage): Unit = tx = Some(msg)
 
+    override def sendTransactionMessages(msg: List[TxMessage]): Unit = Some(msg.head)
+
     def clientMessage(): Option[ClientResponse] = {
       val t = cr
       cr = None
