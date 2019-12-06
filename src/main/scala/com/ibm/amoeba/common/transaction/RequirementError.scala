@@ -1,13 +1,15 @@
 package com.ibm.amoeba.common.transaction
 
-object RequirementError extends Enumeration {
-  val TransactionCollision: Value = Value
-  val LocalTimeError: Value = Value
-  val MissingObject: Value = Value
-  val MissingObjectUpdate: Value = Value
-  val ObjectTypeError: Value = Value
-  val RevisionMismatch: Value = Value
-  val RefcountMismatch: Value = Value
-  val KeyTimestampError: Value = Value
-  val KeyExistenceError: Value = Value
-}
+sealed abstract class RequirementError
+
+case class TransactionCollision(txid: TransactionId) extends RequirementError
+
+case class LocalTimeError() extends RequirementError
+case class MissingObject() extends RequirementError
+case class MissingObjectUpdate() extends RequirementError
+case class ObjectTypeError() extends RequirementError
+case class RevisionMismatch() extends RequirementError
+case class RefcountMismatch() extends RequirementError
+case class KeyTimestampError() extends RequirementError
+case class KeyExistenceError() extends RequirementError
+

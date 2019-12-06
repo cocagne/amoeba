@@ -186,6 +186,7 @@ table TxPrepareResponse {
   last_accepted_id: ProposalID; // Valid for Promise responses
   last_accepted_value: bool;    // Valid for Promise responses
   disposition: TransactionDisposition;
+  transaction_collisions: [byte]; // sequence of 16-byte transaction UUIDs
 }
 
 table TxAccept {

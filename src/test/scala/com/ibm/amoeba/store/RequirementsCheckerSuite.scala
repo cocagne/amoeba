@@ -7,7 +7,7 @@ import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp}
 import com.ibm.amoeba.common.objects.{DataObjectPointer, Key, KeyValueObjectPointer, Metadata, ObjectId, ObjectRefcount, ObjectRevision, ObjectType, Value}
 import com.ibm.amoeba.common.pool.PoolId
 import com.ibm.amoeba.common.store.StorePointer
-import com.ibm.amoeba.common.transaction.{DataUpdate, DataUpdateOperation, KeyValueUpdate, LocalTimeRequirement, RefcountUpdate, RequirementError, RevisionLock, TransactionId, VersionBump}
+import com.ibm.amoeba.common.transaction.{DataUpdate, DataUpdateOperation, KeyExistenceError, KeyValueUpdate, LocalTimeError, LocalTimeRequirement, MissingObjectUpdate, RefcountMismatch, RefcountUpdate, RequirementError, RevisionLock, RevisionMismatch, TransactionCollision, TransactionId, VersionBump}
 import com.ibm.amoeba.server.store.{KVObjectState, ObjectState, RequirementsChecker, ValueState}
 import org.scalatest.{FunSuite, Matchers}
 
@@ -62,7 +62,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
             requirements: List[TransactionRequirement],
             objects: HashMap[ObjectId, ObjectState],
             objectUpdates: HashMap[ObjectId, DataBuffer]):
-  (HashMap[ObjectId, RequirementError.Value], List[RequirementError.Value]) = {*/
+  (HashMap[ObjectId, Value], List[Value]) = {*/
 
   test("DataUpdate okay") {
     val o = new ObjectState(
@@ -158,14 +158,14 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
 
     var objects: HashMap[ObjectId, ObjectState] = new HashMap
     var updates: HashMap[ObjectId, DataBuffer] = new HashMap
-    var expected: HashMap[ObjectId, RequirementError.Value] = new HashMap
+    var expected: HashMap[ObjectId, RequirementError] = new HashMap
 
     objects += (o.objectId -> o)
     updates += (o.objectId -> DataBuffer.Empty)
 
     val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
 
-    expected += (o.objectId -> RequirementError.TransactionCollision)
+    expected += (o.objectId -> TransactionCollision(tx2))
     assert(oerrs == expected)
     assert(errs.isEmpty)
   }
@@ -186,14 +186,14 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
 
     var objects: HashMap[ObjectId, ObjectState] = new HashMap
     var updates: HashMap[ObjectId, DataBuffer] = new HashMap
-    var expected: HashMap[ObjectId, RequirementError.Value] = new HashMap
+    var expected: HashMap[ObjectId, RequirementError] = new HashMap
 
     objects += (o.objectId -> o)
     updates += (o.objectId -> DataBuffer.Empty)
 
     val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
 
-    expected += (o.objectId -> RequirementError.TransactionCollision)
+    expected += (o.objectId -> TransactionCollision(tx2))
     assert(oerrs == expected)
     assert(errs.isEmpty)
   }
@@ -212,14 +212,14 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
 
     var objects: HashMap[ObjectId, ObjectState] = new HashMap
     var updates: HashMap[ObjectId, DataBuffer] = new HashMap
-    var expected: HashMap[ObjectId, RequirementError.Value] = new HashMap
+    var expected: HashMap[ObjectId, RequirementError] = new HashMap
 
     objects += (o.objectId -> o)
     updates += (o.objectId -> DataBuffer.Empty)
 
     val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
 
-    expected += (o.objectId -> RequirementError.RevisionMismatch)
+    expected += (o.objectId -> RevisionMismatch())
     assert(oerrs == expected)
     assert(errs.isEmpty)
   }
@@ -238,14 +238,14 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
 
     var objects: HashMap[ObjectId, ObjectState] = new HashMap
     var updates: HashMap[ObjectId, DataBuffer] = new HashMap
-    var expected: HashMap[ObjectId, RequirementError.Value] = new HashMap
+    var expected: HashMap[ObjectId, RequirementError] = new HashMap
 
     objects += (o.objectId -> o)
     updates += (o.objectId -> DataBuffer.Empty)
 
     val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
 
-    expected += (o.objectId -> RequirementError.RevisionMismatch)
+    expected += (o.objectId -> RevisionMismatch())
     assert(oerrs == expected)
     assert(errs.isEmpty)
   }
@@ -320,13 +320,13 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
 
     var objects: HashMap[ObjectId, ObjectState] = new HashMap
     var updates: HashMap[ObjectId, DataBuffer] = new HashMap
-    var expected: HashMap[ObjectId, RequirementError.Value] = new HashMap
+    var expected: HashMap[ObjectId, RequirementError] = new HashMap
 
     objects += (o.objectId -> o)
 
     val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
 
-    expected += (o.objectId -> RequirementError.MissingObjectUpdate)
+    expected += (o.objectId -> MissingObjectUpdate())
     assert(oerrs == expected)
     assert(errs.isEmpty)
   }
@@ -347,7 +347,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
 
     var objects: HashMap[ObjectId, ObjectState] = new HashMap
     var updates: HashMap[ObjectId, DataBuffer] = new HashMap
-    var expected: HashMap[ObjectId, RequirementError.Value] = new HashMap
+    var expected: HashMap[ObjectId, RequirementError] = new HashMap
 
     objects += (o.objectId -> o)
     updates += (o.objectId -> DataBuffer.Empty)
@@ -356,7 +356,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
 
     val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
 
-    expected += (o.objectId -> RequirementError.TransactionCollision)
+    expected += (o.objectId -> TransactionCollision(tx2))
     assert(oerrs == expected)
     assert(errs.isEmpty)
   }
@@ -377,14 +377,14 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
 
     var objects: HashMap[ObjectId, ObjectState] = new HashMap
     var updates: HashMap[ObjectId, DataBuffer] = new HashMap
-    var expected: HashMap[ObjectId, RequirementError.Value] = new HashMap
+    var expected: HashMap[ObjectId, RequirementError] = new HashMap
 
     objects += (o.objectId -> o)
     updates += (o.objectId -> DataBuffer.Empty)
 
     val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
 
-    expected += (o.objectId -> RequirementError.RevisionMismatch)
+    expected += (o.objectId -> RevisionMismatch())
     assert(oerrs == expected)
     assert(errs.isEmpty)
   }
@@ -405,14 +405,14 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
 
     var objects: HashMap[ObjectId, ObjectState] = new HashMap
     var updates: HashMap[ObjectId, DataBuffer] = new HashMap
-    var expected: HashMap[ObjectId, RequirementError.Value] = new HashMap
+    var expected: HashMap[ObjectId, RequirementError] = new HashMap
 
     objects += (o.objectId -> o)
     updates += (o.objectId -> DataBuffer.Empty)
 
     val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
 
-    expected += (o.objectId -> RequirementError.RefcountMismatch)
+    expected += (o.objectId -> RefcountMismatch())
     assert(oerrs == expected)
     assert(errs.isEmpty)
   }
@@ -437,7 +437,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
     val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
 
     assert(oerrs.isEmpty)
-    assert(errs == List(RequirementError.LocalTimeError))
+    assert(errs == List(LocalTimeError()))
   }
 
   test("Localtime error") {
@@ -456,7 +456,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
 
     var objects: HashMap[ObjectId, ObjectState] = new HashMap
     var updates: HashMap[ObjectId, DataBuffer] = new HashMap
-    var expected: HashMap[ObjectId, RequirementError.Value] = new HashMap
+    var expected: HashMap[ObjectId, RequirementError] = new HashMap
 
     val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
 
@@ -527,8 +527,8 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
 
       val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
 
-      var expected: HashMap[ObjectId, RequirementError.Value] = new HashMap
-      expected += (o.objectId -> RequirementError.KeyExistenceError)
+      var expected: HashMap[ObjectId, RequirementError] = new HashMap
+      expected += (o.objectId -> KeyExistenceError())
       assert(oerrs == expected)
       assert(errs.isEmpty)
     }
@@ -547,8 +547,8 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
 
       val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
 
-      var expected: HashMap[ObjectId, RequirementError.Value] = new HashMap
-      expected += (o.objectId -> RequirementError.TransactionCollision)
+      var expected: HashMap[ObjectId, RequirementError] = new HashMap
+      expected += (o.objectId -> TransactionCollision(tx2))
       assert(errs.isEmpty)
     }
 

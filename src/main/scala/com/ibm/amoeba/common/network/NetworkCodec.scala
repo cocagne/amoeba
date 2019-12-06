@@ -557,6 +557,19 @@ object NetworkCodec {
         P.TxPrepareResponseType.Nack
     }
     val disposition = encodeTransactionDisposition(o.disposition)
+
+    val collisions: Int = if (o.collisions.isEmpty) -1 else {
+      val arr = new Array[Byte](o.collisions.size * 16)
+
+      val bb = ByteBuffer.wrap(arr)
+      bb.order(ByteOrder.BIG_ENDIAN)
+      o.collisions.foreach { id =>
+        bb.putLong(id.uuid.getMostSignificantBits)
+        bb.putLong(id.uuid.getLeastSignificantBits)
+      }
+
+      P.TxPrepareResponse.createTransactionCollisionsVector(builder, arr)
+    }
     
     P.TxPrepareResponse.startTxPrepareResponse(builder)
     P.TxPrepareResponse.addTo(builder, to)
@@ -570,6 +583,8 @@ object NetworkCodec {
       P.TxPrepareResponse.addLastAcceptedValue(builder, lastAcceptedValue)
     }
     P.TxPrepareResponse.addDisposition(builder, disposition)
+    if (collisions != -1)
+      P.TxPrepareResponse.addTransactionCollisions(builder, collisions)
     P.TxPrepareResponse.endTxPrepareResponse(builder)
   }
   def decode(n: P.TxPrepareResponse): TxPrepareResponse = {
@@ -586,8 +601,20 @@ object NetworkCodec {
     val proposalId = decode(n.proposalId())
     val disposition = decodeTransactionDispositione(n.disposition())
 
-        
-    TxPrepareResponse(to, from, TransactionId(transactionUUID), response, proposalId, disposition)
+    val collisions = n.transactionCollisionsAsByteBuffer() match {
+      case null => Nil
+      case bb =>
+        bb.order(ByteOrder.BIG_ENDIAN)
+        var colls: List[TransactionId] = Nil
+        while (bb.remaining() != 0) {
+          val msb = bb.getLong()
+          val lsb = bb.getLong()
+          colls = TransactionId(new UUID(msb, lsb)) :: colls
+        }
+        colls
+    }
+
+    TxPrepareResponse(to, from, TransactionId(transactionUUID), response, proposalId, disposition, collisions)
   }
   
 

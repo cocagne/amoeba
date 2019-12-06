@@ -4,7 +4,7 @@ import com.ibm.amoeba.common.network.{TxAccept, TxAcceptResponse, TxCommitted, T
 import com.ibm.amoeba.common.objects.{ObjectId, ReadError}
 import com.ibm.amoeba.common.paxos.{Accept, Acceptor, Prepare}
 import com.ibm.amoeba.common.store.StoreId
-import com.ibm.amoeba.common.transaction.{ObjectUpdate, PreTransactionOpportunisticRebuild, TransactionDescription, TransactionDisposition, TransactionId, TransactionStatus}
+import com.ibm.amoeba.common.transaction.{ObjectUpdate, PreTransactionOpportunisticRebuild, RequirementError, TransactionCollision, TransactionDescription, TransactionDisposition, TransactionId, TransactionStatus}
 import com.ibm.amoeba.server.crl.{CrashRecoveryLog, TransactionRecoveryState, TxSaveId}
 import com.ibm.amoeba.server.network.Messenger
 import com.ibm.amoeba.server.store.backend.{Backend, CommitError, CommitState}
@@ -40,6 +40,7 @@ class Tx( trs: TransactionRecoveryState,
   private val serializedTxd = trs.serializedTxd
   private val objectUpdates = trs.objectUpdates
   private var disposition = trs.disposition
+  private var collisions: List[TransactionId] = Nil
   private var status = trs.status
   private var oresolution: Option[Boolean] = None
   private var ofinalized: Option[Boolean] = None
@@ -120,6 +121,12 @@ class Tx( trs: TransactionRecoveryState,
 
     val (m, l) = RequirementsChecker.check(transactionId, txd.requirements, objects, ou)
 
+    // Find all objects with transaction collisions for inclusion into the response message
+    m.foreach { t => t._2 match {
+      case TransactionCollision(txid) => collisions = txid :: collisions
+      case _ =>
+    }}
+
     disposition = if (m.isEmpty && l.isEmpty) TransactionDisposition.VoteCommit else TransactionDisposition.VoteAbort
 
     // Case Resolution Complete
@@ -131,7 +138,7 @@ class Tx( trs: TransactionRecoveryState,
     // message as the receivePrepare() method is called immediately after transaction creation.
 
     delayedPrepare.response.foreach { response =>
-      val r = response.copy(disposition=disposition)
+      val r = response.copy(disposition=disposition, collisions=collisions)
       delayedPrepare.response = Some(r)
       delayedPrepare.saveId = nextCrlSaveId()
       val state = TransactionRecoveryState(storeId, serializedTxd, trsObjectUpdates,
@@ -207,7 +214,7 @@ class Tx( trs: TransactionRecoveryState,
       case Left(n) => Left(TxPrepareResponse.Nack(n.promisedProposalId))
     }
 
-    val txr = TxPrepareResponse(m.from, storeId, transactionId, result, m.proposalId, disposition)
+    val txr = TxPrepareResponse(m.from, storeId, transactionId, result, m.proposalId, disposition, collisions)
 
     delayedPrepare.response = Some(txr)
 

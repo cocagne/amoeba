@@ -15,7 +15,7 @@ object RequirementsLocker {
 
     def getState(oid: ObjectId): ObjectState = {
       objects.get(oid) match {
-        case None => throw ObjectErr(oid, RequirementError.MissingObject)
+        case None => throw ObjectErr(oid, MissingObject())
         case Some(os) => os
       }
     }
@@ -50,7 +50,7 @@ object RequirementsLocker {
     requiredRevision.foreach { rev => state.lockedToTransaction = Some(transactionId) }
 
     state.kvState match {
-      case None => throw ObjectErr(state.objectId, RequirementError.ObjectTypeError)
+      case None => throw ObjectErr(state.objectId, ObjectTypeError())
       case Some(kvs) =>
         for (req <- keyRequirements) {
           req match {
@@ -62,7 +62,7 @@ object RequirementsLocker {
               vs.lockedToTransaction = Some(transactionId)
             }
 
-            case r: KeyValueUpdate.DoesNotExist => kvs.noExistenceLocks += r.key
+            case r: KeyValueUpdate.DoesNotExist => kvs.noExistenceLocks += (r.key -> transactionId)
 
             case r: KeyValueUpdate.TimestampEquals => kvs.content.get(r.key).foreach { vs =>
               vs.lockedToTransaction = Some(transactionId)
@@ -86,7 +86,7 @@ object RequirementsLocker {
 
     def getState(oid: ObjectId): ObjectState = {
       objects.get(oid) match {
-        case None => throw ObjectErr(oid, RequirementError.MissingObject)
+        case None => throw ObjectErr(oid, MissingObject())
         case Some(os) => os
       }
     }
@@ -121,7 +121,7 @@ object RequirementsLocker {
     requiredRevision.foreach { rev => state.lockedToTransaction = None }
 
     state.kvState match {
-      case None => throw ObjectErr(state.objectId, RequirementError.ObjectTypeError)
+      case None => throw ObjectErr(state.objectId, ObjectTypeError())
       case Some(kvs) =>
         for (req <- keyRequirements) {
           req match {

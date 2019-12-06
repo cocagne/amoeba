@@ -128,7 +128,8 @@ final case class TxPrepareResponse(
                                     transactionId: TransactionId,
                                     response: Either[TxPrepareResponse.Nack, TxPrepareResponse.Promise],
                                     proposalId: ProposalId,
-                                    disposition: TransactionDisposition.Value) extends TxMessage
+                                    disposition: TransactionDisposition.Value,
+                                    collisions: List[TransactionId]) extends TxMessage
 
 object TxPrepareResponse {
   case class Nack(promisedId: ProposalId)
