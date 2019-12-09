@@ -1,7 +1,5 @@
 package com.ibm.amoeba.server.store
 
-import java.util.UUID
-
 import com.ibm.amoeba.common.ida.IDA
 import com.ibm.amoeba.common.network.{TransactionFinalized, TransactionResolved, TxAccept, TxAcceptResponse, TxCommitted, TxFinalized, TxHeartbeat, TxPrepare, TxPrepareResponse, TxResolved}
 import com.ibm.amoeba.common.objects.{ObjectId, ObjectPointer}
@@ -98,7 +96,7 @@ abstract class TransactionDriver(
     val collisionsWithCompletedTransactions = msg.collisions.nonEmpty && msg.collisions.forall { txid =>
       transactionCache.getStatus(txid) match {
         case None => false
-        case Some(e) => e.status == TransactionStatus.Committed
+        case Some(e) => e.status == TransactionStatus.Committed || e.status == TransactionStatus.Aborted
       }
     }
 

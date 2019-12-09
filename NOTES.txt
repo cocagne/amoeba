@@ -1,10 +1,12 @@
 
+Transaction Recovery
+    - HB Threshold timeout
+    - 1s window for random timeout selection
+    - Sleep random time and verify last hb timeout > 1s + sleep time (otherwise someone else won)
+    - start driving Tx
+    - re-use old driving strategy but update for new interface/threading impl
+
 Next Steps
-    - Create StoreManager
-        - Finish hooking everything together
-    - Create common BackgroundTask Interface
-        - Create through Object so impl can change
-    - Convert BackgroundTask interface to match this repo
     - Convert TransactionDriver
         - Convert Unit tests
             - Possibly copy over with minimal changes?
