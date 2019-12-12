@@ -1,3 +1,18 @@
+Split out SingleThreadedStoreManager
+
+
+SuperSimpleRecovery
+    - Implement as a Mixin for StoreManager
+    - Not needed unless there's an error
+    - Don't need an advanced system. Just simple and inefficient
+       - test scenarios are all we need to handle
+    - Dropped Message
+        - resend every 2 seconds?
+        - only really useful for disconnect,reconnect
+    - Failed Driver
+        - Check every second to see if threshold is elapsed (random select from window)
+        - start driver if so
+
 
 Transaction Recovery
     - HB Threshold timeout
@@ -5,6 +20,12 @@ Transaction Recovery
     - Sleep random time and verify last hb timeout > 1s + sleep time (otherwise someone else won)
     - start driving Tx
     - re-use old driving strategy but update for new interface/threading impl
+
+Driver:
+    - call txDriver.recover(nowTimestamp) every 0.5 seconds
+    - Events set timestamps when action will take place
+    - if (now > nextMessagesTime) { sendMessages(); set nextMessagesTime = next }
+
 
 Next Steps
     - Convert TransactionDriver

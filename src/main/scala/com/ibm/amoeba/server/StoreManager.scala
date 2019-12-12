@@ -1,15 +1,15 @@
-package com.ibm.amoeba.server.store
-
+package com.ibm.amoeba.server
 
 import java.util.concurrent.{LinkedBlockingQueue, TimeUnit}
 
-import com.ibm.amoeba.common.network.{Allocate, ClientRequest, OpportunisticRebuild, Read, TransactionCompletionQuery, TransactionCompletionResponse, TxFinalized, TxMessage, TxPrepare, TxResolved, TxStatusRequest}
+import com.ibm.amoeba.common.network._
 import com.ibm.amoeba.common.store.StoreId
 import com.ibm.amoeba.common.transaction.TransactionStatus
 import com.ibm.amoeba.server.crl.{CrashRecoveryLogFactory, SaveCompletion, SaveCompletionHandler}
 import com.ibm.amoeba.server.network.Messenger
 import com.ibm.amoeba.server.store.backend.{Backend, Completion, CompletionHandler}
 import com.ibm.amoeba.server.store.cache.ObjectCache
+import com.ibm.amoeba.server.store.{Frontend, Store, TransactionDriver, TransactionFinalizer, TransactionStatusCache}
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
@@ -22,6 +22,7 @@ object StoreManager {
   case class ClientReq(msg: ClientRequest) extends Event
   case class LoadStore(backend: Backend) extends Event
   case class Exit() extends Event
+  case class RecoveryEvent() extends Event
 
   class IOHandler(mgr: StoreManager) extends CompletionHandler {
     override def complete(op: Completion): Unit = {
@@ -39,6 +40,8 @@ object StoreManager {
 class StoreManager(val objectCache: ObjectCache,
                    val net: Messenger,
                    crlFactory: CrashRecoveryLogFactory,
+                   val finalizerFactory: TransactionFinalizer.Factory,
+                   val txDriverFactory: TransactionDriver.Factory,
                    initialBackends: List[Backend]) {
   import StoreManager._
 
@@ -51,21 +54,10 @@ class StoreManager(val objectCache: ObjectCache,
 
   private val crl = crlFactory.createCRL(crlHandler)
 
-  private var exitThread = false
+  protected var shutdownCalled = false
   private val shutdownPromise: Promise[Unit] = Promise()
 
-  private var stores: Map[StoreId, Frontend] = Map()
-
-  private val managerThread = new Thread {
-    override def run(): Unit = {
-      threadLoop()
-    }
-  }
-
-  {
-    initialBackends.foreach(loadStore)
-    managerThread.start()
-  }
+  protected var stores: Map[StoreId, Store] = Map()
 
   def loadStore(backend: Backend): Unit = {
     events.add(LoadStore(backend))
@@ -84,57 +76,48 @@ class StoreManager(val objectCache: ObjectCache,
     shutdownPromise.future
   }
 
-  private def transactionMessageHandler(msg: TxMessage): Unit = {
+  /** Placeholder for mixin class to implement transaction and allocation recovery */
+  protected def handleRecoveryEvent(): Unit = ()
 
-    msg match {
-      case m: TxPrepare =>
-        txStatusCache.getStatus(m.txd.transactionId).foreach { entry =>
-          val (r, committed: Boolean) = entry.status match {
-            case TransactionStatus.Unresolved => (None, false)
-            case TransactionStatus.Aborted =>
-              (Some(TxResolved(msg.to, msg.from, m.txd.transactionId, committed = false)), false)
-            case TransactionStatus.Committed =>
-              (Some(TxResolved(msg.to, msg.from, m.txd.transactionId, committed = true)), true)
-          }
-
-          r.foreach(resolved => net.sendTransactionMessage(resolved))
-
-          if (entry.finalized)
-            net.sendTransactionMessage(TxFinalized(msg.from, msg.to, m.txd.transactionId, committed))
-        }
-
-      case _ =>
+  /** Handles all events in the event queue. Returns when the queue is empty */
+  protected def handleEvents(): Unit = {
+    var event = events.poll(0, TimeUnit.NANOSECONDS)
+    while (event != null) {
+      handleEvent(event)
+      event = events.poll(0, TimeUnit.NANOSECONDS)
     }
-
-    stores.get(msg.to).foreach { store =>
-      store.receiveTransactionMessage(msg)
-    }
-
   }
 
-  private def threadLoop(): Unit = while (!exitThread) {
-    events.poll(5, TimeUnit.MINUTES) match {
+  /** Preforms a blocking poll on the event queue, awaitng the delivery of an event */
+  protected def awaitEvent(): Unit = {
+    handleEvent(events.poll(1, TimeUnit.DAYS))
+  }
+
+  private def handleEvent(event: Event): Unit = {
+    event match {
 
       case IOCompletion(op) => stores.get(op.storeId).foreach { store =>
-        store.backendOperationComplete(op)
+        store.frontend.backendOperationComplete(op)
       }
 
       case CRLCompletion(op) => stores.get(op.storeId).foreach { store =>
-        store.crlSaveComplete(op)
+        store.frontend.crlSaveComplete(op)
       }
 
-      case TransactionMessage(msg) => transactionMessageHandler(msg)
+      case TransactionMessage(msg) => stores.get(msg.to).foreach { store =>
+        store.frontend.receiveTransactionMessage(msg)
+      }
 
       case ClientReq(msg) => stores.get(msg.toStore).foreach { store =>
         msg match {
-          case a: Allocate => store.allocateObject(a)
+          case a: Allocate => store.frontend.allocateObject(a)
 
           case r: Read =>
             r.objectPointer.getStoreLocater(store.storeId).foreach { locater =>
-              store.readObjectForNetwork(r.fromClient, r.readUUID, locater)
+              store.frontend.readObjectForNetwork(r.fromClient, r.readUUID, locater)
             }
 
-          case op: OpportunisticRebuild => store.readObjectForOpportunisticRebuild(op)
+          case op: OpportunisticRebuild => store.frontend.readObjectForOpportunisticRebuild(op)
 
           case s: TransactionCompletionQuery =>
             val isComplete = txStatusCache.getStatus(s.transactionId) match {
@@ -149,15 +132,17 @@ class StoreManager(val objectCache: ObjectCache,
         }
       }
 
+      case RecoveryEvent() => handleRecoveryEvent()
+
       case LoadStore(backend) =>
-        val f = new Frontend(backend.storeId, backend, objectCache, net, crl, txStatusCache)
+        val store = new Store(backend, objectCache, net, crl, txStatusCache,finalizerFactory, txDriverFactory)
         backend.setCompletionHandler(ioHandler)
-        stores += backend.storeId -> f
+        stores += backend.storeId -> store
 
       case null => // nothing to do
 
       case _:Exit =>
-        exitThread = true
+        shutdownCalled = true
         shutdownPromise.success(())
     }
   }

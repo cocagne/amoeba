@@ -14,6 +14,61 @@ import org.apache.logging.log4j.scala.Logging
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.concurrent.duration.{Duration, SECONDS}
 
+object TransactionDriver {
+
+  trait Factory {
+    def create(
+                storeId: StoreId,
+                messenger:Messenger,
+                txd: TransactionDescription,
+                finalizerFactory: TransactionFinalizer.Factory): TransactionDriver
+  }
+
+  object noErrorRecoveryFactory extends Factory {
+
+    import scala.concurrent.ExecutionContext.Implicits.global
+
+    class NoRecoveryTransactionDriver(
+                                       storeId: StoreId,
+                                       messenger: Messenger,
+                                       txd: TransactionDescription,
+                                       finalizerFactory: TransactionFinalizer.Factory) extends TransactionDriver(
+      storeId, messenger, txd, finalizerFactory) {
+
+      var hung = false
+
+      val hangCheckTask: BackgroundTask.ScheduledTask = BackgroundTask.schedule(Duration(10, SECONDS)) {
+        //val test = messenger.system.map(_.getSystemAttribute("unittest.name").getOrElse("UNKNOWN TEST"))
+        //println(s"**** HUNG TRANSACTION: $test")
+        println(s"**** HUNG TRANSACTION")
+        printState()
+        synchronized(hung = true)
+      }
+
+      override protected def onFinalized(committed: Boolean): Unit = {
+        super.onFinalized(committed)
+        synchronized {
+          if (hung) {
+            //val test = messenger.system.map(_.getSystemAttribute("unittest.name").getOrElse("UNKNOWN TEST"))
+            //println(s"**** HUNG TRANSACTION EVENTUALLY COMPLETED! : $test ")
+            println(s"**** HUNG TRANSACTION EVENTUALLY COMPLETED!")
+          }
+        }
+        hangCheckTask.cancel()
+      }
+    }
+
+    def create(
+                storeId: StoreId,
+                messenger:Messenger,
+                txd: TransactionDescription,
+                finalizerFactory: TransactionFinalizer.Factory): TransactionDriver = {
+      new NoRecoveryTransactionDriver(storeId, messenger, txd, finalizerFactory)
+    }
+  }
+}
+
+
 abstract class TransactionDriver(
                                   val storeId: StoreId,
                                   val messenger: Messenger,
@@ -52,7 +107,7 @@ abstract class TransactionDriver(
     logger.info(s"Driving transaction to completion ($kind): ${txd.shortString}")
   }
 
-  complete.foreach(_ => logger.info(s"Transaction driven to completion: ${txd.transactionId}"))
+  //complete.foreach(_ => logger.info(s"Transaction driven to completion: ${txd.transactionId}"))
 
   def printState(print: String => Unit = println): Unit = synchronized {
     val sb = new StringBuilder
@@ -323,53 +378,3 @@ abstract class TransactionDriver(
   }
 }
 
-object TransactionDriver {
-
-  trait Factory {
-    def create(
-                storeId: StoreId,
-                messenger:Messenger,
-                txd: TransactionDescription,
-                finalizerFactory: TransactionFinalizer.Factory)(implicit ec: ExecutionContext): TransactionDriver
-  }
-
-  object noErrorRecoveryFactory extends Factory {
-    class NoRecoveryTransactionDriver(
-                                       storeId: StoreId,
-                                       messenger: Messenger,
-                                       txd: TransactionDescription,
-                                       finalizerFactory: TransactionFinalizer.Factory)(implicit ec: ExecutionContext) extends TransactionDriver(
-      storeId, messenger, txd, finalizerFactory) {
-
-      var hung = false
-
-      val hangCheckTask: BackgroundTask.ScheduledTask = BackgroundTask.schedule(Duration(10, SECONDS)) {
-        //val test = messenger.system.map(_.getSystemAttribute("unittest.name").getOrElse("UNKNOWN TEST"))
-        //println(s"**** HUNG TRANSACTION: $test")
-        println(s"**** HUNG TRANSACTION")
-        printState()
-        synchronized(hung = true)
-      }
-
-      override protected def onFinalized(committed: Boolean): Unit = {
-        super.onFinalized(committed)
-        synchronized {
-          if (hung) {
-            //val test = messenger.system.map(_.getSystemAttribute("unittest.name").getOrElse("UNKNOWN TEST"))
-            //println(s"**** HUNG TRANSACTION EVENTUALLY COMPLETED! : $test ")
-            println(s"**** HUNG TRANSACTION EVENTUALLY COMPLETED!")
-          }
-        }
-        hangCheckTask.cancel()
-      }
-    }
-
-    def create(
-                storeId: StoreId,
-                messenger:Messenger,
-                txd: TransactionDescription,
-                finalizerFactory: TransactionFinalizer.Factory)(implicit ec: ExecutionContext): TransactionDriver = {
-      new NoRecoveryTransactionDriver(storeId, messenger, txd, finalizerFactory)
-    }
-  }
-}
