@@ -3,12 +3,12 @@ package com.ibm.amoeba.server.store
 import com.github.blemale.scaffeine.Scaffeine
 import com.ibm.amoeba.common.network.{TxAcceptResponse, TxCommitted, TxFinalized, TxMessage, TxPrepare, TxPrepareResponse, TxResolved}
 import com.ibm.amoeba.common.store.StoreId
-import com.ibm.amoeba.common.transaction.{TransactionId, TransactionStatus}
+import com.ibm.amoeba.common.transaction.{TransactionDescription, TransactionId, TransactionStatus}
 import com.ibm.amoeba.server.crl.CrashRecoveryLog
 import com.ibm.amoeba.server.network.Messenger
 import com.ibm.amoeba.server.store.backend.Backend
 import com.ibm.amoeba.server.store.cache.ObjectCache
-import com.ibm.amoeba.server.transaction.{TransactionDriver, TransactionFinalizer, TransactionStatusCache}
+import com.ibm.amoeba.server.transaction.{TransactionDriver, TransactionFinalizer, TransactionStatusCache, Tx}
 
 import scala.concurrent.duration._
 
@@ -28,6 +28,17 @@ class Store(val backend: Backend,
   private[this] val prepareResponseCache = Scaffeine().expireAfterWrite(10.seconds)
     .maximumSize(1000)
     .build[TransactionId, List[TxPrepareResponse]]()
+
+  def driveTransaction(txd: TransactionDescription): Unit = if (!transactionDrivers.contains(txd.transactionId)) {
+    val driver = txDriverFactory.create(storeId, net, txd, finalizerFactory)
+
+    transactionDrivers += txd.transactionId -> driver
+
+    prepareResponseCache.getIfPresent(txd.transactionId).foreach { lst =>
+      lst.foreach(driver.receiveTxPrepareResponse(_, txStatusCache))
+      prepareResponseCache.invalidate(txd.transactionId)
+    }
+  }
 
   def receiveTransactionMessage(msg: TxMessage): Unit = {
 
@@ -49,17 +60,7 @@ class Store(val backend: Backend,
         }
 
         if (m.txd.primaryObject.poolId == storeId.poolId && m.txd.designatedLeaderUID == storeId.poolIndex) {
-          if (!transactionDrivers.contains(m.txd.transactionId)) {
-            val driver = txDriverFactory.create(storeId, net, m.txd, finalizerFactory)
-
-            transactionDrivers += m.txd.transactionId -> driver
-
-            driver.receiveTxPrepare(m)
-            prepareResponseCache.getIfPresent(m.txd.transactionId).foreach { lst =>
-              lst.foreach(driver.receiveTxPrepareResponse(_, txStatusCache))
-              prepareResponseCache.invalidate(m.txd.transactionId)
-            }
-          }
+          driveTransaction(m.txd)
         }
 
       case m: TxPrepareResponse =>
@@ -85,6 +86,7 @@ class Store(val backend: Backend,
 
       case m: TxFinalized => transactionDrivers.get(m.transactionId).foreach { driver =>
         driver.receiveTxFinalized(m)
+        transactionDrivers -= m.transactionId
       }
 
       case _ =>

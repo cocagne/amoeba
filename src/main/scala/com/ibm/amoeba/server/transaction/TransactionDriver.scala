@@ -17,6 +17,8 @@ import scala.concurrent.{ExecutionContext, Future, Promise}
 object TransactionDriver {
 
   trait Factory {
+    def failedDriverDuration: Duration = Duration(2, SECONDS)
+
     def create(
                 storeId: StoreId,
                 messenger:Messenger,

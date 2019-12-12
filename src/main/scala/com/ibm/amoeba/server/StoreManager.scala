@@ -77,6 +77,8 @@ class StoreManager(val objectCache: ObjectCache,
     shutdownPromise.future
   }
 
+  protected def addRecoveryEvent(): Unit = events.add(RecoveryEvent())
+
   /** Placeholder for mixin class to implement transaction and allocation recovery */
   protected def handleRecoveryEvent(): Unit = ()
 

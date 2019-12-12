@@ -66,6 +66,8 @@ class Tx( trs: TransactionRecoveryState,
 
   private def updateLastEvent(): Unit = lastEvent = System.nanoTime()
 
+  def lastEventTime: Long = lastEvent
+
   private def nextCrlSaveId(): TxSaveId = {
     val id = nextCrlSave
     nextCrlSave = TxSaveId(id.number + 1)

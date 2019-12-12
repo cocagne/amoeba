@@ -1,36 +1,14 @@
-Split out SingleThreadedStoreManager
 
+Transaction Driver & Recovery is in place
 
-SuperSimpleRecovery
-    - Implement as a Mixin for StoreManager
-    - Not needed unless there's an error
-    - Don't need an advanced system. Just simple and inefficient
-       - test scenarios are all we need to handle
-    - Dropped Message
-        - resend every 2 seconds?
-        - only really useful for disconnect,reconnect
-    - Failed Driver
-        - Check every second to see if threshold is elapsed (random select from window)
-        - start driver if so
-
-
-Transaction Recovery
-    - HB Threshold timeout
-    - 1s window for random timeout selection
-    - Sleep random time and verify last hb timeout > 1s + sleep time (otherwise someone else won)
-    - start driving Tx
-    - re-use old driving strategy but update for new interface/threading impl
-
-Driver:
-    - call txDriver.recover(nowTimestamp) every 0.5 seconds
-    - Events set timestamps when action will take place
-    - if (now > nextMessagesTime) { sendMessages(); set nextMessagesTime = next }
-
-
-Next Steps
-    - Convert TransactionDriver
-        - Convert Unit tests
-            - Possibly copy over with minimal changes?
+Need:
+    - TestNetwork
+    - Client Side
+        - Minimal AmoebaSystem
+        - Read Objects
+        - TransactionBuilder
+            - Allocate objects
+            - provide access to owning System
 
 FIXME - Sweeper impl can only handle 1 allocation per transaction. Major changes needed to fix this.
 FiXME   Will need to include the ObjectId into the TxId
