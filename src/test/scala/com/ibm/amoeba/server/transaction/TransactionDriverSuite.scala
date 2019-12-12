@@ -1,4 +1,4 @@
-package com.ibm.amoeba.store
+package com.ibm.amoeba.server.transaction
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import com.ibm.amoeba.common.HLCTimestamp
@@ -10,7 +10,6 @@ import com.ibm.amoeba.common.pool.PoolId
 import com.ibm.amoeba.common.store.{StoreId, StorePointer}
 import com.ibm.amoeba.common.transaction.{DataUpdate, DataUpdateOperation, RefcountUpdate, TransactionDescription, TransactionDisposition, TransactionId}
 import com.ibm.amoeba.server.network.Messenger
-import com.ibm.amoeba.server.store.{TransactionDriver, TransactionFinalizer, TransactionStatusCache}
 import org.scalatest.{FunSuite, Matchers}
 
 import scala.concurrent.{Future, Promise}

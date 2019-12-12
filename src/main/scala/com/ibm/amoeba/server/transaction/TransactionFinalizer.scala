@@ -1,6 +1,4 @@
-package com.ibm.amoeba.server.store
-
-import java.util.UUID
+package com.ibm.amoeba.server.transaction
 
 import com.ibm.amoeba.common.objects.ObjectId
 import com.ibm.amoeba.common.store.StoreId

@@ -11,7 +11,7 @@ import com.ibm.amoeba.server.crl.{AllocSaveComplete, AllocationRecoveryState, Cr
 import com.ibm.amoeba.server.network.Messenger
 import com.ibm.amoeba.server.store.backend.{Backend, Commit, CommitState, Completion, Read}
 import com.ibm.amoeba.server.store.cache.ObjectCache
-import com.ibm.amoeba.server.transaction.Tx
+import com.ibm.amoeba.server.transaction.{TransactionStatusCache, Tx}
 
 
 object Frontend {

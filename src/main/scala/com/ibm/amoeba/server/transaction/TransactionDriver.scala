@@ -1,18 +1,18 @@
-package com.ibm.amoeba.server.store
+package com.ibm.amoeba.server.transaction
 
 import com.ibm.amoeba.common.ida.IDA
-import com.ibm.amoeba.common.network.{TransactionFinalized, TransactionResolved, TxAccept, TxAcceptResponse, TxCommitted, TxFinalized, TxHeartbeat, TxPrepare, TxPrepareResponse, TxResolved}
+import com.ibm.amoeba.common.network._
 import com.ibm.amoeba.common.objects.{ObjectId, ObjectPointer}
-import com.ibm.amoeba.common.paxos.{Learner, Proposer}
 import com.ibm.amoeba.common.paxos
+import com.ibm.amoeba.common.paxos.{Learner, Proposer}
 import com.ibm.amoeba.common.store.StoreId
 import com.ibm.amoeba.common.transaction.{TransactionDescription, TransactionDisposition, TransactionStatus}
 import com.ibm.amoeba.common.util.BackgroundTask
 import com.ibm.amoeba.server.network.Messenger
 import org.apache.logging.log4j.scala.Logging
 
-import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.concurrent.duration.{Duration, SECONDS}
+import scala.concurrent.{ExecutionContext, Future, Promise}
 
 object TransactionDriver {
 

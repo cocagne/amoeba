@@ -1,4 +1,4 @@
-package com.ibm.amoeba.store
+package com.ibm.amoeba.server.store
 
 import java.util.UUID
 
@@ -12,9 +12,9 @@ import com.ibm.amoeba.common.store.{StoreId, StorePointer}
 import com.ibm.amoeba.common.transaction.{DataUpdate, DataUpdateOperation, ObjectUpdate, TransactionDescription, TransactionId}
 import com.ibm.amoeba.server.crl.{AllocSaveComplete, AllocationRecoveryState, CrashRecoveryLog, CrashRecoveryLogClient, TransactionRecoveryState, TxSaveId}
 import com.ibm.amoeba.server.network.Messenger
-import com.ibm.amoeba.server.store.{Frontend, TransactionStatusCache}
 import com.ibm.amoeba.server.store.backend.MapBackend
 import com.ibm.amoeba.server.store.cache.SimpleLRUObjectCache
+import com.ibm.amoeba.server.transaction.TransactionStatusCache
 import org.scalatest.{FunSuite, Matchers}
 
 object FrontendSuite {

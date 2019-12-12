@@ -8,6 +8,7 @@ import com.ibm.amoeba.server.crl.CrashRecoveryLog
 import com.ibm.amoeba.server.network.Messenger
 import com.ibm.amoeba.server.store.backend.Backend
 import com.ibm.amoeba.server.store.cache.ObjectCache
+import com.ibm.amoeba.server.transaction.{TransactionDriver, TransactionFinalizer, TransactionStatusCache}
 
 import scala.concurrent.duration._
 

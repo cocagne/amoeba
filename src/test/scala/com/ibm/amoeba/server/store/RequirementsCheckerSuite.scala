@@ -1,4 +1,4 @@
-package com.ibm.amoeba.store
+package com.ibm.amoeba.server.store
 
 import java.util.UUID
 
@@ -8,7 +8,6 @@ import com.ibm.amoeba.common.objects.{DataObjectPointer, Key, KeyValueObjectPoin
 import com.ibm.amoeba.common.pool.PoolId
 import com.ibm.amoeba.common.store.StorePointer
 import com.ibm.amoeba.common.transaction.{DataUpdate, DataUpdateOperation, KeyExistenceError, KeyValueUpdate, LocalTimeError, LocalTimeRequirement, MissingObjectUpdate, RefcountMismatch, RefcountUpdate, RequirementError, RevisionLock, RevisionMismatch, TransactionCollision, TransactionId, VersionBump}
-import com.ibm.amoeba.server.store.{KVObjectState, ObjectState, RequirementsChecker, ValueState}
 import org.scalatest.{FunSuite, Matchers}
 
 import scala.collection.immutable.HashMap

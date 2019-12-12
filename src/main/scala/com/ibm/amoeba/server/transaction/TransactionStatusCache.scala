@@ -1,4 +1,4 @@
-package com.ibm.amoeba.server.store
+package com.ibm.amoeba.server.transaction
 
 import com.github.blemale.scaffeine.{Cache, Scaffeine}
 import com.ibm.amoeba.common.transaction.{TransactionId, TransactionStatus}

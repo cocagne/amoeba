@@ -2,9 +2,9 @@ package com.ibm.amoeba.server
 
 import com.ibm.amoeba.server.crl.CrashRecoveryLogFactory
 import com.ibm.amoeba.server.network.Messenger
-import com.ibm.amoeba.server.store.{TransactionDriver, TransactionFinalizer}
 import com.ibm.amoeba.server.store.backend.Backend
 import com.ibm.amoeba.server.store.cache.ObjectCache
+import com.ibm.amoeba.server.transaction.{TransactionDriver, TransactionFinalizer}
 
 class SingleThreadedStoreManager(objectCache: ObjectCache,
                                  net: Messenger,

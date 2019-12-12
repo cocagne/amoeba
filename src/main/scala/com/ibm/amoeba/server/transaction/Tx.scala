@@ -8,7 +8,7 @@ import com.ibm.amoeba.common.transaction.{ObjectUpdate, PreTransactionOpportunis
 import com.ibm.amoeba.server.crl.{CrashRecoveryLog, TransactionRecoveryState, TxSaveId}
 import com.ibm.amoeba.server.network.Messenger
 import com.ibm.amoeba.server.store.backend.{Backend, CommitError, CommitState}
-import com.ibm.amoeba.server.store.{Locater, ObjectState, RequirementsApplyer, RequirementsChecker, RequirementsLocker, TransactionStatusCache}
+import com.ibm.amoeba.server.store.{Locater, ObjectState, RequirementsApplyer, RequirementsChecker, RequirementsLocker}
 import org.apache.logging.log4j.scala.Logging
 
 object Tx {

@@ -1,4 +1,4 @@
-package com.ibm.amoeba.store
+package com.ibm.amoeba.server.store
 
 import java.util.UUID
 
@@ -6,7 +6,6 @@ import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp}
 import com.ibm.amoeba.common.objects.{Metadata, ObjectId, ObjectRefcount, ObjectRevision, ObjectType}
 import com.ibm.amoeba.common.store.StorePointer
 import com.ibm.amoeba.common.transaction.TransactionId
-import com.ibm.amoeba.server.store.ObjectState
 import com.ibm.amoeba.server.store.cache.SimpleLRUObjectCache
 import org.scalatest.{FunSuite, Matchers}
 
