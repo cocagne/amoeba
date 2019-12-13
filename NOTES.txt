@@ -4,7 +4,9 @@ Transaction Driver & Recovery is in place
 Need:
     - TestNetwork
     - Client Side
-        - Minimal AmoebaSystem
+        - Minimal AmoebaClient
+        - Start with Allocation
+        - Use concrete classes unless variation is really needed
         - Read Objects
         - TransactionBuilder
             - Allocate objects

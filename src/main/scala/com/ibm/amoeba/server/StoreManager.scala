@@ -82,8 +82,12 @@ class StoreManager(val objectCache: ObjectCache,
   /** Placeholder for mixin class to implement transaction and allocation recovery */
   protected def handleRecoveryEvent(): Unit = ()
 
+  def hasEvents: Boolean = {
+    events.size() != 0
+  }
+
   /** Handles all events in the event queue. Returns when the queue is empty */
-  protected def handleEvents(): Unit = {
+  def handleEvents(): Unit = {
     var event = events.poll(0, TimeUnit.NANOSECONDS)
     while (event != null) {
       handleEvent(event)
@@ -140,7 +144,7 @@ class StoreManager(val objectCache: ObjectCache,
       case LoadStore(backend) =>
         val store = new Store(backend, objectCache, net, crl, txStatusCache,finalizerFactory, txDriverFactory)
         backend.setCompletionHandler(ioHandler)
-        stores += backend.storeId -> store
+        stores += (backend.storeId -> store)
 
       case null => // nothing to do
 
