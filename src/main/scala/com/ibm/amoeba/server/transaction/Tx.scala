@@ -119,7 +119,7 @@ class Tx( trs: TransactionRecoveryState,
     }
 
     // Determine local disposition
-    val ou = objectUpdates.iterator.map(ou => ObjectId(ou.objectUUID) -> ou.data).toMap
+    val ou = objectUpdates.iterator.map(ou => ou.objectId -> ou.data).toMap
 
     val (m, l) = RequirementsChecker.check(transactionId, txd.requirements, objects, ou)
 
@@ -154,7 +154,7 @@ class Tx( trs: TransactionRecoveryState,
 
     unlock()
 
-    val ou = objectUpdates.iterator.map(ou => ObjectId(ou.objectUUID) -> ou.data).toMap
+    val ou = objectUpdates.iterator.map(ou => ou.objectId -> ou.data).toMap
 
     val skipped = RequirementsApplyer.apply(transactionId, txd.startTimestamp, txd.requirements,
       objects, ou)

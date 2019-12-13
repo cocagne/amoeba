@@ -172,7 +172,7 @@ class FrontendSuite extends FunSuite with Matchers {
       List(), None, List(), List())
 
     val db = DataBuffer(Array[Byte](0, 1, 2, 3))
-    val ou = ObjectUpdate(oid1.uuid, db)
+    val ou = ObjectUpdate(oid1, db)
     val prep = TxPrepare(storeId, storeId, txd, ProposalId.initialProposal(1), List(ou), List())
 
     f.receiveTransactionMessage(prep)

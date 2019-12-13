@@ -40,8 +40,8 @@ class SweeperSuite extends FileBasedTests {
     val txd = DataBuffer(Array[Byte](1, 2))
     val oud1 = DataBuffer(Array[Byte](3,4))
     val oud2 = DataBuffer(Array[Byte](4))
-    val ou1 = ObjectUpdate(new UUID(0,3), oud1)
-    val ou2 = ObjectUpdate(new UUID(0,4), oud2)
+    val ou1 = ObjectUpdate(ObjectId(new UUID(0,3)), oud1)
+    val ou2 = ObjectUpdate(ObjectId(new UUID(0,4)), oud2)
     val disp = TransactionDisposition.VoteCommit
     val status = TransactionStatus.Unresolved
     val promise = ProposalId(1, 1)
@@ -76,9 +76,9 @@ class SweeperSuite extends FileBasedTests {
       assert(t.storeId == storeId)
       assert(t.serializedTxd.asReadOnlyBuffer() == txd.asReadOnlyBuffer())
       assert(t.objectUpdates.length == 2)
-      assert(t.objectUpdates.head.objectUUID == ou2.objectUUID)
+      assert(t.objectUpdates.head.objectId == ou2.objectId)
       assert(t.objectUpdates.head.data.asReadOnlyBuffer() == ou2.data.asReadOnlyBuffer())
-      assert(t.objectUpdates.tail.head.objectUUID == ou1.objectUUID)
+      assert(t.objectUpdates.tail.head.objectId == ou1.objectId)
       assert(t.objectUpdates.tail.head.data.asReadOnlyBuffer() == ou1.data.asReadOnlyBuffer())
       assert(t.disposition == disp)
       assert(t.status == status)
@@ -104,8 +104,8 @@ class SweeperSuite extends FileBasedTests {
     val txd = DataBuffer(Array[Byte](1, 2))
     val oud1 = DataBuffer(Array[Byte](3,4))
     val oud2 = DataBuffer(Array[Byte](4))
-    val ou1 = ObjectUpdate(new UUID(0,3), oud1)
-    val ou2 = ObjectUpdate(new UUID(0,4), oud2)
+    val ou1 = ObjectUpdate(ObjectId(new UUID(0,3)), oud1)
+    val ou2 = ObjectUpdate(ObjectId(new UUID(0,4)), oud2)
     val disp = TransactionDisposition.VoteCommit
     val status = TransactionStatus.Unresolved
     val promise = ProposalId(1, 1)
@@ -151,9 +151,9 @@ class SweeperSuite extends FileBasedTests {
       assert(t.storeId == storeId)
       assert(t.serializedTxd.asReadOnlyBuffer() == txd.asReadOnlyBuffer())
       assert(t.objectUpdates.length == 2)
-      assert(t.objectUpdates.head.objectUUID == ou2.objectUUID)
+      assert(t.objectUpdates.head.objectId == ou2.objectId)
       assert(t.objectUpdates.head.data.asReadOnlyBuffer() == ou2.data.asReadOnlyBuffer())
-      assert(t.objectUpdates.tail.head.objectUUID == ou1.objectUUID)
+      assert(t.objectUpdates.tail.head.objectId == ou1.objectId)
       assert(t.objectUpdates.tail.head.data.asReadOnlyBuffer() == ou1.data.asReadOnlyBuffer())
       assert(t.disposition == disp)
       assert(t.status == status)
@@ -193,8 +193,8 @@ class SweeperSuite extends FileBasedTests {
     val txd = DataBuffer(Array[Byte](1, 2))
     val oud1 = DataBuffer(Array[Byte](3,4))
     val oud2 = DataBuffer(Array[Byte](4))
-    val ou1 = ObjectUpdate(new UUID(0,3), oud1)
-    val ou2 = ObjectUpdate(new UUID(0,4), oud2)
+    val ou1 = ObjectUpdate(ObjectId(new UUID(0,3)), oud1)
+    val ou2 = ObjectUpdate(ObjectId(new UUID(0,4)), oud2)
     val disp = TransactionDisposition.VoteCommit
     val disp2 = TransactionDisposition.VoteAbort
     val status = TransactionStatus.Unresolved
@@ -235,9 +235,9 @@ class SweeperSuite extends FileBasedTests {
       assert(t.storeId == storeId)
       assert(t.serializedTxd.asReadOnlyBuffer() == txd.asReadOnlyBuffer())
       assert(t.objectUpdates.length == 2)
-      assert(t.objectUpdates.head.objectUUID == ou2.objectUUID)
+      assert(t.objectUpdates.head.objectId == ou2.objectId)
       assert(t.objectUpdates.head.data.asReadOnlyBuffer() == ou2.data.asReadOnlyBuffer())
-      assert(t.objectUpdates.tail.head.objectUUID == ou1.objectUUID)
+      assert(t.objectUpdates.tail.head.objectId == ou1.objectId)
       assert(t.objectUpdates.tail.head.data.asReadOnlyBuffer() == ou1.data.asReadOnlyBuffer())
       assert(t.disposition == disp2)
       assert(t.status == status)
@@ -263,8 +263,8 @@ class SweeperSuite extends FileBasedTests {
     val txd = DataBuffer(Array[Byte](1, 2))
     val oud1 = DataBuffer(Array[Byte](3,4))
     val oud2 = DataBuffer(Array[Byte](4))
-    val ou1 = ObjectUpdate(new UUID(0,3), oud1)
-    val ou2 = ObjectUpdate(new UUID(0,4), oud2)
+    val ou1 = ObjectUpdate(ObjectId(new UUID(0,3)), oud1)
+    val ou2 = ObjectUpdate(ObjectId(new UUID(0,4)), oud2)
     val disp = TransactionDisposition.VoteCommit
     val disp2 = TransactionDisposition.VoteAbort
     val status = TransactionStatus.Unresolved
@@ -311,9 +311,9 @@ class SweeperSuite extends FileBasedTests {
       assert(t.storeId == storeId)
       assert(t.serializedTxd.asReadOnlyBuffer() == txd.asReadOnlyBuffer())
       assert(t.objectUpdates.length == 2)
-      assert(t.objectUpdates.head.objectUUID == ou2.objectUUID)
+      assert(t.objectUpdates.head.objectId == ou2.objectId)
       assert(t.objectUpdates.head.data.asReadOnlyBuffer() == ou2.data.asReadOnlyBuffer())
-      assert(t.objectUpdates.tail.head.objectUUID == ou1.objectUUID)
+      assert(t.objectUpdates.tail.head.objectId == ou1.objectId)
       assert(t.objectUpdates.tail.head.data.asReadOnlyBuffer() == ou1.data.asReadOnlyBuffer())
       assert(t.disposition == disp2)
       assert(t.status == status)
@@ -338,8 +338,8 @@ class SweeperSuite extends FileBasedTests {
     val txd = DataBuffer(Array[Byte](1, 2))
     val oud1 = DataBuffer(Array[Byte](3,4))
     val oud2 = DataBuffer(Array[Byte](4))
-    val ou1 = ObjectUpdate(new UUID(0,3), oud1)
-    val ou2 = ObjectUpdate(new UUID(0,4), oud2)
+    val ou1 = ObjectUpdate(ObjectId(new UUID(0,3)), oud1)
+    val ou2 = ObjectUpdate(ObjectId(new UUID(0,4)), oud2)
     val disp = TransactionDisposition.VoteCommit
     val disp2 = TransactionDisposition.VoteAbort
     val status = TransactionStatus.Unresolved
@@ -388,9 +388,9 @@ class SweeperSuite extends FileBasedTests {
       assert(t.storeId == storeId)
       assert(t.serializedTxd.asReadOnlyBuffer() == txd.asReadOnlyBuffer())
       assert(t.objectUpdates.length == 2)
-      assert(t.objectUpdates.head.objectUUID == ou2.objectUUID)
+      assert(t.objectUpdates.head.objectId == ou2.objectId)
       assert(t.objectUpdates.head.data.asReadOnlyBuffer() == ou2.data.asReadOnlyBuffer())
-      assert(t.objectUpdates.tail.head.objectUUID == ou1.objectUUID)
+      assert(t.objectUpdates.tail.head.objectId == ou1.objectId)
       assert(t.objectUpdates.tail.head.data.asReadOnlyBuffer() == ou1.data.asReadOnlyBuffer())
       assert(t.disposition == disp2)
       assert(t.status == status)
@@ -415,8 +415,8 @@ class SweeperSuite extends FileBasedTests {
     val txd = DataBuffer(Array[Byte](1, 2))
     val oud1 = DataBuffer(Array[Byte](3,4))
     val oud2 = DataBuffer(Array[Byte](4))
-    val ou1 = ObjectUpdate(new UUID(0,3), oud1)
-    val ou2 = ObjectUpdate(new UUID(0,4), oud2)
+    val ou1 = ObjectUpdate(ObjectId(new UUID(0,3)), oud1)
+    val ou2 = ObjectUpdate(ObjectId(new UUID(0,4)), oud2)
     val disp = TransactionDisposition.VoteCommit
     val disp2 = TransactionDisposition.VoteAbort
     val status = TransactionStatus.Unresolved
@@ -481,9 +481,9 @@ class SweeperSuite extends FileBasedTests {
       assert(t.storeId == storeId)
       assert(t.serializedTxd.asReadOnlyBuffer() == txd.asReadOnlyBuffer())
       assert(t.objectUpdates.length == 2)
-      assert(t.objectUpdates.head.objectUUID == ou2.objectUUID)
+      assert(t.objectUpdates.head.objectId == ou2.objectId)
       assert(t.objectUpdates.head.data.asReadOnlyBuffer() == ou2.data.asReadOnlyBuffer())
-      assert(t.objectUpdates.tail.head.objectUUID == ou1.objectUUID)
+      assert(t.objectUpdates.tail.head.objectId == ou1.objectId)
       assert(t.objectUpdates.tail.head.data.asReadOnlyBuffer() == ou1.data.asReadOnlyBuffer())
       assert(t.disposition == disp2)
       assert(t.status == status)

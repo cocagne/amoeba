@@ -71,15 +71,15 @@ object RequirementsChecker {
     val now = HLCTimestamp.now
     tsReq.tsRequirement match {
       case LocalTimeRequirement.Requirement.Equals =>
-        if (now != tsReq.timestamp)
+        if (now == tsReq.timestamp)
           throw NonObjectErr(LocalTimeError())
 
       case LocalTimeRequirement.Requirement.LessThan =>
-        if (now >= tsReq.timestamp)
+        if (now < tsReq.timestamp)
           throw NonObjectErr(LocalTimeError())
 
       case LocalTimeRequirement.Requirement.GreaterThan =>
-        if (now <= tsReq.timestamp)
+        if (now > tsReq.timestamp)
           throw NonObjectErr(LocalTimeError())
     }
   }

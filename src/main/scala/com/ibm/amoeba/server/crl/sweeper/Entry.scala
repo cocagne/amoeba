@@ -155,7 +155,7 @@ class Entry(val maxSize: Long, initialFileSize: Long) {
 
       if (tx.keepObjectUpdates) {
         tx.objectUpdateLocations.zip(tx.state.objectUpdates).foreach { t =>
-          putUUID(t._2.objectUUID)
+          putUUID(t._2.objectId.uuid)
           putFileLocation(t._1)
         }
       }

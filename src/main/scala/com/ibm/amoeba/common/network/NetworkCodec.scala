@@ -12,7 +12,7 @@ import com.ibm.amoeba.common.objects.{ByteArrayKeyOrdering, ByteRange, DataObjec
 import com.ibm.amoeba.common.paxos.ProposalId
 import com.ibm.amoeba.common.pool.PoolId
 import com.ibm.amoeba.common.store.{StoreId, StorePointer}
-import com.ibm.amoeba.common.transaction.{DataUpdate, DataUpdateOperation, KeyValueUpdate, LocalTimeRequirement, RefcountUpdate, RevisionLock, SerializedFinalizationAction, TransactionDescription, TransactionDisposition, TransactionId, TransactionRequirement, TransactionStatus, VersionBump}
+import com.ibm.amoeba.common.transaction.{DataUpdate, DataUpdateOperation, FinalizationActionId, KeyValueUpdate, LocalTimeRequirement, RefcountUpdate, RevisionLock, SerializedFinalizationAction, TransactionDescription, TransactionDisposition, TransactionId, TransactionRequirement, TransactionStatus, VersionBump}
 
 
 object NetworkCodec {
@@ -374,7 +374,7 @@ object NetworkCodec {
   def encode(builder:FlatBufferBuilder, o:SerializedFinalizationAction): Int = {
     val data = P.SerializedFinalizationAction.createDataVector(builder, o.data)
     P.SerializedFinalizationAction.startSerializedFinalizationAction(builder)
-    P.SerializedFinalizationAction.addTypeUuid(builder, encode(builder, o.typeUUID))
+    P.SerializedFinalizationAction.addTypeUuid(builder, encode(builder, o.typeId.uuid))
     P.SerializedFinalizationAction.addData(builder, data)
     P.SerializedFinalizationAction.endSerializedFinalizationAction(builder)
   }
@@ -382,7 +382,7 @@ object NetworkCodec {
     val uuid =  decode(n.typeUuid())
     val data = new Array[Byte](n.dataLength())
     n.dataAsByteBuffer().get(data)
-    SerializedFinalizationAction(uuid, data)
+    SerializedFinalizationAction(FinalizationActionId(uuid), data)
   }
 
 

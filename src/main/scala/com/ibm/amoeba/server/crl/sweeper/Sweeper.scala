@@ -407,7 +407,7 @@ class Sweeper(directory: Path,
         val loc = getFileLocation(entry)
         if (keep) {
           val data = DataBuffer(files(loc.fileId.number).read(loc.offset, loc.length))
-          objectUpdates = ObjectUpdate(uuid, data) :: objectUpdates
+          objectUpdates = ObjectUpdate(ObjectId(uuid), data) :: objectUpdates
           updateLocations = loc :: updateLocations
         }
       }
