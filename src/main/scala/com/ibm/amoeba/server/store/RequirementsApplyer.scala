@@ -54,8 +54,8 @@ object RequirementsApplyer {
               op match {
                 case o: SetMin => kvs.min = Some(Key(o.value))
                 case o: SetMax => kvs.max = Some(Key(o.value))
-                case o: SetLeft => kvs.left = Some(Key(o.value))
-                case o: SetRight => kvs.right = Some(Key(o.value))
+                case o: SetLeft => kvs.left = Some(Value(o.value))
+                case o: SetRight => kvs.right = Some(Value(o.value))
                 case _: DeleteMin => kvs.min = None
                 case _: DeleteMax => kvs.max = None
                 case _: DeleteLeft => kvs.left = None

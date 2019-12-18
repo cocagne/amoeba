@@ -1,5 +1,9 @@
 
-Transaction Driver & Recovery is in place
+* Need Common KeyValueObjectEncoding
+    - Server uses it to parse and encode data for commit (currently missing this)
+    - Client uses it to parse content coming from stores
+
+* OpportunisitcRebuildManager
 
 Need:
     - TestNetwork
