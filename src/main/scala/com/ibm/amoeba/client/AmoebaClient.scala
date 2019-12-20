@@ -18,4 +18,5 @@ trait AmoebaClient {
 
   private[client] val messenger: Messenger
 
+  private[client] val objectCache: ObjectCache
 }

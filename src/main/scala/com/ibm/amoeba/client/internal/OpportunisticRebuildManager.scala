@@ -1,8 +1,8 @@
 package com.ibm.amoeba.client.internal
 
+import com.ibm.amoeba.client.ObjectState
 import com.ibm.amoeba.common.objects.ObjectPointer
 import com.ibm.amoeba.common.transaction.PreTransactionOpportunisticRebuild
-import com.ibm.amoeba.server.store.ObjectState
 
 import scala.concurrent.duration.Duration
 

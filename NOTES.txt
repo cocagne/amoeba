@@ -1,8 +1,4 @@
 
-* Object Cache
-
-* OpportunisitcRebuildManager
-
 Need:
     - TestNetwork
     - Client Side
