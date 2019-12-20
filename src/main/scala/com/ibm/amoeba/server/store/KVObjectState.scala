@@ -24,6 +24,8 @@ class KVObjectState(
 
 object KVObjectState {
 
+  def apply(dataBuffer: DataBuffer): KVObjectState = decode(dataBuffer)
+
   // <mask byte> min 0 max << 1 left << 2 right << 3
   // <vartint len><nbytes>
   // <varint_num_content_entries>
@@ -55,7 +57,7 @@ object KVObjectState {
               contents: Map[Key, ValueState]): DataBuffer = {
     val bb = ByteBuffer.allocate(encodedSize(min, max, left, right, contents))
 
-    var mask: Byte = 1
+    var mask: Byte = 0
     if (min.nonEmpty)   mask = (mask | 1 << 0).asInstanceOf[Byte]
     if (max.nonEmpty)   mask = (mask | 1 << 1).asInstanceOf[Byte]
     if (left.nonEmpty)  mask = (mask | 1 << 2).asInstanceOf[Byte]

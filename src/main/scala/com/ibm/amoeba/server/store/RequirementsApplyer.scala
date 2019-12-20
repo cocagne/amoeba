@@ -67,6 +67,8 @@ object RequirementsApplyer {
               }
             }
 
+            state.data = kvs.encode()
+
           case r: RefcountUpdate =>
             val s = objects(ptr.id)
             s.metadata = s.metadata.copy(

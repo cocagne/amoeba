@@ -20,7 +20,10 @@ class ObjectState(val objectId: ObjectId,
 
   var lockedToTransaction: Option[TransactionId] = None
 
-  var kvState: Option[KVObjectState] = None
+  var kvState: Option[KVObjectState] = objectType match {
+    case ObjectType.KeyValue => Some(KVObjectState(data))
+    case _ => None
+  }
 
   def lockedWriteTransactions: Set[TransactionId] = {
     var s = Set[TransactionId]()
