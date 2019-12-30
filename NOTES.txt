@@ -1,14 +1,40 @@
 
-Need:
-    - TestNetwork
-    - Client Side
-        - Minimal AmoebaClient
-        - Start with Allocation
-        - Use concrete classes unless variation is really needed
-        - Read Objects
-        - TransactionBuilder
-            - Allocate objects
-            - provide access to owning System
+Add BootstrapAllocation interface to Store
+    - Still needed for bootstrap process
+    - Do this directly on Backend rather than store/frontend
+        - immediate mode for simplicity
+        - precludes bootstrapping over the network but simplifies things greatly
+
+ReadDriver
+    - Test algorithm without network (direct injection)
+    - Test with using bootstrap alloction directly on stores
+        - this also verifies network read
+
+StoragePool
+    - port over the full interface
+    - Skip the missed update handling for now
+
+Object Allocater Interface
+SinglePoolObjectAllocater
+
+Client Allocation Manager
+Client Allocation Driver
+
+Basic System Test
+    - Allocate objects
+    - do transactions on them
+    - read results and verify correctness
+    - Ensure all allocations, transactions, and Finalization Actions are complete before shutting down
+        - Background tasks should be empty as well
+            - doh, parallelized tests will share same BG operator
+        - Move Background to Server side then have a new one in AmoebaSystem?
+            - Could restrict to [client]
+
+TieredList
+FinalizationActions
+MissedUpdateErrorHandling
+AllocationErrorHandling
+    - Fix sweeper bug
 
 FIXME - Sweeper impl can only handle 1 allocation per transaction. Major changes needed to fix this.
 FiXME   Will need to include the ObjectId into the TxId

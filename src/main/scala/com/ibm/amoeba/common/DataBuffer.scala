@@ -38,6 +38,17 @@ final class DataBuffer private (private val buf: ByteBuffer) extends AnyVal {
     arr
   }
 
+  /** Returns the underlying Array storage for this data buffer IFF an underlying array exists and exactly matches
+    * the buffer size. Otherwise it returns a copy
+    */
+  private[amoeba] def getDirectByteArray: Array[Byte] = {
+
+    if (buf.hasArray && buf.arrayOffset() == 0 && buf.array().length == this.size)
+      buf.array
+    else
+      getByteArray
+  }
+
   def copy(): DataBuffer = DataBuffer(this.getByteArray)
 
   def compareTo(that: DataBuffer): Int = buf.compareTo(that.buf)

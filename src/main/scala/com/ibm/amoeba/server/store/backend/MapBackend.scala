@@ -15,6 +15,18 @@ class MapBackend(val storeId: StoreId) extends Backend {
     chandler = Some(handler)
   }
 
+  override def bootstrapAllocate(objectId: ObjectId,
+                                 objectType: ObjectType.Value,
+                                 metadata: Metadata,
+                                 data: DataBuffer): StorePointer = {
+    val sp = StorePointer(storeId.poolIndex, Array())
+    val os = new ObjectState(objectId, sp, metadata, objectType, data, None)
+
+    m += (objectId -> os)
+
+    sp
+  }
+
   override def allocate(objectId: ObjectId,
                         objectType: ObjectType.Value,
                         metadata: Metadata,
