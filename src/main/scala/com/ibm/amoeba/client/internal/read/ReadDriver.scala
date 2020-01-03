@@ -1,4 +1,4 @@
-package com.ibm.amoeba.client.internal
+package com.ibm.amoeba.client.internal.read
 
 import java.util.UUID
 
@@ -19,15 +19,16 @@ trait ReadDriver {
 
   /** Returns True when all stores have been heard from */
   def receiveReadResponse(response:ReadResponse): Boolean
-
-  val opportunisticRebuildManager: OpportunisticRebuildManager
 }
 
 object ReadDriver {
 
   /**
-    * UUID is the read UUID
+    * objectPointer: ObjectPointer,
+    * readType: ReadType,
+    * readUUID:UUID,
+    * disableOpportunisticRebuild: Boolean
     */
-  type Factory = (AmoebaClient, ObjectPointer, UUID) => ReadDriver
+  type Factory = (AmoebaClient, ObjectPointer, UUID, Boolean) => ReadDriver
 
 }

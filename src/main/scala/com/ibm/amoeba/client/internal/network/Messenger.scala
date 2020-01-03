@@ -1,10 +1,10 @@
 package com.ibm.amoeba.client.internal.network
 
-import com.ibm.amoeba.common.network.{ClientRequest, TxMessage}
+import com.ibm.amoeba.common.network.{ClientId, ClientRequest, TxMessage}
 
 trait Messenger {
 
-  def sendClientResponse(msg: ClientRequest): Unit
+  def sendClientRequest(msg: ClientRequest): Unit
 
   def sendTransactionMessage(msg: TxMessage): Unit
 

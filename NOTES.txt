@@ -1,4 +1,6 @@
 
+Added read impl, driver, and manager
+
 Add BootstrapAllocation interface to Store
     - Still needed for bootstrap process
     - Do this directly on Backend rather than store/frontend

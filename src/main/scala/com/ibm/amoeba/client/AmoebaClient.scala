@@ -19,4 +19,7 @@ trait AmoebaClient {
   private[client] val messenger: Messenger
 
   private[client] val objectCache: ObjectCache
+
+  private[amoeba] def getSystemAttribute(key: String): Option[String]
+  private[amoeba] def setSystemAttribute(key: String, value: String): Unit
 }
