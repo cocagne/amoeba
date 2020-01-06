@@ -26,7 +26,7 @@ class ReadManager(val client: AmoebaClient, val driverFactory: ReadDriver.Factor
     val promise: Promise[Unit] = Promise()
     var responses: Map[StoreId, Boolean] = Map()
 
-    private val retransmitTask = BackgroundTask.RetryWithExponentialBackoff(tryNow = true, Duration(10, SECONDS), Duration(3, MINUTES)) {
+    private val retransmitTask = client.backgroundTasks.retryWithExponentialBackoff(tryNow = true, Duration(10, SECONDS), Duration(3, MINUTES)) {
       pointer.hostingStores.foreach { storeId =>
         client.messenger.sendClientRequest(TransactionCompletionQuery(storeId, client.clientId, queryUUID, TransactionId(transactionUUID)))
       }
@@ -50,7 +50,7 @@ class ReadManager(val client: AmoebaClient, val driverFactory: ReadDriver.Factor
     * read threshold is achieved will still make their way to the read driver and potentially result in opportunistic
     * rebuild messages.
     */
-  val pruneStaleReadsTask: BackgroundTask.ScheduledTask = BackgroundTask.schedulePeriodic(Duration(1, SECONDS)) {
+  val pruneStaleReadsTask: BackgroundTask.ScheduledTask = client.backgroundTasks.schedulePeriodic(Duration(1, SECONDS)) {
     val completionSnap = synchronized { completionTimes }
     val now = System.nanoTime()/1000000
     val prune = completionSnap.filter( t => (now - t._2._1) > client.opportunisticRebuildManager.slowReadReplyDuration.toMillis )

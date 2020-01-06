@@ -1,20 +1,22 @@
 package com.ibm.amoeba.server.store
 
 import com.github.blemale.scaffeine.Scaffeine
-import com.ibm.amoeba.common.network.{TxAcceptResponse, TxCommitted, TxFinalized, TxMessage, TxPrepare, TxPrepareResponse, TxResolved}
+import com.ibm.amoeba.common.network._
 import com.ibm.amoeba.common.store.StoreId
 import com.ibm.amoeba.common.transaction.{TransactionDescription, TransactionId, TransactionStatus}
+import com.ibm.amoeba.common.util.BackgroundTask
 import com.ibm.amoeba.server.crl.CrashRecoveryLog
 import com.ibm.amoeba.server.network.Messenger
 import com.ibm.amoeba.server.store.backend.Backend
 import com.ibm.amoeba.server.store.cache.ObjectCache
-import com.ibm.amoeba.server.transaction.{TransactionDriver, TransactionFinalizer, TransactionStatusCache, Tx}
+import com.ibm.amoeba.server.transaction.{TransactionDriver, TransactionFinalizer, TransactionStatusCache}
 
 import scala.concurrent.duration._
 
 class Store(val backend: Backend,
             val objectCache: ObjectCache,
             val net: Messenger,
+            val backgroundTasks: BackgroundTask,
             val crl: CrashRecoveryLog,
             val txStatusCache: TransactionStatusCache,
             val finalizerFactory: TransactionFinalizer.Factory,
@@ -30,7 +32,7 @@ class Store(val backend: Backend,
     .build[TransactionId, List[TxPrepareResponse]]()
 
   def driveTransaction(txd: TransactionDescription): Unit = if (!transactionDrivers.contains(txd.transactionId)) {
-    val driver = txDriverFactory.create(storeId, net, txd, finalizerFactory)
+    val driver = txDriverFactory.create(storeId, net, backgroundTasks, txd, finalizerFactory)
 
     transactionDrivers += txd.transactionId -> driver
 

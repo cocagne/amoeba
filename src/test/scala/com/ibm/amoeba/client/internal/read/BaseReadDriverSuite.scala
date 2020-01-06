@@ -12,6 +12,7 @@ import com.ibm.amoeba.common.objects.{DataObjectPointer, KeyValueObjectPointer, 
 import com.ibm.amoeba.common.pool.PoolId
 import com.ibm.amoeba.common.store.{StoreId, StorePointer}
 import com.ibm.amoeba.common.transaction.{TransactionDescription, TransactionId}
+import com.ibm.amoeba.common.util.BackgroundTask
 import org.scalatest.{AsyncFunSuite, Matchers}
 
 import scala.concurrent.{Await, ExecutionContext}
@@ -49,6 +50,8 @@ object BaseReadDriverSuite {
   class TClient(override val clientId: ClientId) extends AmoebaClient {
 
     val txStatusCache: TransactionStatusCache = TransactionStatusCache.NoCache
+
+    private[client] def backgroundTasks: BackgroundTask = BackgroundTask.NoBackgroundTasks
 
     private[client] def clientContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
 

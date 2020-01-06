@@ -21,9 +21,10 @@ object SimpleTransactionDriver {
       def create(
                   storeId: StoreId,
                   messenger: Messenger,
+                  backgroundTasks: BackgroundTask,
                   txd: TransactionDescription,
                   finalizerFactory: TransactionFinalizer.Factory): TransactionDriver = {
-        new SimpleTransactionDriver(initialDelay, maxDelay, storeId, messenger, txd, finalizerFactory)
+        new SimpleTransactionDriver(initialDelay, maxDelay, storeId, messenger, backgroundTasks, txd, finalizerFactory)
       }
     }
   }
@@ -37,12 +38,13 @@ class SimpleTransactionDriver(
                               val maxDelay: Duration,
                               storeId: StoreId,
                               messenger: Messenger,
+                              backgroundTasks: BackgroundTask,
                               txd: TransactionDescription,
                               finalizerFactory: TransactionFinalizer.Factory)(implicit ec: ExecutionContext) extends TransactionDriver(
-  storeId, messenger, txd, finalizerFactory) {
+  storeId, messenger, backgroundTasks, txd, finalizerFactory) {
 
   private[this] var backoffDelay = initialDelay
-  private[this] var nextTry = BackgroundTask.schedule(initialDelay) { sendMessages() }
+  private[this] var nextTry = backgroundTasks.schedule(initialDelay) { sendMessages() }
 
   private[this] var sendCount = 0
 
@@ -80,7 +82,7 @@ class SimpleTransactionDriver(
       // Continually re-broadcast the prepare/accept messages for our current proposal at a fixed rate
       // if we get interrupted, the backoff mechanism will protect against contention
       nextTry.cancel()
-      nextTry = BackgroundTask.schedule(initialDelay) {
+      nextTry = backgroundTasks.schedule(initialDelay) {
         sendMessages()
       }
     }
@@ -97,7 +99,7 @@ class SimpleTransactionDriver(
     val thisDelay = ThreadLocalRandom.current().nextInt(0, backoffDelay.toMillis.asInstanceOf[Int])
 
     nextTry.cancel()
-    nextTry = BackgroundTask.schedule(Duration(thisDelay, MILLISECONDS)) { sendMessages() }
+    nextTry = backgroundTasks.schedule(Duration(thisDelay, MILLISECONDS)) { sendMessages() }
   }
 
 }

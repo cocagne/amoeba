@@ -39,7 +39,7 @@ class SimpleClientTransactionDriver(
 
   private var retries = 0
 
-  private val task = BackgroundTask.schedulePeriodic(retransmitDelay) {
+  private val task = client.backgroundTasks.schedulePeriodic(retransmitDelay) {
     synchronized {
       retries += 1
       if (retries % 3 == 0)

@@ -173,7 +173,7 @@ object BaseReadDriver {
 
       var hung = false
 
-      val hangCheckTask: BackgroundTask.ScheduledTask = BackgroundTask.schedule(Duration(10, SECONDS)) {
+      val hangCheckTask: BackgroundTask.ScheduledTask = client.backgroundTasks.schedule(Duration(10, SECONDS)) {
         val test = client.getSystemAttribute("unittest.name").getOrElse("UNKNOWN TEST")
         println(s"**** HUNG READ: $test")
 

@@ -9,6 +9,7 @@ import com.ibm.amoeba.common.paxos.ProposalId
 import com.ibm.amoeba.common.pool.PoolId
 import com.ibm.amoeba.common.store.{StoreId, StorePointer}
 import com.ibm.amoeba.common.transaction.{DataUpdate, DataUpdateOperation, RefcountUpdate, TransactionDescription, TransactionDisposition, TransactionId}
+import com.ibm.amoeba.common.util.BackgroundTask.NoBackgroundTasks
 import com.ibm.amoeba.server.network.Messenger
 import org.scalatest.{FunSuite, Matchers}
 
@@ -51,7 +52,7 @@ object TransactionDriverSuite {
              messenger: Messenger,
              initialPrepare: TxPrepare,
              finalizerFactory: TransactionFinalizer.Factory,
-             onComplete: TransactionId => Unit) extends TransactionDriver(storeId, messenger, initialPrepare.txd, finalizerFactory) {
+             onComplete: TransactionId => Unit) extends TransactionDriver(storeId, messenger, NoBackgroundTasks, initialPrepare.txd, finalizerFactory) {
     override protected def onFinalized(committed: Boolean): Unit = {
       super.onFinalized(committed)
       onComplete(txd.transactionId)

@@ -22,6 +22,7 @@ object TransactionDriver {
     def create(
                 storeId: StoreId,
                 messenger:Messenger,
+                backgroundTasks: BackgroundTask,
                 txd: TransactionDescription,
                 finalizerFactory: TransactionFinalizer.Factory): TransactionDriver
   }
@@ -33,13 +34,14 @@ object TransactionDriver {
     class NoRecoveryTransactionDriver(
                                        storeId: StoreId,
                                        messenger: Messenger,
+                                       backgroundTasks: BackgroundTask,
                                        txd: TransactionDescription,
                                        finalizerFactory: TransactionFinalizer.Factory) extends TransactionDriver(
-      storeId, messenger, txd, finalizerFactory) {
+      storeId, messenger, backgroundTasks, txd, finalizerFactory) {
 
       var hung = false
 
-      val hangCheckTask: BackgroundTask.ScheduledTask = BackgroundTask.schedule(Duration(10, SECONDS)) {
+      val hangCheckTask: BackgroundTask.ScheduledTask = backgroundTasks.schedule(Duration(10, SECONDS)) {
         //val test = messenger.system.map(_.getSystemAttribute("unittest.name").getOrElse("UNKNOWN TEST"))
         //println(s"**** HUNG TRANSACTION: $test")
         println(s"**** HUNG TRANSACTION")
@@ -63,9 +65,10 @@ object TransactionDriver {
     def create(
                 storeId: StoreId,
                 messenger:Messenger,
+                backgroundTasks: BackgroundTask,
                 txd: TransactionDescription,
                 finalizerFactory: TransactionFinalizer.Factory): TransactionDriver = {
-      new NoRecoveryTransactionDriver(storeId, messenger, txd, finalizerFactory)
+      new NoRecoveryTransactionDriver(storeId, messenger, backgroundTasks, txd, finalizerFactory)
     }
   }
 }
@@ -74,6 +77,7 @@ object TransactionDriver {
 abstract class TransactionDriver(
                                   val storeId: StoreId,
                                   val messenger: Messenger,
+                                  val backgroundTasks: BackgroundTask,
                                   val txd: TransactionDescription,
                                   private val finalizerFactory: TransactionFinalizer.Factory)(implicit ec: ExecutionContext) extends Logging {
 

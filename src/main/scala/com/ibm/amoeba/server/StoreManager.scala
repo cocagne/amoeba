@@ -5,6 +5,7 @@ import java.util.concurrent.{LinkedBlockingQueue, TimeUnit}
 import com.ibm.amoeba.common.network._
 import com.ibm.amoeba.common.store.StoreId
 import com.ibm.amoeba.common.transaction.TransactionStatus
+import com.ibm.amoeba.common.util.BackgroundTask
 import com.ibm.amoeba.server.crl.{CrashRecoveryLogFactory, SaveCompletion, SaveCompletionHandler}
 import com.ibm.amoeba.server.network.Messenger
 import com.ibm.amoeba.server.store.backend.{Backend, Completion, CompletionHandler}
@@ -40,6 +41,7 @@ object StoreManager {
 
 class StoreManager(val objectCache: ObjectCache,
                    val net: Messenger,
+                   val backgroundTasks: BackgroundTask,
                    crlFactory: CrashRecoveryLogFactory,
                    val finalizerFactory: TransactionFinalizer.Factory,
                    val txDriverFactory: TransactionDriver.Factory,
@@ -142,7 +144,8 @@ class StoreManager(val objectCache: ObjectCache,
       case RecoveryEvent() => handleRecoveryEvent()
 
       case LoadStore(backend) =>
-        val store = new Store(backend, objectCache, net, crl, txStatusCache,finalizerFactory, txDriverFactory)
+        val store = new Store(backend, objectCache, net, backgroundTasks, crl,
+          txStatusCache,finalizerFactory, txDriverFactory)
         backend.setCompletionHandler(ioHandler)
         stores += (backend.storeId -> store)
 

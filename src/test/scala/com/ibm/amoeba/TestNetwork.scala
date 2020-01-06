@@ -7,6 +7,7 @@ import com.ibm.amoeba.common.objects.ObjectId
 import com.ibm.amoeba.common.pool.PoolId
 import com.ibm.amoeba.common.store.StoreId
 import com.ibm.amoeba.common.transaction.{TransactionDescription, TransactionId}
+import com.ibm.amoeba.common.util.{BackgroundTask, BackgroundTaskPool}
 import com.ibm.amoeba.server.StoreManager
 import com.ibm.amoeba.server.crl.{AllocSaveComplete, AllocationRecoveryState, CrashRecoveryLog, CrashRecoveryLogClient, CrashRecoveryLogFactory, SaveCompletionHandler, TransactionRecoveryState, TxSaveComplete, TxSaveId}
 import com.ibm.amoeba.server.network.Messenger
@@ -74,7 +75,8 @@ class TestNetwork extends Messenger {
   val store1 = new MapBackend(storeId1)
   val store2 = new MapBackend(storeId2)
 
-  val smgr = new StoreManager(objectCache, this, TestCRL, NullFinalizer, TransactionDriver.noErrorRecoveryFactory,
+  val smgr = new StoreManager(objectCache, this, BackgroundTask.NoBackgroundTasks,
+    TestCRL, NullFinalizer, TransactionDriver.noErrorRecoveryFactory,
     List(store0, store1, store2))
 
   // process load store events
