@@ -34,9 +34,28 @@ class KeyValueObjectReader(metadataOnly: Boolean, pointer: KeyValueObjectPointer
 
     val min = matchingStoreStates.head.kvoss.minimum
     val max = matchingStoreStates.head.kvoss.maximum
-    val left = matchingStoreStates.head.kvoss.left
-    val right = matchingStoreStates.head.kvoss.right
 
+    val left = if (matchingStoreStates.head.kvoss.left.nonEmpty) {
+      val lleft = matchingStoreStates.flatMap { ss => ss.kvoss.left.map(v => ss.storeId.poolIndex -> v.bytes) }
+
+      if (lleft.size < threshold)
+        throw BaseObjectReader.NotRestorable(s"KVObject left object attribute is below threshold")
+      else
+        Some(Value(pointer.ida.restoreArray(lleft)))
+    } else {
+      None
+    }
+
+    val right = if (matchingStoreStates.head.kvoss.right.nonEmpty) {
+      val lright = matchingStoreStates.flatMap { ss => ss.kvoss.right.map(v => ss.storeId.poolIndex -> v.bytes) }
+
+      if (lright.size < threshold)
+        throw BaseObjectReader.NotRestorable(s"KVObject right object attribute is below threshold")
+      else
+        Some(Value(pointer.ida.restoreArray(lright)))
+    } else {
+      None
+    }
 
     val kvrestores = storeStates.foldLeft(Map[Key, List[Segment]]()) { (m, ss) =>
       ss.kvoss.contents.iterator.foldLeft(m) { (subm, v) =>
@@ -67,6 +86,7 @@ class KeyValueObjectReader(metadataOnly: Boolean, pointer: KeyValueObjectPointer
                          storeStates: List[KeyValueObjectStoreState],
                          segments: List[Segment]): Option[Restorable] = if (segments.isEmpty) None else {
 
+    //println("HELLO")
     val highestRevision = segments.foldLeft((HLCTimestamp.Zero, ObjectRevision.Null)) { (h,s) =>
       if (s.timestamp > h._1)
         (s.timestamp, s.revision)
@@ -77,6 +97,8 @@ class KeyValueObjectReader(metadataOnly: Boolean, pointer: KeyValueObjectPointer
       storeStates.find(p => p.storeId == s.storeID).foreach(ss => knownBehind += s.storeID -> ss.readTimestamp)
       false
     }}
+
+    //println(s"Resolving $what. hrev: $highestRevision matches: $matches")
 
     val matching = matches.size
     val mismatching = storeStates.size - matching

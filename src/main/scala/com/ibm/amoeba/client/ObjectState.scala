@@ -275,7 +275,15 @@ class KeyValueObjectState(
 
 object KeyValueObjectState {
 
-  case class ValueState(value: Value, revision: ObjectRevision, timestamp: HLCTimestamp)
+  final case class ValueState(value: Value, revision: ObjectRevision, timestamp: HLCTimestamp) {
+    override def hashCode = (value, revision, timestamp).##
+
+    override def equals(other: Any) = other match {
+      case that: ValueState =>
+        java.util.Arrays.equals(value.bytes, that.value.bytes) && revision == that.revision && timestamp == that.timestamp
+      case _ => false
+    }
+  }
 
   def compare(
                pointer: KeyValueObjectPointer,

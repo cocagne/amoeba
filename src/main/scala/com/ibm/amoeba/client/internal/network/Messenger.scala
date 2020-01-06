@@ -11,3 +11,13 @@ trait Messenger {
   def sendTransactionMessages(msg: List[TxMessage]): Unit
 
 }
+
+object Messenger {
+  object None extends Messenger {
+    def sendClientRequest(msg: ClientRequest): Unit = ()
+
+    def sendTransactionMessage(msg: TxMessage): Unit = ()
+
+    def sendTransactionMessages(msg: List[TxMessage]): Unit = ()
+  }
+}

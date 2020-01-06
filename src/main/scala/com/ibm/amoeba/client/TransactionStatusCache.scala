@@ -15,6 +15,14 @@ object TransactionStatusCache {
   private class Committed(var ourCommitErrors: Map[StoreId, List[TransactionId]] = Map()) extends TxStatus
 
   private class Finalized extends TxStatus
+
+  object NoCache extends TransactionStatusCache {
+    override def transactionAborted(txid: TransactionId): Unit = None
+
+    override def transactionCommitted(txid: TransactionId): Unit = None
+
+    override def transactionFinalized(txid: TransactionId): Unit = None
+  }
 }
 
 class TransactionStatusCache(cacheDuration: Duration = Duration(30, SECONDS)) {
