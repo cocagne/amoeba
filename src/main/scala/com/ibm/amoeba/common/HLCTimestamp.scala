@@ -10,10 +10,17 @@ final class HLCTimestamp private (private val longValue: Long) extends AnyVal wi
 
   def compare(t: HLCTimestamp): Int = {
     val pdelta = wallTime - t.wallTime
+
     if (pdelta == 0)
       logical - t.logical
-    else
-      pdelta.asInstanceOf[Int]
+    else {
+      if (pdelta > 0)
+        1
+      else if (pdelta < 0)
+        -1
+      else
+        0
+    }
   }
 
   def -(rhs: HLCTimestamp): Duration = this.asDuration - rhs.asDuration

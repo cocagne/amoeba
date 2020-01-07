@@ -128,6 +128,7 @@ abstract class BaseObjectReader[PointerType <: ObjectPointer, StoreStateType <: 
   }
 
   protected def attemptRestore(): Unit = {
+
     val mostRecent = responses.valuesIterator.foldLeft((ObjectRevision.Null, HLCTimestamp.Zero)) { (t,r) => r match {
       case Left(_) => t
       case Right(ss) => if (ss.timestamp > t._2) (ss.revision, ss.timestamp) else t
