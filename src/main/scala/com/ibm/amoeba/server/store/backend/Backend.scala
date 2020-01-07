@@ -17,6 +17,9 @@ trait Backend {
                         metadata: Metadata,
                         data: DataBuffer): StorePointer
 
+  /** Bootstrap-only overwrite method. It cannot fail and must return after the data is committed to disk */
+  def bootstrapOverwrite(objectId: ObjectId, pointer: StorePointer, data:DataBuffer): Unit
+
   def allocate(objectId: ObjectId,
                objectType: ObjectType.Value,
                metadata: Metadata,

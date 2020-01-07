@@ -1,14 +1,12 @@
 
-
-Start Bootstrap implementation
-    - Start with empty nucleus
-
-Add TestSystem
-    - Bootstrapped Store
-    - Test Network Implementation
-    - Store client
+Basic System Tests
+    - com.ibm.amoeba package
     - Do basic Transaction & Read tests on nucleus
 
+Client Allocation Manager
+Client Allocation Driver
+
+    - Allocate a data object and test transactions on it
 
 
 StoragePool
@@ -18,8 +16,7 @@ StoragePool
 Object Allocater Interface
 SinglePoolObjectAllocater
 
-Client Allocation Manager
-Client Allocation Driver
+
 
 Basic System Test
     - Allocate objects

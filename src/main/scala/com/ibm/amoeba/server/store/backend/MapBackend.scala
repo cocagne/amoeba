@@ -27,6 +27,10 @@ class MapBackend(val storeId: StoreId) extends Backend {
     sp
   }
 
+  override def bootstrapOverwrite(objectId: ObjectId, pointer: StorePointer, data:DataBuffer): Unit = {
+    m(objectId).data = data
+  }
+
   override def allocate(objectId: ObjectId,
                         objectType: ObjectType.Value,
                         metadata: Metadata,

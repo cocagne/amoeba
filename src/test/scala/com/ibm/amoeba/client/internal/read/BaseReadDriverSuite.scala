@@ -5,7 +5,7 @@ import java.util.UUID
 import com.ibm.amoeba.client.internal.OpportunisticRebuildManager
 import com.ibm.amoeba.client.internal.network.Messenger
 import com.ibm.amoeba.client.{AmoebaClient, CorruptedObject, DataObjectState, InvalidObject, ObjectCache, TransactionStatusCache}
-import com.ibm.amoeba.common.network.{ClientId, ReadResponse}
+import com.ibm.amoeba.common.network.{ClientId, ClientResponse, ReadResponse}
 import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp}
 import com.ibm.amoeba.common.ida.Replication
 import com.ibm.amoeba.common.objects.{DataObjectPointer, KeyValueObjectPointer, ObjectId, ObjectPointer, ObjectRefcount, ObjectRevision, ReadError}
@@ -60,6 +60,8 @@ object BaseReadDriverSuite {
     private[client] val messenger: Messenger = Messenger.None
 
     private[client] val objectCache: ObjectCache = ObjectCache.NoCache
+
+    private[amoeba] def receiveClientResponse(msg: ClientResponse): Unit = ()
 
     private[amoeba] def getSystemAttribute(key: String): Option[String] = None
     private[amoeba] def setSystemAttribute(key: String, value: String): Unit = ()
