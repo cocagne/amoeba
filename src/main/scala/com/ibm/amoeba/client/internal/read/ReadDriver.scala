@@ -9,7 +9,7 @@ import com.ibm.amoeba.common.objects.ObjectPointer
 import scala.concurrent.Future
 
 trait ReadDriver {
-  def readResult: Future[Either[ReadError, ObjectState]]
+  def readResult: Future[ObjectState]
 
   /** Called to begin the read process. Read messages must not be sent until this method is called */
   def begin(): Unit

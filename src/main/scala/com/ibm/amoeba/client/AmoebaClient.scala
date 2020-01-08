@@ -3,15 +3,20 @@ package com.ibm.amoeba.client
 import com.ibm.amoeba.client.internal.OpportunisticRebuildManager
 import com.ibm.amoeba.client.internal.network.Messenger
 import com.ibm.amoeba.common.network.{ClientId, ClientResponse, TxMessage}
+import com.ibm.amoeba.common.objects.{DataObjectPointer, KeyValueObjectPointer}
 import com.ibm.amoeba.common.util.BackgroundTask
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 
 trait AmoebaClient {
 
   val clientId: ClientId
 
   val txStatusCache: TransactionStatusCache
+
+  def read(pointer: DataObjectPointer): Future[DataObjectState]
+
+  def read(pointer: KeyValueObjectPointer): Future[KeyValueObjectState]
 
   private[client] def backgroundTasks: BackgroundTask
 

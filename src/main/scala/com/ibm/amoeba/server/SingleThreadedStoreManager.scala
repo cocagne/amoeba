@@ -7,13 +7,13 @@ import com.ibm.amoeba.server.store.backend.Backend
 import com.ibm.amoeba.server.store.cache.ObjectCache
 import com.ibm.amoeba.server.transaction.{TransactionDriver, TransactionFinalizer}
 
-class SingleThreadedStoreManager(objectCache: ObjectCache,
+class SingleThreadedStoreManager(objectCacheFactory: () => ObjectCache,
                                  net: Messenger,
                                  backgroundTasks: BackgroundTask,
                                  crlFactory: CrashRecoveryLogFactory,
                                  finalizerFactory: TransactionFinalizer.Factory,
                                  txDriverFactory: TransactionDriver.Factory,
-                                 initialBackends: List[Backend]) extends StoreManager(objectCache,
+                                 initialBackends: List[Backend]) extends StoreManager(objectCacheFactory,
   net, backgroundTasks, crlFactory, finalizerFactory, txDriverFactory, initialBackends){
 
   private val managerThread = new Thread {

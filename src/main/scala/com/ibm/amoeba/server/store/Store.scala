@@ -42,6 +42,12 @@ class Store(val backend: Backend,
     }
   }
 
+  def hasTransactions: Boolean = synchronized { transactionDrivers.nonEmpty }
+
+  def logTransactionStatus(log: String => Unit): Unit = synchronized {
+    transactionDrivers.values.foreach(_.printState(log))
+  }
+
   def receiveTransactionMessage(msg: TxMessage): Unit = {
 
     msg match {

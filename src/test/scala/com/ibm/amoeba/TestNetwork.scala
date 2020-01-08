@@ -3,15 +3,16 @@ package com.ibm.amoeba
 import java.util.UUID
 
 import com.ibm.amoeba.client.internal.OpportunisticRebuildManager
-import com.ibm.amoeba.client.{AmoebaClient, ObjectCache, TransactionStatusCache}
+import com.ibm.amoeba.client.{AmoebaClient, DataObjectState, KeyValueObjectState, ObjectCache, TransactionStatusCache}
 import com.ibm.amoeba.client.internal.network.{Messenger => ClientMessenger}
+import com.ibm.amoeba.client.internal.read.{BaseReadDriver, ReadManager}
+import com.ibm.amoeba.common.Nucleus
 import com.ibm.amoeba.common.ida.Replication
-import com.ibm.amoeba.common.network.{ClientId, ClientRequest, ClientResponse, TxMessage}
-import com.ibm.amoeba.common.objects.{KeyValueObjectPointer, ObjectId}
-import com.ibm.amoeba.common.pool.PoolId
+import com.ibm.amoeba.common.network.{ClientId, ClientRequest, ClientResponse, ReadResponse, TransactionCompletionResponse, TxMessage}
+import com.ibm.amoeba.common.objects.{DataObjectPointer, KeyValueObjectPointer, ObjectId}
 import com.ibm.amoeba.common.store.StoreId
 import com.ibm.amoeba.common.transaction.{TransactionDescription, TransactionId}
-import com.ibm.amoeba.common.util.BackgroundTask
+import com.ibm.amoeba.common.util.{BackgroundTask, BackgroundTaskPool}
 import com.ibm.amoeba.server.StoreManager
 import com.ibm.amoeba.server.crl.{AllocSaveComplete, AllocationRecoveryState, CrashRecoveryLog, CrashRecoveryLogClient, CrashRecoveryLogFactory, SaveCompletionHandler, TransactionRecoveryState, TxSaveComplete, TxSaveId}
 import com.ibm.amoeba.server.network.{Messenger => ServerMessenger}
@@ -20,7 +21,8 @@ import com.ibm.amoeba.server.store.backend.MapBackend
 import com.ibm.amoeba.server.store.cache.SimpleLRUObjectCache
 import com.ibm.amoeba.server.transaction.{TransactionDriver, TransactionFinalizer}
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.duration.{Duration, MILLISECONDS}
+import scala.concurrent.{ExecutionContext, Future, Promise}
 
 
 object TestNetwork {
@@ -66,9 +68,23 @@ object TestNetwork {
 
   class TClient(msngr: ClientMessenger) extends AmoebaClient {
 
+    import scala.concurrent.ExecutionContext.Implicits.global
+
+    var attributes: Map[String, String] = Map()
+
     override val clientId: ClientId = ClientId(new UUID(0,1))
 
     val txStatusCache: TransactionStatusCache = TransactionStatusCache.NoCache
+
+    val rmgr = new ReadManager(this, BaseReadDriver.noErrorRecoveryReadDriver)
+
+    def read(pointer: DataObjectPointer): Future[DataObjectState] = {
+      rmgr.read(pointer).map(_.asInstanceOf[DataObjectState])
+    }
+
+    def read(pointer: KeyValueObjectPointer): Future[KeyValueObjectState] = {
+      rmgr.read(pointer).map(_.asInstanceOf[KeyValueObjectState])
+    }
 
     def backgroundTasks: BackgroundTask = BackgroundTask.NoBackgroundTasks
 
@@ -80,10 +96,14 @@ object TestNetwork {
 
     val objectCache: ObjectCache = ObjectCache.NoCache
 
-    def receiveClientResponse(msg: ClientResponse): Unit = ()
+    def receiveClientResponse(msg: ClientResponse): Unit = msg match {
+      case m: ReadResponse => rmgr.receive(m)
+      case m: TransactionCompletionResponse => rmgr.receive(m)
+      case _ =>
+    }
 
-    def getSystemAttribute(key: String): Option[String] = None
-    def setSystemAttribute(key: String, value: String): Unit = ()
+    def getSystemAttribute(key: String): Option[String] = attributes.get(key)
+    def setSystemAttribute(key: String, value: String): Unit = attributes += key -> value
   }
 }
 
@@ -91,13 +111,11 @@ object TestNetwork {
 class TestNetwork extends ServerMessenger {
   import TestNetwork._
 
-  val objectCache = new SimpleLRUObjectCache(1000)
+  val objectCacheFactory: () => SimpleLRUObjectCache = () => new SimpleLRUObjectCache(1000)
 
-  val poolId = PoolId(new UUID(0, 0))
-
-  val storeId0 = StoreId(poolId, 0)
-  val storeId1 = StoreId(poolId, 1)
-  val storeId2 = StoreId(poolId, 2)
+  val storeId0 = StoreId(Nucleus.poolId, 0)
+  val storeId1 = StoreId(Nucleus.poolId, 1)
+  val storeId2 = StoreId(Nucleus.poolId, 2)
 
   val store0 = new MapBackend(storeId0)
   val store1 = new MapBackend(storeId1)
@@ -107,19 +125,22 @@ class TestNetwork extends ServerMessenger {
 
   val nucleus: KeyValueObjectPointer = Bootstrap.initialize(ida, List(store0, store1, store2))
 
-  val smgr = new StoreManager(objectCache, this, BackgroundTask.NoBackgroundTasks,
+  val smgr = new StoreManager(objectCacheFactory, this, BackgroundTask.NoBackgroundTasks,
     TestCRL, NullFinalizer, TransactionDriver.noErrorRecoveryFactory,
     List(store0, store1, store2))
 
 
   private val cliMessenger = new ClientMessenger {
 
-    def sendClientRequest(msg: ClientRequest): Unit = smgr.receiveClientRequest(msg)
+    def sendClientRequest(msg: ClientRequest): Unit = {
+      smgr.receiveClientRequest(msg)
+      while (smgr.hasEvents)
+        smgr.handleEvents()
+    }
 
-    def sendTransactionMessage(msg: TxMessage): Unit = smgr.receiveTransactionMessage(msg)
+    def sendTransactionMessage(msg: TxMessage): Unit = sendTransactionMessage(msg)
 
-    def sendTransactionMessages(msg: List[TxMessage]): Unit = msg.foreach(m => smgr.receiveTransactionMessage(m))
-
+    def sendTransactionMessages(msg: List[TxMessage]): Unit = sendTransactionMessages(msg)
   }
 
   val client = new TClient(cliMessenger)
@@ -129,7 +150,9 @@ class TestNetwork extends ServerMessenger {
 
   private var topSend = true
 
-  override def sendClientResponse(msg: ClientResponse): Unit = client.receiveClientResponse(msg)
+  override def sendClientResponse(msg: ClientResponse): Unit = {
+    client.receiveClientResponse(msg)
+  }
 
   override def sendTransactionMessage(msg: TxMessage): Unit = {
     val isTopSend = topSend
@@ -147,4 +170,31 @@ class TestNetwork extends ServerMessenger {
   }
 
   override def sendTransactionMessages(msg: List[TxMessage]): Unit = msg.foreach(sendTransactionMessage)
+
+  def printTransactionStatus(): Unit = {
+    println("*********** Transaction Status ***********")
+    smgr.logTransactionStatus(s => println(s))
+    println("******************************************")
+  }
+
+  def waitForTransactionsToComplete(): Future[Unit] = {
+    //val stack = com.ibm.aspen.util.getStack()
+
+    val bgTasks = new BackgroundTaskPool
+
+    val p = Promise[Unit]()
+    val pollDelay = Duration(5, MILLISECONDS)
+
+    def check(): Unit = {
+      if (!smgr.hasTransactions) {
+        bgTasks.shutdown(pollDelay)
+        p.success(())
+      } else
+        bgTasks.schedule(pollDelay)(check())
+    }
+
+    bgTasks.schedule(pollDelay)(check())
+
+    p.future
+  }
 }

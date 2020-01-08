@@ -4,7 +4,7 @@ import java.util.UUID
 
 import com.ibm.amoeba.client.internal.OpportunisticRebuildManager
 import com.ibm.amoeba.client.internal.network.Messenger
-import com.ibm.amoeba.client.{AmoebaClient, CorruptedObject, DataObjectState, InvalidObject, ObjectCache, TransactionStatusCache}
+import com.ibm.amoeba.client.{AmoebaClient, CorruptedObject, DataObjectState, InvalidObject, KeyValueObjectState, ObjectCache, TransactionStatusCache}
 import com.ibm.amoeba.common.network.{ClientId, ClientResponse, ReadResponse}
 import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp}
 import com.ibm.amoeba.common.ida.Replication
@@ -15,8 +15,9 @@ import com.ibm.amoeba.common.transaction.{TransactionDescription, TransactionId}
 import com.ibm.amoeba.common.util.BackgroundTask
 import org.scalatest.{AsyncFunSuite, Matchers}
 
-import scala.concurrent.{Await, ExecutionContext}
+import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration._
+import scala.util.Failure
 
 object BaseReadDriverSuite {
   val awaitDuration = Duration(100, MILLISECONDS)
@@ -50,6 +51,9 @@ object BaseReadDriverSuite {
   class TClient(override val clientId: ClientId) extends AmoebaClient {
 
     val txStatusCache: TransactionStatusCache = TransactionStatusCache.NoCache
+
+    def read(pointer: DataObjectPointer): Future[DataObjectState] = Future.failed(new Exception("TODO"))
+    def read(pointer: KeyValueObjectPointer): Future[KeyValueObjectState] = Future.failed(new Exception("TODO"))
 
     private[client] def backgroundTasks: BackgroundTask = BackgroundTask.NoBackgroundTasks
 
@@ -98,11 +102,9 @@ class BaseReadDriverSuite  extends AsyncFunSuite with Matchers {
     r.receiveReadResponse(ReadResponse(client, ds2, readUUID, readTime, Left(ReadError.ObjectMismatch)))
 
     r.readResult.isCompleted should be (true)
-    val o = Await.result(r.readResult, awaitDuration)
 
-    o match {
-      case Left(err: InvalidObject) => err.pointer should be (ptr)
-      case _ => fail("bah")
+    recoverToSucceededIf[InvalidObject] {
+      r.readResult
     }
   }
 
@@ -121,11 +123,9 @@ class BaseReadDriverSuite  extends AsyncFunSuite with Matchers {
     r.receiveReadResponse(ReadResponse(client, ds2, readUUID, ts, Left(ReadError.CorruptedObject)))
 
     r.readResult.isCompleted should be (true)
-    val o = Await.result(r.readResult, awaitDuration)
 
-    o match {
-      case Left(err: CorruptedObject) => err.pointer should be (ptr)
-      case _ => fail("bah")
+    recoverToSucceededIf[CorruptedObject] {
+      r.readResult
     }
   }
 
@@ -154,7 +154,7 @@ class BaseReadDriverSuite  extends AsyncFunSuite with Matchers {
     //        println(s"ptr(${ptr}), rev(${nrev2}), ref(${ref}), ts(${ts}), data(${com.ibm.aspen.util.db2string(odata)})")
     //    }
 
-    o should be (Right(DataObjectState(ptr, nrev2, ref, ts, readTime, 5, odata)))
+    o should be (DataObjectState(ptr, nrev2, ref, ts, readTime, 5, odata))
   }
 
   test("Ignore old revisions") {
@@ -174,7 +174,7 @@ class BaseReadDriverSuite  extends AsyncFunSuite with Matchers {
     r.readResult.isCompleted should be (true)
     val o = Await.result(r.readResult, awaitDuration)
 
-    o should be (Right(DataObjectState(ptr, nrev2, ref, ts, ts, 5, odata)))
+    o should be (DataObjectState(ptr, nrev2, ref, ts, ts, 5, odata))
   }
 
   test("Use minimum readTime") {
@@ -196,7 +196,7 @@ class BaseReadDriverSuite  extends AsyncFunSuite with Matchers {
     r.readResult.isCompleted should be (true)
     val o = Await.result(r.readResult, awaitDuration)
 
-    o should be (Right(DataObjectState(ptr, nrev2, ref, ts, minTs, 5, odata)))
+    o should be (DataObjectState(ptr, nrev2, ref, ts, minTs, 5, odata))
   }
 
 
@@ -211,7 +211,7 @@ class BaseReadDriverSuite  extends AsyncFunSuite with Matchers {
     r.readResult.isCompleted should be (true)
     val o = Await.result(r.readResult, awaitDuration)
 
-    o should be (Right(DataObjectState(ptr, rev, ref, ts, ts, 5, odata)))
+    o should be (DataObjectState(ptr, rev, ref, ts, ts, 5, odata))
   }
 
 }

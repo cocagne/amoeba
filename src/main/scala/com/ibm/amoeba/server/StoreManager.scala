@@ -39,7 +39,7 @@ object StoreManager {
   }
 }
 
-class StoreManager(val objectCache: ObjectCache,
+class StoreManager(val objectCacheFactory: () => ObjectCache,
                    val net: Messenger,
                    val backgroundTasks: BackgroundTask,
                    crlFactory: CrashRecoveryLogFactory,
@@ -60,7 +60,24 @@ class StoreManager(val objectCache: ObjectCache,
   protected var shutdownCalled = false
   private val shutdownPromise: Promise[Unit] = Promise()
 
-  protected var stores: Map[StoreId, Store] = Map()
+  protected var stores: Map[StoreId, Store] = initialBackends.map { backend =>
+    val store = new Store(backend, objectCacheFactory(), net, backgroundTasks, crl,
+      txStatusCache, finalizerFactory, txDriverFactory)
+
+    backend.setCompletionHandler(op => {
+      events.add(IOCompletion(op))
+    })
+
+    backend.storeId -> store
+  }.toMap
+
+  def hasTransactions: Boolean = synchronized {
+    stores.valuesIterator.exists(_.hasTransactions)
+  }
+
+  def logTransactionStatus(log: String => Unit): Unit = synchronized {
+    stores.values.foreach(_.logTransactionStatus(log))
+  }
 
   def loadStore(backend: Backend): Unit = {
     events.add(LoadStore(backend))
@@ -103,6 +120,7 @@ class StoreManager(val objectCache: ObjectCache,
   }
 
   private def handleEvent(event: Event): Unit = {
+
     event match {
 
       case IOCompletion(op) => stores.get(op.storeId).foreach { store =>
@@ -118,6 +136,7 @@ class StoreManager(val objectCache: ObjectCache,
       }
 
       case ClientReq(msg) => stores.get(msg.toStore).foreach { store =>
+
         msg match {
           case a: Allocate => store.frontend.allocateObject(a)
 
@@ -144,7 +163,7 @@ class StoreManager(val objectCache: ObjectCache,
       case RecoveryEvent() => handleRecoveryEvent()
 
       case LoadStore(backend) =>
-        val store = new Store(backend, objectCache, net, backgroundTasks, crl,
+        val store = new Store(backend, objectCacheFactory(), net, backgroundTasks, crl,
           txStatusCache,finalizerFactory, txDriverFactory)
         backend.setCompletionHandler(ioHandler)
         stores += (backend.storeId -> store)

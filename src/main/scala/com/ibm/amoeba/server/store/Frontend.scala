@@ -3,7 +3,7 @@ package com.ibm.amoeba.server.store
 import java.util.UUID
 
 import com.ibm.amoeba.common.HLCTimestamp
-import com.ibm.amoeba.common.network.{Allocate, AllocateResponse, ClientId, NetworkCodec, OpportunisticRebuild, ReadResponse, TxAccept, TxFinalized, TxHeartbeat, TxMessage, TxPrepare, TxResolved, TxStatusRequest}
+import com.ibm.amoeba.common.network.{Allocate, AllocateResponse, ClientId, OpportunisticRebuild, ReadResponse, TxAccept, TxFinalized, TxHeartbeat, TxMessage, TxPrepare, TxResolved, TxStatusRequest}
 import com.ibm.amoeba.common.objects.{Metadata, ObjectId, ObjectRevision, ReadError}
 import com.ibm.amoeba.common.store.{ReadState, StoreId, StorePointer}
 import com.ibm.amoeba.common.transaction.{TransactionDescription, TransactionId}
@@ -204,7 +204,6 @@ class Frontend(val storeId: StoreId,
   def backendReadComplete(objectId: ObjectId,
                           storePointer: StorePointer,
                           result: Either[ReadState, ReadError.Value]): Unit = {
-
     result match {
       case Left(rs) =>
         val os = new ObjectState(objectId, storePointer, rs.metadata, rs.objectType, rs.data, None)

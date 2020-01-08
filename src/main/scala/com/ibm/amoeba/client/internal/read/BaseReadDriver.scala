@@ -42,9 +42,9 @@ abstract class BaseReadDriver(
 
   private var rebuildsSent: Set[StoreId] = Set()
 
-  protected val promise: Promise[Either[ReadError, ObjectState]] = Promise()
+  protected val promise: Promise[ObjectState] = Promise()
 
-  def readResult: Future[Either[ReadError, ObjectState]] = promise.future
+  def readResult: Future[ObjectState] = promise.future
 
   def begin(): Unit = sendReadRequests()
 
@@ -119,15 +119,18 @@ abstract class BaseReadDriver(
           }
 
           result match {
-            case Left(err) => logger.info(s"Read UUID $readUUID: Failed to read object ${objectPointer.id}. Reason: $err")
-            case Right(obj) => obj match {
-              case dos: DataObjectState => logger.info(s"Read UUID $readUUID: Successfully read DataObject ${objectPointer.id} Rev ${dos.revision} Ref ${dos.refcount} Size ${dos.data.size} Hash ${dos.data.hashString}")
-              case kvos: KeyValueObjectState => logger.info(s"Read UUID $readUUID: Successfully read KeyValueObject ${objectPointer.id} Rev ${kvos.revision} Ref ${kvos.refcount} Num Entries ${kvos.contents.size}")
-              case mos: MetadataObjectState => logger.info(s"Read UUID $readUUID: Successfully read MetadataObject ${objectPointer.id} Rev ${mos.revision} Ref ${mos.refcount}")
-            }
-          }
+            case Left(err) =>
+              logger.info(s"Read UUID $readUUID: Failed to read object ${objectPointer.id}. Reason: $err")
+              promise.failure(err)
 
-          promise.success(result)
+            case Right(obj) =>
+              obj match {
+                case dos: DataObjectState => logger.info(s"Read UUID $readUUID: Successfully read DataObject ${objectPointer.id} Rev ${dos.revision} Ref ${dos.refcount} Size ${dos.data.size} Hash ${dos.data.hashString}")
+                case kvos: KeyValueObjectState => logger.info(s"Read UUID $readUUID: Successfully read KeyValueObject ${objectPointer.id} Rev ${kvos.revision} Ref ${kvos.refcount} Num Entries ${kvos.contents.size}")
+                case mos: MetadataObjectState => logger.info(s"Read UUID $readUUID: Successfully read MetadataObject ${objectPointer.id} Rev ${mos.revision} Ref ${mos.refcount}")
+              }
+              promise.success(obj)
+          }
         }
 
         if (promise.isCompleted) {
@@ -161,7 +164,7 @@ abstract class BaseReadDriver(
 
 object BaseReadDriver {
 
-  def noErrorRecoveryReadDriver(ec: ExecutionContext)(
+  def noErrorRecoveryReadDriver(
     client: AmoebaClient,
     objectPointer: ObjectPointer,
     readUUID:UUID,

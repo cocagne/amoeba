@@ -3,6 +3,15 @@ Basic System Tests
     - com.ibm.amoeba package
     - Do basic Transaction & Read tests on nucleus
 
+Object Allocater Interface
+    - SinglePoolObjectAllocater
+    - Special-case the Nucleus Pool allocater
+        - uses single pool allocater
+        - constant, zeroed pool id from Nucleus.poolId
+        - Special-case this in the getObjectAllocater(poolId: PoolId): Future[ObjectAllocater]
+            - all objects use same IDA as nucleus
+            - storeIds always use poolId + index
+
 Client Allocation Manager
 Client Allocation Driver
 
@@ -13,8 +22,7 @@ StoragePool
     - port over the full interface
     - Skip the missed update handling for now
 
-Object Allocater Interface
-SinglePoolObjectAllocater
+
 
 
 

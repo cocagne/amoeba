@@ -2,7 +2,7 @@ package com.ibm.amoeba.client.internal.read
 
 import java.util.UUID
 
-import com.ibm.amoeba.client.{AmoebaClient, ObjectState, ReadError}
+import com.ibm.amoeba.client.{AmoebaClient, ObjectState}
 import com.ibm.amoeba.common.network.{ReadResponse, TransactionCompletionQuery, TransactionCompletionResponse}
 import com.ibm.amoeba.common.objects.ObjectPointer
 import com.ibm.amoeba.common.store.StoreId
@@ -10,8 +10,8 @@ import com.ibm.amoeba.common.transaction.TransactionId
 import com.ibm.amoeba.common.util.BackgroundTask
 import org.apache.logging.log4j.scala.Logging
 
-import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.concurrent.duration.{Duration, MINUTES, SECONDS}
+import scala.concurrent.{ExecutionContext, Future, Promise}
 
 class ReadManager(val client: AmoebaClient, val driverFactory: ReadDriver.Factory) extends Logging {
 
@@ -99,7 +99,7 @@ class ReadManager(val client: AmoebaClient, val driverFactory: ReadDriver.Factor
   def read(
             objectPointer: ObjectPointer,
             disableOpportunisticRebuild:Boolean=false,
-            ): Future[Either[ReadError, ObjectState]] = {
+            ): Future[ObjectState] = {
 
     val readUUID = UUID.randomUUID()
 

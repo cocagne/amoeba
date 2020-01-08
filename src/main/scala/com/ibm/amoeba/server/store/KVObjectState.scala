@@ -97,42 +97,48 @@ object KVObjectState {
   }
 
   def decode(db: DataBuffer): KVObjectState = {
-    val bb = db.asReadOnlyBuffer()
+    if (db.size == 0)
+      new KVObjectState(None, None, None, None, Map(), Map())
+    else {
+      val bb = db.asReadOnlyBuffer()
 
-    def getBytes: Array[Byte] = {
-      val len = Varint.getUnsignedInt(bb)
-      val arr = new Array[Byte](len)
-      bb.get(arr)
-      arr
+      def getBytes: Array[Byte] = {
+        val len = Varint.getUnsignedInt(bb)
+        val arr = new Array[Byte](len)
+        bb.get(arr)
+        arr
+      }
+
+      def getKey: Key = Key(getBytes)
+
+      def getValue: Value = Value(getBytes)
+
+      def getContent: (Key, ValueState) = {
+        val msb = bb.getLong
+        val lsb = bb.getLong
+        val revision = ObjectRevision(TransactionId(new UUID(msb, lsb)))
+        val timestamp = HLCTimestamp(bb.getLong)
+        val key = getKey
+        val value = getValue
+        key -> new ValueState(value, revision, timestamp, None)
+      }
+
+      val mask = bb.get()
+
+      val min = if ((mask & 1 << 0) != 0) Some(getKey) else None
+      val max = if ((mask & 1 << 1) != 0) Some(getKey) else None
+      val left = if ((mask & 1 << 2) != 0) Some(getValue) else None
+      val right = if ((mask & 1 << 3) != 0) Some(getValue) else None
+
+      val ncontents = Varint.getUnsignedInt(bb)
+
+      var content: Map[Key, ValueState] = Map()
+
+      for (_ <- 0 until ncontents) {
+        content += getContent
+      }
+
+      new KVObjectState(min, max, left, right, content, Map())
     }
-
-    def getKey: Key = Key(getBytes)
-    def getValue: Value = Value(getBytes)
-
-    def getContent: (Key, ValueState) = {
-      val msb = bb.getLong
-      val lsb = bb.getLong
-      val revision = ObjectRevision(TransactionId(new UUID(msb, lsb)))
-      val timestamp = HLCTimestamp(bb.getLong)
-      val key = getKey
-      val value = getValue
-      key -> new ValueState(value, revision, timestamp, None)
-    }
-    val mask = bb.get()
-
-    val min   = if ((mask & 1 << 0) != 0) Some(getKey) else None
-    val max   = if ((mask & 1 << 1) != 0) Some(getKey) else None
-    val left  = if ((mask & 1 << 2) != 0) Some(getValue) else None
-    val right = if ((mask & 1 << 3) != 0) Some(getValue) else None
-
-    val ncontents = Varint.getUnsignedInt(bb)
-
-    var content: Map[Key, ValueState] = Map()
-
-    for (_ <- 0 until ncontents) {
-      content += getContent
-    }
-
-    new KVObjectState(min, max, left, right, content, Map())
   }
 }

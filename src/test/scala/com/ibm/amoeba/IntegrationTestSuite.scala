@@ -1,0 +1,75 @@
+package com.ibm.amoeba
+
+import java.util.concurrent.TimeoutException
+
+import com.ibm.amoeba.client.AmoebaClient
+import com.ibm.amoeba.common.objects.KeyValueObjectPointer
+import org.scalatest.{AsyncFunSuite, BeforeAndAfter, FutureOutcome, Matchers}
+
+import scala.concurrent.{Await, Future}
+import scala.concurrent.duration.{Duration, MILLISECONDS}
+
+class IntegrationTestSuite  extends AsyncFunSuite with Matchers { //with BeforeAndAfter {
+  var net: TestNetwork = _
+  var client: AmoebaClient = _
+  var nucleus: KeyValueObjectPointer = _
+  var testName: String = "NO_TEST"
+
+  /*
+  after {
+    try {
+      Await.result(net.waitForTransactionsToComplete(), Duration(5000, MILLISECONDS))
+    } catch {
+      case e: TimeoutException =>
+        println(s"TEST LEFT TRANSACTIONS UNFINISHED: $testName")
+        net.printTransactionStatus()
+        throw e
+    }
+
+    net = null
+    client = null
+    nucleus = null
+    testName = "NO_TEST"
+  }*/
+
+  override def withFixture(test: NoArgAsyncTest): FutureOutcome = {
+    net = new TestNetwork
+    client = net.client
+    testName = test.name
+    nucleus = net.nucleus
+    client.setSystemAttribute("unittest.name", test.name)
+
+    complete {
+      super.withFixture(test)
+    } lastly {
+      try {
+        Await.result(net.waitForTransactionsToComplete(), Duration(5000, MILLISECONDS))
+      } catch {
+        case e: TimeoutException =>
+          println(s"TEST LEFT TRANSACTIONS UNFINISHED: $testName")
+          net.printTransactionStatus()
+          throw e
+      }
+
+      net = null
+      client = null
+      nucleus = null
+      testName = "NO_TEST"
+    }
+  }
+
+  def waitForTransactionsToComplete(): Future[Unit] = net.waitForTransactionsToComplete()
+
+  def waitForIt(errMsg: String)(fn: => Boolean): Future[Unit] = Future {
+
+    var count = 0
+    while (!fn && count < 500) {
+      count += 1
+      Thread.sleep(5)
+    }
+
+    if (count >= 500)
+      throw new Exception(errMsg)
+  }
+
+}
