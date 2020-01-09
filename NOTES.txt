@@ -1,3 +1,4 @@
+**** Remove extra values from Insert operation
 
 Basic System Tests
     - com.ibm.amoeba package

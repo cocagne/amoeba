@@ -34,9 +34,6 @@ class SimpleClientTransactionDriver(
 
   implicit private val ec: ExecutionContext = client.clientContext
 
-  private var haveUpdateContent = Set[StoreId]()
-  private var responded = Set[StoreId]()
-
   private var retries = 0
 
   private val task = client.backgroundTasks.schedulePeriodic(retransmitDelay) {
@@ -45,37 +42,10 @@ class SimpleClientTransactionDriver(
       if (retries % 3 == 0)
         logger.info(s"***** HUNG Client Transaction ${txd.transactionId}")
     }
-    retransmit()
+    sendPrepareMessages()
   }
 
   override def shutdown(): Unit = task.cancel()
 
   result onComplete { _ => task.cancel() }
-
-  override def receive(prepareResponse: TxPrepareResponse): Unit = synchronized {
-    haveUpdateContent += prepareResponse.from
-  }
-
-  override def receive(acceptResponse: TxAcceptResponse): Unit = synchronized {
-    responded += acceptResponse.from
-    super.receive(acceptResponse)
-  }
-
-  def retransmit(): Unit = synchronized {
-
-    val poolId = txd.primaryObject.poolId
-    val fromStore = StoreId(poolId, txd.designatedLeaderUID)
-    val pid = ProposalId.initialProposal(txd.designatedLeaderUID)
-
-    txd.allDataStores.filter(!responded.contains(_)).foreach { toStore =>
-
-      val transactionData = updateData.getOrElse(toStore, TransactionData(Nil, Nil))
-
-      val initialPrepare = TxPrepare(toStore, fromStore, txd, pid,
-        transactionData.localUpdates, transactionData.preTransactionRebuilds)
-
-      client.messenger.sendTransactionMessage(initialPrepare)
-    }
-  }
-
 }

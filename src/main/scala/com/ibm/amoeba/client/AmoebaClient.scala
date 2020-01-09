@@ -1,6 +1,6 @@
 package com.ibm.amoeba.client
 
-import com.ibm.amoeba.client.internal.OpportunisticRebuildManager
+import com.ibm.amoeba.client.internal.{OpportunisticRebuildManager, TransactionManager}
 import com.ibm.amoeba.client.internal.network.Messenger
 import com.ibm.amoeba.common.network.{ClientId, ClientResponse, TxMessage}
 import com.ibm.amoeba.common.objects.{DataObjectPointer, KeyValueObjectPointer}
@@ -17,6 +17,8 @@ trait AmoebaClient {
   def read(pointer: DataObjectPointer): Future[DataObjectState]
 
   def read(pointer: KeyValueObjectPointer): Future[KeyValueObjectState]
+
+  def newTransaction(): Transaction
 
   private[client] def backgroundTasks: BackgroundTask
 

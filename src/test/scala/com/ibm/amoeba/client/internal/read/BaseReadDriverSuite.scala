@@ -4,7 +4,7 @@ import java.util.UUID
 
 import com.ibm.amoeba.client.internal.OpportunisticRebuildManager
 import com.ibm.amoeba.client.internal.network.Messenger
-import com.ibm.amoeba.client.{AmoebaClient, CorruptedObject, DataObjectState, InvalidObject, KeyValueObjectState, ObjectCache, TransactionStatusCache}
+import com.ibm.amoeba.client.{AmoebaClient, CorruptedObject, DataObjectState, InvalidObject, KeyValueObjectState, ObjectCache, Transaction, TransactionStatusCache}
 import com.ibm.amoeba.common.network.{ClientId, ClientResponse, ReadResponse}
 import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp}
 import com.ibm.amoeba.common.ida.Replication
@@ -54,6 +54,8 @@ object BaseReadDriverSuite {
 
     def read(pointer: DataObjectPointer): Future[DataObjectState] = Future.failed(new Exception("TODO"))
     def read(pointer: KeyValueObjectPointer): Future[KeyValueObjectState] = Future.failed(new Exception("TODO"))
+
+    def newTransaction(): Transaction = null
 
     private[client] def backgroundTasks: BackgroundTask = BackgroundTask.NoBackgroundTasks
 

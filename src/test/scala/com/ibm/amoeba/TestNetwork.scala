@@ -2,13 +2,13 @@ package com.ibm.amoeba
 
 import java.util.UUID
 
-import com.ibm.amoeba.client.internal.OpportunisticRebuildManager
-import com.ibm.amoeba.client.{AmoebaClient, DataObjectState, KeyValueObjectState, ObjectCache, TransactionStatusCache}
+import com.ibm.amoeba.client.internal.{ClientTransactionDriver, OpportunisticRebuildManager, TransactionImpl, TransactionManager}
+import com.ibm.amoeba.client.{AmoebaClient, DataObjectState, KeyValueObjectState, ObjectCache, Transaction, TransactionStatusCache}
 import com.ibm.amoeba.client.internal.network.{Messenger => ClientMessenger}
 import com.ibm.amoeba.client.internal.read.{BaseReadDriver, ReadManager}
 import com.ibm.amoeba.common.Nucleus
 import com.ibm.amoeba.common.ida.Replication
-import com.ibm.amoeba.common.network.{ClientId, ClientRequest, ClientResponse, ReadResponse, TransactionCompletionResponse, TxMessage}
+import com.ibm.amoeba.common.network.{ClientId, ClientRequest, ClientResponse, ReadResponse, TransactionCompletionResponse, TransactionFinalized, TransactionResolved, TxMessage}
 import com.ibm.amoeba.common.objects.{DataObjectPointer, KeyValueObjectPointer, ObjectId}
 import com.ibm.amoeba.common.store.StoreId
 import com.ibm.amoeba.common.transaction.{TransactionDescription, TransactionId}
@@ -86,6 +86,12 @@ object TestNetwork {
       rmgr.read(pointer).map(_.asInstanceOf[KeyValueObjectState])
     }
 
+    val txManager = new TransactionManager(this, ClientTransactionDriver.noErrorRecoveryFactory)
+
+    def newTransaction(): Transaction = {
+      new TransactionImpl(this, txManager, _ => 0, None)
+    }
+
     def backgroundTasks: BackgroundTask = BackgroundTask.NoBackgroundTasks
 
     def clientContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
@@ -99,6 +105,8 @@ object TestNetwork {
     def receiveClientResponse(msg: ClientResponse): Unit = msg match {
       case m: ReadResponse => rmgr.receive(m)
       case m: TransactionCompletionResponse => rmgr.receive(m)
+      case m: TransactionResolved => txManager.receive(m)
+      case m: TransactionFinalized => txManager.receive(m)
       case _ =>
     }
 
@@ -138,7 +146,12 @@ class TestNetwork extends ServerMessenger {
         smgr.handleEvents()
     }
 
-    def sendTransactionMessage(msg: TxMessage): Unit = sendTransactionMessage(msg)
+    def sendTransactionMessage(msg: TxMessage): Unit = {
+      smgr.receiveTransactionMessage(msg)
+
+      while (smgr.hasEvents)
+        smgr.handleEvents()
+    }
 
     def sendTransactionMessages(msg: List[TxMessage]): Unit = sendTransactionMessages(msg)
   }
@@ -148,25 +161,17 @@ class TestNetwork extends ServerMessenger {
   // process load store events
   smgr.handleEvents()
 
-  private var topSend = true
-
   override def sendClientResponse(msg: ClientResponse): Unit = {
     client.receiveClientResponse(msg)
   }
 
   override def sendTransactionMessage(msg: TxMessage): Unit = {
-    val isTopSend = topSend
-
-    if (isTopSend)
-      topSend = false
 
     smgr.receiveTransactionMessage(msg)
 
-    if (isTopSend) {
-      while (smgr.hasEvents)
-        smgr.handleEvents()
-      topSend = true
-    }
+    while (smgr.hasEvents)
+      smgr.handleEvents()
+
   }
 
   override def sendTransactionMessages(msg: List[TxMessage]): Unit = msg.foreach(sendTransactionMessage)

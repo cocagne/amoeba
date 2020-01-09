@@ -132,7 +132,7 @@ class StoreManager(val objectCacheFactory: () => ObjectCache,
       }
 
       case TransactionMessage(msg) => stores.get(msg.to).foreach { store =>
-        store.frontend.receiveTransactionMessage(msg)
+        store.receiveTransactionMessage(msg)
       }
 
       case ClientReq(msg) => stores.get(msg.toStore).foreach { store =>

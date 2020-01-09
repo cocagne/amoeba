@@ -52,6 +52,7 @@ class Store(val backend: Backend,
 
     msg match {
       case m: TxPrepare =>
+
         txStatusCache.getStatus(m.txd.transactionId).foreach { entry =>
           val (r, committed: Boolean) = entry.status match {
             case TransactionStatus.Unresolved => (None, false)
