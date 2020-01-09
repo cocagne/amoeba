@@ -21,7 +21,7 @@ class BasicIntegrationSuite extends IntegrationTestSuite {
       tx.update(nucleus,
         Some(kvos.revision),
         List(KeyValueUpdate.DoesNotExist(key)),
-        List(Insert(key, value.bytes, None, None)))
+        List(Insert(key, value.bytes)))
 
       tx.commit().map(_=>())
     }

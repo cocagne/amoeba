@@ -8,22 +8,16 @@ import com.ibm.amoeba.common.util.Varint
 
 sealed abstract class KeyValueOperation {
 
-  import KeyValueOperation._
-
-  def timestamp: Option[HLCTimestamp]
-
-  def revision: Option[ObjectRevision]
-
   val opcode: Byte
 
   final def encodedLength(ida: IDA): Int = {
     val dataLen = dataLength(ida)
-    1 + revision.map(_ => 16).getOrElse(0) + timestamp.map(_ => 8).getOrElse(0) + Varint.getUnsignedIntEncodingLength(dataLen) + dataLen
+    1 + Varint.getUnsignedIntEncodingLength(dataLen) + dataLen
   }
 
   final def encodedLength: Int = {
     val dataLen = dataLength
-    1 + revision.map(_ => 16).getOrElse(0) + timestamp.map(_ => 8).getOrElse(0) + Varint.getUnsignedIntEncodingLength(dataLen) + dataLen
+    1 + Varint.getUnsignedIntEncodingLength(dataLen) + dataLen
   }
 
   protected def dataLength(ida: IDA): Int
@@ -34,13 +28,10 @@ sealed abstract class KeyValueOperation {
 
   final protected def encodeGenericIda(ida: IDA, bbArray:Array[ByteBuffer]): Unit = {
 
-    val mask = revision.map(_ => HasRevisionMask).getOrElse(0.asInstanceOf[Byte]) | timestamp.map(_ => HasTimestampMask).getOrElse(0.asInstanceOf[Byte])
     val dataLen = dataLength(ida)
 
     for (bb <- bbArray) {
-      bb.put( (mask | opcode).asInstanceOf[Byte] )
-      revision.foreach(rev => rev.encodeInto(bb))
-      timestamp.foreach(ts => bb.putLong(ts.asLong))
+      bb.put( opcode.asInstanceOf[Byte] )
       Varint.putUnsignedInt(bb, dataLen)
     }
 
@@ -48,12 +39,9 @@ sealed abstract class KeyValueOperation {
   }
 
   final protected def encodeReplicated(bb: ByteBuffer): Unit = {
-    val mask = revision.map(_ => HasRevisionMask).getOrElse(0.asInstanceOf[Byte]) | timestamp.map(_ => HasTimestampMask).getOrElse(0.asInstanceOf[Byte])
     val dataLen = dataLength
 
-    bb.put( (mask | opcode).asInstanceOf[Byte] )
-    revision.foreach(rev => rev.encodeInto(bb))
-    timestamp.foreach(ts => bb.putLong(ts.asLong))
+    bb.put( opcode.asInstanceOf[Byte] )
     Varint.putUnsignedInt(bb, dataLen)
     putData(bb)
   }
@@ -98,17 +86,15 @@ object KeyValueOperation {
     while (bb.remaining() != 0) {
       val mask = bb.get()
 
-      val rev = if ((mask & HasRevisionMask) == 0) txRevision else ObjectRevision(bb)
-      val ts = if ((mask & HasTimestampMask) == 0) txTimestamp else HLCTimestamp(bb.getLong())
       val code = mask & CodeMask
       val dataLen = Varint.getUnsignedInt(bb)
 
       val op = code match {
-        case SetMinCode      => SetMin.decode(bb, dataLen, rev, ts)
-        case SetMaxCode      => SetMax.decode(bb, dataLen, rev, ts)
-        case SetLeftCode     => SetLeft.decode(bb, dataLen, rev, ts)
-        case SetRightCode    => SetRight.decode(bb, dataLen, rev, ts)
-        case InsertCode      => Insert.decode(bb, dataLen, rev, ts)
+        case SetMinCode      => SetMin.decode(bb, dataLen)
+        case SetMaxCode      => SetMax.decode(bb, dataLen)
+        case SetLeftCode     => SetLeft.decode(bb, dataLen)
+        case SetRightCode    => SetRight.decode(bb, dataLen)
+        case InsertCode      => Insert.decode(bb, dataLen)
         case DeleteCode      => Delete.decode(bb, dataLen)
         case DeleteMinCode   => DeleteMin.decode(bb, dataLen)
         case DeleteMaxCode   => DeleteMax.decode(bb, dataLen)
@@ -184,43 +170,43 @@ sealed abstract class SingleEncodedValue(val value: Array[Byte]) extends KeyValu
 
 }
 
-class SetMin(value: Key, val timestamp: Option[HLCTimestamp]=None, val revision: Option[ObjectRevision]=None)  extends SingleReplicatedValue(value.bytes) {
+class SetMin(value: Key)  extends SingleReplicatedValue(value.bytes) {
   val opcode: Byte = KeyValueOperation.SetMinCode
 }
 object SetMin {
-  def apply(value: Key, timestamp: Option[HLCTimestamp]=None, revision: Option[ObjectRevision]=None) = new SetMin(value, timestamp, revision)
-  def decode(bb: ByteBuffer, dataLen: Int, revision: ObjectRevision, timestamp: HLCTimestamp): KeyValueOperation = {
-    new SetMin(Key(KeyValueOperation.getArray(bb, dataLen)), Some(timestamp), Some(revision))
+  def apply(value: Key) = new SetMin(value)
+  def decode(bb: ByteBuffer, dataLen: Int): KeyValueOperation = {
+    new SetMin(Key(KeyValueOperation.getArray(bb, dataLen)))
   }
 }
 
-class SetMax(value: Key, val timestamp: Option[HLCTimestamp]=None, val revision: Option[ObjectRevision]=None)  extends SingleReplicatedValue(value.bytes) {
+class SetMax(value: Key)  extends SingleReplicatedValue(value.bytes) {
   val opcode: Byte = KeyValueOperation.SetMaxCode
 }
 object SetMax {
-  def apply(value: Key, timestamp: Option[HLCTimestamp]=None, revision: Option[ObjectRevision]=None) = new SetMax(value, timestamp, revision)
-  def decode(bb: ByteBuffer, dataLen: Int, revision: ObjectRevision, timestamp: HLCTimestamp): SetMax = {
-    new SetMax(Key(KeyValueOperation.getArray(bb, dataLen)), Some(timestamp), Some(revision))
+  def apply(value: Key) = new SetMax(value)
+  def decode(bb: ByteBuffer, dataLen: Int): SetMax = {
+    new SetMax(Key(KeyValueOperation.getArray(bb, dataLen)))
   }
 }
 
-class SetLeft(value: Array[Byte], val timestamp: Option[HLCTimestamp]=None, val revision: Option[ObjectRevision]=None)  extends SingleEncodedValue(value) {
+class SetLeft(value: Array[Byte])  extends SingleEncodedValue(value) {
   val opcode: Byte = KeyValueOperation.SetLeftCode
 }
 object SetLeft {
-  def apply(value: Array[Byte], timestamp: Option[HLCTimestamp]=None, revision: Option[ObjectRevision]=None) = new SetLeft(value, timestamp, revision)
-  def decode(bb: ByteBuffer, dataLen: Int, revision: ObjectRevision, timestamp: HLCTimestamp): SetLeft = {
-    new SetLeft(KeyValueOperation.getArray(bb, dataLen), Some(timestamp), Some(revision))
+  def apply(value: Array[Byte]) = new SetLeft(value)
+  def decode(bb: ByteBuffer, dataLen: Int): SetLeft = {
+    new SetLeft(KeyValueOperation.getArray(bb, dataLen))
   }
 }
 
-class SetRight(value: Array[Byte], val timestamp: Option[HLCTimestamp]=None, val revision: Option[ObjectRevision]=None)  extends SingleEncodedValue(value) {
+class SetRight(value: Array[Byte])  extends SingleEncodedValue(value) {
   val opcode: Byte = KeyValueOperation.SetRightCode
 }
 object SetRight {
-  def apply(value: Array[Byte], timestamp: Option[HLCTimestamp]=None, revision: Option[ObjectRevision]=None) = new SetRight(value, timestamp, revision)
-  def decode(bb: ByteBuffer, dataLen: Int, revision: ObjectRevision, timestamp: HLCTimestamp): SetRight = {
-    new SetRight(KeyValueOperation.getArray(bb, dataLen), Some(timestamp), Some(revision))
+  def apply(value: Array[Byte]) = new SetRight(value)
+  def decode(bb: ByteBuffer, dataLen: Int): SetRight = {
+    new SetRight(KeyValueOperation.getArray(bb, dataLen))
   }
 }
 
@@ -237,13 +223,12 @@ object Delete {
   }
 }
 
-class Insert(
-              val key: Key,
-              val value: Array[Byte],
-              val timestamp: Option[HLCTimestamp] = None,
-              val revision: Option[ObjectRevision] = None) extends KeyValueOperation {
+class Insert(val key: Key, val value: Array[Byte]) extends KeyValueOperation {
 
   val opcode: Byte = KeyValueOperation.InsertCode
+
+  def timestamp: Option[HLCTimestamp] = None
+  def revision: Option[ObjectRevision] = None
 
   protected def dataLength(ida: IDA): Int = Varint.getUnsignedIntEncodingLength(key.bytes.length) + key.bytes.length + ida.calculateEncodedSegmentLength(value.length)
   protected def putData(ida: IDA, bbArray: Array[ByteBuffer]): Unit = {
@@ -264,14 +249,14 @@ class Insert(
 
 }
 object Insert {
-  def apply(key: Key, value: Array[Byte], timestamp: Option[HLCTimestamp]=None, revision: Option[ObjectRevision]=None) = new Insert(key, value, timestamp, revision)
+  def apply(key: Key, value: Array[Byte]) = new Insert(key, value)
 
-  def decode(bb: ByteBuffer, dataLen: Int, revision: ObjectRevision, timestamp: HLCTimestamp): KeyValueOperation = {
+  def decode(bb: ByteBuffer, dataLen: Int): KeyValueOperation = {
     val keyLen = Varint.getUnsignedInt(bb)
     val valLen = dataLen - Varint.getUnsignedIntEncodingLength(keyLen) - keyLen
     val key = Key(KeyValueOperation.getArray(bb, keyLen))
     val value = KeyValueOperation.getArray(bb, valLen)
-    new Insert(key, value, Some(timestamp), Some(revision))
+    new Insert(key, value)
   }
 }
 

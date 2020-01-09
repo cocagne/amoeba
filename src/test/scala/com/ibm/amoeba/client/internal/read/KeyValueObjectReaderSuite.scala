@@ -3,17 +3,16 @@ package com.ibm.amoeba.client.internal.read
 import java.nio.charset.StandardCharsets
 import java.util.UUID
 
+import com.ibm.amoeba.client.KeyValueObjectState
 import com.ibm.amoeba.client.KeyValueObjectState.ValueState
-import com.ibm.amoeba.client.{CorruptedObject, InvalidObject, KeyValueObjectState, ObjectState}
 import com.ibm.amoeba.common.HLCTimestamp
 import com.ibm.amoeba.common.ida.{IDA, Replication}
 import com.ibm.amoeba.common.network.{ClientId, ReadResponse}
-import com.ibm.amoeba.common.objects.{DataObjectPointer, Insert, Key, KeyValueObjectPointer, KeyValueOperation, ObjectId, ObjectRefcount, ObjectRevision, ReadError, SetLeft, SetMax, SetMin, SetRight, Value}
+import com.ibm.amoeba.common.objects._
 import com.ibm.amoeba.common.pool.PoolId
 import com.ibm.amoeba.common.store.StoreId
-import com.ibm.amoeba.server.store.{ValueState => StoreValueState}
 import com.ibm.amoeba.common.transaction.TransactionId
-import com.ibm.amoeba.server.store.KVObjectState
+import com.ibm.amoeba.server.store.{KVObjectState, ValueState => StoreValueState}
 import org.scalatest.{Assertion, FunSuite, Matchers}
 
 object KeyValueObjectReaderSuite {
@@ -51,6 +50,13 @@ object KeyValueObjectReaderSuite {
   val kfoo = Key("foo")
   val kbar = Key("bar")
   val kbaz = Key("baz")
+
+  sealed abstract class KVOp
+  case class Insert(key: Key, value:Array[Byte], timestamp:Option[HLCTimestamp], revision:Option[ObjectRevision]) extends KVOp
+  case class SetMin(value: Key, timestamp:Option[HLCTimestamp], revision:Option[ObjectRevision]) extends KVOp
+  case class SetMax(value: Key, timestamp:Option[HLCTimestamp], revision:Option[ObjectRevision]) extends KVOp
+  case class SetLeft(value: Array[Byte], timestamp:Option[HLCTimestamp], revision:Option[ObjectRevision]) extends KVOp
+  case class SetRight(value: Array[Byte], timestamp:Option[HLCTimestamp], revision:Option[ObjectRevision]) extends KVOp
 
   val ka = Key("foo")
   val a0 = Insert(ka, foo.bytes, Some(t0), Some(r0))
@@ -93,7 +99,7 @@ object KeyValueObjectReaderSuite {
     def ok(store: Int,
            oversion: (ObjectRevision, HLCTimestamp),
            locks: Set[ObjectRevision],
-           ops: KeyValueOperation*): Unit = {
+           ops: KVOp*): Unit = {
 
       var min: Option[Key] = None
       var max: Option[Key] = None
@@ -102,8 +108,8 @@ object KeyValueObjectReaderSuite {
       var contents: Map[Key, StoreValueState] = Map()
 
       ops.foreach {
-        case o: SetMin => min = Some(Key(o.value))
-        case o: SetMax => max = Some(Key(o.value))
+        case o: SetMin => min = Some(o.value)
+        case o: SetMax => max = Some(o.value)
         case o: SetLeft => left = Some(Value(o.value))
         case o: SetRight => right = Some(Value(o.value))
         case o: Insert => contents += o.key -> new StoreValueState(Value(o.value), o.revision.get, o.timestamp.get, None)
@@ -316,7 +322,7 @@ class KeyValueObjectReaderSuite extends FunSuite with Matchers {
     }
   }
 
-  def tdeleted(op0: KeyValueOperation): Assertion = {
+  def tdeleted(op0: KVOp): Assertion = {
     val r = TestReader(ida5)
     r.ok(0, v0, Set())
     r.result should be (None)
@@ -332,7 +338,7 @@ class KeyValueObjectReaderSuite extends FunSuite with Matchers {
     tdeleted(a0)
   }
 
-  def tdeletedWithLock(op0: KeyValueOperation): Assertion = {
+  def tdeletedWithLock(op0: KVOp): Assertion = {
     val r = TestReader(ida5)
     r.ok(0, v0, Set(r0))
     r.result should be (None)
