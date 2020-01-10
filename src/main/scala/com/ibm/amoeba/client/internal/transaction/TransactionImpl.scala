@@ -1,12 +1,12 @@
-package com.ibm.amoeba.client.internal
+package com.ibm.amoeba.client.internal.transaction
 
 import java.util.UUID
 
 import com.ibm.amoeba.client.{AmoebaClient, PostCommitTransactionModification, Transaction, TransactionAborted}
-import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp}
-import com.ibm.amoeba.common.objects.{DataObjectPointer, KeyValueObjectPointer, KeyValueOperation, ObjectPointer, ObjectRefcount, ObjectRevision}
+import com.ibm.amoeba.common.objects._
 import com.ibm.amoeba.common.store.StoreId
 import com.ibm.amoeba.common.transaction.{FinalizationActionId, KeyValueUpdate, TransactionId}
+import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp}
 import org.apache.logging.log4j.scala.Logging
 
 import scala.concurrent.{ExecutionContext, Future, Promise}

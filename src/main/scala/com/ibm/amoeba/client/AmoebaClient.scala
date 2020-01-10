@@ -1,6 +1,6 @@
 package com.ibm.amoeba.client
 
-import com.ibm.amoeba.client.internal.{OpportunisticRebuildManager, TransactionManager}
+import com.ibm.amoeba.client.internal.OpportunisticRebuildManager
 import com.ibm.amoeba.client.internal.network.Messenger
 import com.ibm.amoeba.common.network.{ClientId, ClientResponse, TxMessage}
 import com.ibm.amoeba.common.objects.{DataObjectPointer, KeyValueObjectPointer}

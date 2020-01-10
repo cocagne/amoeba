@@ -1,7 +1,7 @@
-package com.ibm.amoeba.client.internal
+package com.ibm.amoeba.client.internal.transaction
 
 import com.ibm.amoeba.client.AmoebaClient
-import com.ibm.amoeba.client.internal.TransactionBuilder.TransactionData
+import com.ibm.amoeba.client.internal.transaction.TransactionBuilder.TransactionData
 import com.ibm.amoeba.common.HLCTimestamp
 import com.ibm.amoeba.common.network.{TransactionFinalized, TransactionResolved, TxPrepare}
 import com.ibm.amoeba.common.paxos.ProposalId

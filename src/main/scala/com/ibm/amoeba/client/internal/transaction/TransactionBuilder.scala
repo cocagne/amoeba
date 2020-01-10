@@ -1,11 +1,12 @@
-package com.ibm.amoeba.client.internal
+package com.ibm.amoeba.client.internal.transaction
 
+import com.ibm.amoeba.client.internal.OpportunisticRebuildManager
 import com.ibm.amoeba.client.{ConflictingRequirements, MultipleDataUpdatesToObject, MultipleRefcountUpdatesToObject}
 import com.ibm.amoeba.common.network.ClientId
-import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp}
-import com.ibm.amoeba.common.objects.{KeyValueObjectPointer, KeyValueOperation, ObjectPointer, ObjectRefcount, ObjectRevision}
+import com.ibm.amoeba.common.objects._
 import com.ibm.amoeba.common.store.StoreId
-import com.ibm.amoeba.common.transaction.{DataUpdate, DataUpdateOperation, FinalizationActionId, KeyValueUpdate, ObjectUpdate, PreTransactionOpportunisticRebuild, RefcountUpdate, RevisionLock, SerializedFinalizationAction, TransactionDescription, TransactionId, TransactionObjectRequirement, TransactionRequirement, VersionBump}
+import com.ibm.amoeba.common.transaction._
+import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp}
 
 object TransactionBuilder {
   case class KVUpdate(

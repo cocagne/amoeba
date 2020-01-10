@@ -1,13 +1,10 @@
-package com.ibm.amoeba.client.internal
+package com.ibm.amoeba.client.internal.transaction
 
 import com.ibm.amoeba.client.AmoebaClient
-import org.apache.logging.log4j.scala.Logging
-import com.ibm.amoeba.client.internal.TransactionBuilder.TransactionData
-import com.ibm.amoeba.common.network.{TxAcceptResponse, TxPrepare, TxPrepareResponse}
-import com.ibm.amoeba.common.paxos.ProposalId
+import com.ibm.amoeba.client.internal.transaction.TransactionBuilder.TransactionData
 import com.ibm.amoeba.common.store.StoreId
 import com.ibm.amoeba.common.transaction.TransactionDescription
-import com.ibm.amoeba.common.util.BackgroundTask
+import org.apache.logging.log4j.scala.Logging
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.Duration

@@ -2,10 +2,11 @@ package com.ibm.amoeba
 
 import java.util.UUID
 
-import com.ibm.amoeba.client.internal.{ClientTransactionDriver, OpportunisticRebuildManager, TransactionImpl, TransactionManager}
+import com.ibm.amoeba.client.internal.OpportunisticRebuildManager
 import com.ibm.amoeba.client.{AmoebaClient, DataObjectState, KeyValueObjectState, ObjectCache, Transaction, TransactionStatusCache}
 import com.ibm.amoeba.client.internal.network.{Messenger => ClientMessenger}
 import com.ibm.amoeba.client.internal.read.{BaseReadDriver, ReadManager}
+import com.ibm.amoeba.client.internal.transaction.{ClientTransactionDriver, TransactionImpl, TransactionManager}
 import com.ibm.amoeba.common.Nucleus
 import com.ibm.amoeba.common.ida.Replication
 import com.ibm.amoeba.common.network.{ClientId, ClientRequest, ClientResponse, ReadResponse, TransactionCompletionResponse, TransactionFinalized, TransactionResolved, TxMessage}

@@ -1,8 +1,3 @@
-**** Remove extra values from Insert operation
-
-Basic System Tests
-    - com.ibm.amoeba package
-    - Do basic Transaction & Read tests on nucleus
 
 Object Allocater Interface
     - SinglePoolObjectAllocater
@@ -18,24 +13,9 @@ Client Allocation Driver
 
     - Allocate a data object and test transactions on it
 
-
 StoragePool
     - port over the full interface
     - Skip the missed update handling for now
-
-
-
-
-
-Basic System Test
-    - Allocate objects
-    - do transactions on them
-    - read results and verify correctness
-    - Ensure all allocations, transactions, and Finalization Actions are complete before shutting down
-        - Background tasks should be empty as well
-            - doh, parallelized tests will share same BG operator
-        - Move Background to Server side then have a new one in AmoebaSystem?
-            - Could restrict to [client]
 
 TieredList
 FinalizationActions
