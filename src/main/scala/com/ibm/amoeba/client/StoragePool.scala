@@ -1,17 +1,22 @@
-package com.ibm.amoeba.client.internal.pool
+package com.ibm.amoeba.client
 
 import com.ibm.amoeba.common.ida.IDA
 import com.ibm.amoeba.common.pool.PoolId
 
 trait StoragePool {
+
   val poolId: PoolId
 
-  def numberOfStores: Int
+  val numberOfStores: Int
+
+  val maxObjectSize: Option[Int]
 
   def supportsIDA(ida: IDA): Boolean
 
+  def createAllocater(ida: IDA): ObjectAllocator
+
   /** Throws AllocationError: UnsupportedIDA if the IDA is not supported*/
-  def selectStoresForAllocation(ida: IDA): Array[Int]
+  private[client] def selectStoresForAllocation(ida: IDA): Array[Int]
 
   /*
   val poolDefinitionPointer: KeyValueObjectPointer

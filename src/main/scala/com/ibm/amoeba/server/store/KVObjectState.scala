@@ -3,6 +3,7 @@ package com.ibm.amoeba.server.store
 import java.nio.ByteBuffer
 import java.util.UUID
 
+import com.ibm.amoeba.common.ida.IDA
 import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp}
 import com.ibm.amoeba.common.objects.{Key, ObjectRevision, Value}
 import com.ibm.amoeba.common.transaction.TransactionId
@@ -94,6 +95,109 @@ object KVObjectState {
     bb.position(0)
 
     bb
+  }
+
+  def encodedSizeIDA( ida: IDA,
+                      min: Option[Key],
+                      max: Option[Key],
+                      left: Option[Value],
+                      right: Option[Value],
+                      contents: Map[Key, ValueState]): Int = {
+    var size = 1 // mask byte
+    min.foreach(key => size += Varint.getUnsignedIntEncodingLength(key.bytes.length) + key.bytes.length)
+    max.foreach(key => size += Varint.getUnsignedIntEncodingLength(key.bytes.length) + key.bytes.length)
+
+    left.foreach { value =>
+      val encodedSize = ida.calculateEncodedSegmentLength(value.bytes.length)
+      size += Varint.getUnsignedIntEncodingLength(encodedSize) + encodedSize
+    }
+    right.foreach { value =>
+      val encodedSize = ida.calculateEncodedSegmentLength(value.bytes.length)
+      size += Varint.getUnsignedIntEncodingLength(encodedSize) + encodedSize
+    }
+    size += Varint.getUnsignedIntEncodingLength(contents.size)
+    contents.foreach { t =>
+      val (key, vs) = t
+      size += 16 + 8
+      size += Varint.getUnsignedIntEncodingLength(key.bytes.length) + key.bytes.length
+
+      val encodedSize = ida.calculateEncodedSegmentLength(vs.value.bytes.length)
+
+      size += Varint.getUnsignedIntEncodingLength(encodedSize) + encodedSize
+    }
+    size
+  }
+
+  def encodeIDA( ida: IDA,
+                 min: Option[Key],
+                 max: Option[Key],
+                 left: Option[Value],
+                 right: Option[Value],
+                 contents: Map[Key, ValueState]): Array[DataBuffer] = {
+
+    var mask: Byte = 0
+    if (min.nonEmpty) mask = (mask | 1 << 0).asInstanceOf[Byte]
+    if (max.nonEmpty) mask = (mask | 1 << 1).asInstanceOf[Byte]
+    if (left.nonEmpty) mask = (mask | 1 << 2).asInstanceOf[Byte]
+    if (right.nonEmpty) mask = (mask | 1 << 3).asInstanceOf[Byte]
+
+    val bbArray = new Array[ByteBuffer](ida.width)
+
+    for (i <- 0 until ida.width) {
+      bbArray(i) = ByteBuffer.allocate(encodedSizeIDA(ida, min, max, left, right, contents))
+
+      bbArray(i).put(mask)
+
+      min.foreach { key =>
+        Varint.putUnsignedInt(bbArray(i), key.bytes.length)
+        bbArray(i).put(key.bytes)
+      }
+      max.foreach { key =>
+        Varint.putUnsignedInt(bbArray(i), key.bytes.length)
+        bbArray(i).put(key.bytes)
+      }
+    }
+
+    left.foreach { value =>
+      val sz = ida.calculateEncodedSegmentLength(value.bytes.length)
+      val enc = ida.encode(value.bytes)
+      for (i <- 0 until ida.width) {
+        Varint.putUnsignedInt(bbArray(i), sz)
+        bbArray(i).put(enc(i))
+      }
+    }
+    right.foreach { value =>
+      val sz = ida.calculateEncodedSegmentLength(value.bytes.length)
+      val enc = ida.encode(value.bytes)
+      for (i <- 0 until ida.width) {
+        Varint.putUnsignedInt(bbArray(i), sz)
+        bbArray(i).put(enc(i))
+      }
+    }
+
+    for (i <- 0 until ida.width) {
+      Varint.putUnsignedInt(bbArray(i), contents.size)
+    }
+
+    contents.foreach { t =>
+      val (key, vs) = t
+      val sz = ida.calculateEncodedSegmentLength(vs.value.bytes.length)
+      val enc = ida.encode(vs.value.bytes)
+      for (i <- 0 until ida.width) {
+        bbArray(i).putLong(vs.revision.lastUpdateTxUUID.getMostSignificantBits)
+        bbArray(i).putLong(vs.revision.lastUpdateTxUUID.getLeastSignificantBits)
+        bbArray(i).putLong(vs.timestamp.asLong)
+        Varint.putUnsignedInt(bbArray(i), key.bytes.length)
+        bbArray(i).put(key.bytes)
+        Varint.putUnsignedInt(bbArray(i), sz)
+        bbArray(i).put(enc(i))
+      }
+    }
+
+    for (i <- 0 until ida.width)
+      bbArray(i).position(0)
+
+    bbArray.map(DataBuffer(_))
   }
 
   def decode(db: DataBuffer): KVObjectState = {

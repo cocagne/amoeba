@@ -3,14 +3,17 @@ package com.ibm.amoeba
 import java.util.UUID
 
 import com.ibm.amoeba.client.internal.OpportunisticRebuildManager
-import com.ibm.amoeba.client.{AmoebaClient, DataObjectState, KeyValueObjectState, ObjectCache, Transaction, TransactionStatusCache}
+import com.ibm.amoeba.client.internal.allocation.{AllocationManager, BaseAllocationDriver}
+import com.ibm.amoeba.client.{AmoebaClient, DataObjectState, KeyValueObjectState, ObjectCache, StoragePool, Transaction, TransactionStatusCache}
 import com.ibm.amoeba.client.internal.network.{Messenger => ClientMessenger}
+import com.ibm.amoeba.client.internal.pool.SimpleStoragePool
 import com.ibm.amoeba.client.internal.read.{BaseReadDriver, ReadManager}
 import com.ibm.amoeba.client.internal.transaction.{ClientTransactionDriver, TransactionImpl, TransactionManager}
 import com.ibm.amoeba.common.Nucleus
 import com.ibm.amoeba.common.ida.Replication
-import com.ibm.amoeba.common.network.{ClientId, ClientRequest, ClientResponse, ReadResponse, TransactionCompletionResponse, TransactionFinalized, TransactionResolved, TxMessage}
+import com.ibm.amoeba.common.network.{AllocateResponse, ClientId, ClientRequest, ClientResponse, ReadResponse, TransactionCompletionResponse, TransactionFinalized, TransactionResolved, TxMessage}
 import com.ibm.amoeba.common.objects.{DataObjectPointer, KeyValueObjectPointer, ObjectId}
+import com.ibm.amoeba.common.pool.PoolId
 import com.ibm.amoeba.common.store.StoreId
 import com.ibm.amoeba.common.transaction.{TransactionDescription, TransactionId}
 import com.ibm.amoeba.common.util.{BackgroundTask, BackgroundTaskPool}
@@ -93,6 +96,8 @@ object TestNetwork {
       new TransactionImpl(this, txManager, _ => 0, None)
     }
 
+    def getStoragePool(poolId: PoolId): Future[StoragePool] = Future.successful(new SimpleStoragePool(this, poolId, 3, None))
+
     def backgroundTasks: BackgroundTask = BackgroundTask.NoBackgroundTasks
 
     def clientContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
@@ -101,6 +106,9 @@ object TestNetwork {
 
     val messenger: ClientMessenger = msngr
 
+    val allocationManager: AllocationManager = new AllocationManager(this,
+      BaseAllocationDriver.NoErrorRecoveryAllocationDriver)
+
     val objectCache: ObjectCache = ObjectCache.NoCache
 
     def receiveClientResponse(msg: ClientResponse): Unit = msg match {
@@ -108,6 +116,7 @@ object TestNetwork {
       case m: TransactionCompletionResponse => rmgr.receive(m)
       case m: TransactionResolved => txManager.receive(m)
       case m: TransactionFinalized => txManager.receive(m)
+      case m: AllocateResponse => allocationManager.receive(m)
       case _ =>
     }
 

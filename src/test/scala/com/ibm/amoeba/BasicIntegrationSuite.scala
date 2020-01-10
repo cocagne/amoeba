@@ -1,7 +1,9 @@
 package com.ibm.amoeba
 
-import com.ibm.amoeba.client.KeyValueObjectState
-import com.ibm.amoeba.common.objects.{Insert, Key, Value}
+import com.ibm.amoeba.client.{KeyValueObjectState, ObjectAllocator}
+import com.ibm.amoeba.common.Nucleus
+import com.ibm.amoeba.common.ida.Replication
+import com.ibm.amoeba.common.objects.{Insert, Key, KeyValueObjectPointer, ObjectRevision, ObjectRevisionGuard, Value}
 import com.ibm.amoeba.common.transaction.KeyValueUpdate
 
 import scala.concurrent.Future
@@ -36,6 +38,114 @@ class BasicIntegrationSuite extends IntegrationTestSuite {
       kvos.contents(key).value.bytes.length should be (1)
       kvos.contents(key).value.bytes(0) should be (2)
     }
+  }
 
+  test("Allocate data object") {
+    val key = Key(Array[Byte](1))
+    val value = Value(Array[Byte](2))
+
+    implicit val tx = client.newTransaction()
+
+    for {
+      ikvos <- client.read(nucleus)
+
+      _ = tx.update(nucleus,
+        Some(ikvos.revision),
+        List(KeyValueUpdate.DoesNotExist(key)),
+        List(Insert(key, value.bytes)))
+
+      pool <- client.getStoragePool(Nucleus.poolId)
+      alloc = pool.createAllocater(Replication(3,2))
+
+      dp <- alloc.allocateDataObject(ObjectRevisionGuard(nucleus, ikvos.revision), Array[Byte](0))
+
+      _ <- tx.commit().map(_=>())
+
+      kvos <- client.read(nucleus)
+      dos <- client.read(dp)
+    } yield {
+      kvos.contents.isEmpty should be (false)
+      kvos.contents.contains(key) should be (true)
+      kvos.contents(key).value.bytes.length should be (1)
+      kvos.contents(key).value.bytes(0) should be (2)
+      dos.data.size should be (1)
+    }
+  }
+
+  test("Allocate KeyValue object") {
+    val key = Key(Array[Byte](1))
+    val value = Value(Array[Byte](2))
+
+    implicit val tx = client.newTransaction()
+
+    tx.update(nucleus,
+      None,
+      List(KeyValueUpdate.DoesNotExist(key)),
+      List(Insert(key, value.bytes)))
+
+    for {
+      ikvos <- client.read(nucleus)
+
+      pool <- client.getStoragePool(Nucleus.poolId)
+
+      alloc = pool.createAllocater(Replication(3,2))
+
+      kp <- alloc.allocateKeyValueObject(ObjectRevisionGuard(nucleus, ikvos.revision), Map(key -> value))
+
+      _ <- tx.commit().map(_=>())
+
+      kvos <- client.read(nucleus)
+      kvos2 <- client.read(kp)
+    } yield {
+      kvos.contents.isEmpty should be (false)
+      kvos.contents.contains(key) should be (true)
+      kvos.contents(key).value.bytes.length should be (1)
+      kvos.contents(key).value.bytes(0) should be (2)
+
+      kvos2.contents.isEmpty should be (false)
+      kvos2.contents.contains(key) should be (true)
+      kvos2.contents(key).value.bytes.length should be (1)
+      kvos2.contents(key).value.bytes(0) should be (2)
+    }
+  }
+
+  test("Allocate and update data object") {
+    val key = Key(Array[Byte](1))
+    val value = Value(Array[Byte](2))
+
+    implicit val tx = client.newTransaction()
+
+    for {
+      ikvos <- client.read(nucleus)
+
+      _ = tx.update(nucleus,
+        Some(ikvos.revision),
+        List(KeyValueUpdate.DoesNotExist(key)),
+        List(Insert(key, value.bytes)))
+
+      pool <- client.getStoragePool(Nucleus.poolId)
+      alloc = pool.createAllocater(Replication(3,2))
+
+      dp <- alloc.allocateDataObject(ObjectRevisionGuard(nucleus, ikvos.revision), Array[Byte](0))
+
+      _ <- tx.commit().map(_=>())
+
+      kvos <- client.read(nucleus)
+
+      tx2 = client.newTransaction()
+      _ = tx2.overwrite(dp, ObjectRevision(tx.id), Array[Byte](5,6))
+
+      _ <- tx2.commit()
+
+      dos <- client.read(dp)
+    } yield {
+      kvos.contents.isEmpty should be (false)
+      kvos.contents.contains(key) should be (true)
+      kvos.contents(key).value.bytes.length should be (1)
+      kvos.contents(key).value.bytes(0) should be (2)
+      dos.data.size should be (2)
+      dos.data.get(0) should be (5)
+      dos.data.get(1) should be (6)
+    }
   }
 }

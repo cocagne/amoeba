@@ -1,9 +1,11 @@
 package com.ibm.amoeba.client
 
 import com.ibm.amoeba.client.internal.OpportunisticRebuildManager
+import com.ibm.amoeba.client.internal.allocation.AllocationManager
 import com.ibm.amoeba.client.internal.network.Messenger
-import com.ibm.amoeba.common.network.{ClientId, ClientResponse, TxMessage}
+import com.ibm.amoeba.common.network.{ClientId, ClientResponse}
 import com.ibm.amoeba.common.objects.{DataObjectPointer, KeyValueObjectPointer}
+import com.ibm.amoeba.common.pool.PoolId
 import com.ibm.amoeba.common.util.BackgroundTask
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -20,6 +22,8 @@ trait AmoebaClient {
 
   def newTransaction(): Transaction
 
+  def getStoragePool(poolId: PoolId): Future[StoragePool]
+
   private[client] def backgroundTasks: BackgroundTask
 
   private[client] def clientContext: ExecutionContext
@@ -27,6 +31,8 @@ trait AmoebaClient {
   private[client] def opportunisticRebuildManager: OpportunisticRebuildManager
 
   private[client] val messenger: Messenger
+
+  private[client] val allocationManager: AllocationManager
 
   private[client] val objectCache: ObjectCache
 
