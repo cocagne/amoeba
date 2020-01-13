@@ -97,6 +97,18 @@ object KVObjectState {
     bb
   }
 
+  def idaEncodedPairSize(ida: IDA, key: Key, value: Value): Int = {
+    var size = 16 + 8
+
+    size += Varint.getUnsignedIntEncodingLength(key.bytes.length) + key.bytes.length
+
+    val encodedSize = ida.calculateEncodedSegmentLength(value.bytes.length)
+
+    size += Varint.getUnsignedIntEncodingLength(encodedSize) + encodedSize
+
+    size
+  }
+
   def encodedSizeIDA( ida: IDA,
                       min: Option[Key],
                       max: Option[Key],

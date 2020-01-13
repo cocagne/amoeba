@@ -4,7 +4,7 @@ import java.util.UUID
 
 import com.ibm.amoeba.client.internal.OpportunisticRebuildManager
 import com.ibm.amoeba.client.internal.allocation.{AllocationManager, BaseAllocationDriver}
-import com.ibm.amoeba.client.{AmoebaClient, DataObjectState, KeyValueObjectState, ObjectCache, StoragePool, Transaction, TransactionStatusCache}
+import com.ibm.amoeba.client.{AmoebaClient, DataObjectState, ExponentialBackoffRetryStrategy, KeyValueObjectState, ObjectCache, RetryStrategy, StoragePool, Transaction, TransactionStatusCache}
 import com.ibm.amoeba.client.internal.network.{Messenger => ClientMessenger}
 import com.ibm.amoeba.client.internal.pool.SimpleStoragePool
 import com.ibm.amoeba.client.internal.read.{BaseReadDriver, ReadManager}
@@ -97,6 +97,8 @@ object TestNetwork {
     }
 
     def getStoragePool(poolId: PoolId): Future[StoragePool] = Future.successful(new SimpleStoragePool(this, poolId, 3, None))
+
+    val retryStrategy: RetryStrategy = new ExponentialBackoffRetryStrategy(this)
 
     def backgroundTasks: BackgroundTask = BackgroundTask.NoBackgroundTasks
 

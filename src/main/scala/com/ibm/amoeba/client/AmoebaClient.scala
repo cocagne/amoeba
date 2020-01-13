@@ -10,11 +10,13 @@ import com.ibm.amoeba.common.util.BackgroundTask
 
 import scala.concurrent.{ExecutionContext, Future}
 
-trait AmoebaClient {
+trait AmoebaClient extends ObjectReader {
 
   val clientId: ClientId
 
   val txStatusCache: TransactionStatusCache
+
+  def client: AmoebaClient = this
 
   def read(pointer: DataObjectPointer): Future[DataObjectState]
 
@@ -23,6 +25,36 @@ trait AmoebaClient {
   def newTransaction(): Transaction
 
   def getStoragePool(poolId: PoolId): Future[StoragePool]
+
+  def transact[T](prepare: Transaction => Future[T])(implicit ec: ExecutionContext): Future[T] = {
+    val tx = newTransaction()
+
+    val fprep = try { prepare(tx) } catch {
+      case err: Throwable => Future.failed(err)
+    }
+
+    val fresult = for {
+      prepResult <- fprep
+      _ <- tx.commit()
+    } yield prepResult
+
+    fresult.failed.foreach(err => tx.invalidateTransaction(err))
+
+    fresult
+  }
+
+  def transactUntilSuccessful[T](prepare: Transaction => Future[T])(implicit ec: ExecutionContext): Future[T] = {
+    retryStrategy.retryUntilSuccessful {
+      transact(prepare)
+    }
+  }
+  def transactUntilSuccessfulWithRecovery[T](onCommitFailure: Throwable => Future[Unit])(prepare: Transaction => Future[T])(implicit ec: ExecutionContext): Future[T] = {
+    retryStrategy.retryUntilSuccessful(onCommitFailure) {
+      transact(prepare)
+    }
+  }
+
+  private[client] def retryStrategy: RetryStrategy
 
   private[client] def backgroundTasks: BackgroundTask
 

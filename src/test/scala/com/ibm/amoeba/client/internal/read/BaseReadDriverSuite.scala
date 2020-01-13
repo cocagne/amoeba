@@ -5,7 +5,7 @@ import java.util.UUID
 import com.ibm.amoeba.client.internal.OpportunisticRebuildManager
 import com.ibm.amoeba.client.internal.allocation.AllocationManager
 import com.ibm.amoeba.client.internal.network.Messenger
-import com.ibm.amoeba.client.{AmoebaClient, CorruptedObject, DataObjectState, InvalidObject, KeyValueObjectState, ObjectCache, StoragePool, Transaction, TransactionStatusCache}
+import com.ibm.amoeba.client.{AmoebaClient, CorruptedObject, DataObjectState, InvalidObject, KeyValueObjectState, ObjectCache, RetryStrategy, StoragePool, Transaction, TransactionStatusCache}
 import com.ibm.amoeba.common.network.{ClientId, ClientResponse, ReadResponse}
 import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp}
 import com.ibm.amoeba.common.ida.Replication
@@ -59,6 +59,8 @@ object BaseReadDriverSuite {
     def newTransaction(): Transaction = null
 
     def getStoragePool(poolId: PoolId): Future[StoragePool] = null
+
+    val retryStrategy: RetryStrategy = null
 
     private[client] def backgroundTasks: BackgroundTask = BackgroundTask.NoBackgroundTasks
 
