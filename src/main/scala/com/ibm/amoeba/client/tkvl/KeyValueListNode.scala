@@ -4,6 +4,7 @@ import com.ibm.amoeba.client.KeyValueObjectState.ValueState
 import com.ibm.amoeba.client.{KeyValueObjectState, ObjectAllocator, ObjectReader, Transaction}
 import com.ibm.amoeba.common.HLCTimestamp
 import com.ibm.amoeba.common.objects._
+import com.ibm.amoeba.common.transaction.KeyValueUpdate
 import com.ibm.amoeba.server.store.KVObjectState
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
@@ -75,14 +76,38 @@ class KeyValueListNode(val reader: ObjectReader,
              value: Value,
              maxNodeSize: Int,
              allocator: ObjectAllocator)(implicit tx: Transaction): Future[Unit] = fetchContainingNode(key).flatMap { node =>
+    KeyValueListNode.insert(node, ordering, key, value, maxNodeSize, allocator)
+  }
+
+  def delete(key: Key)(implicit tx: Transaction): Future[Unit] = fetchContainingNode(key).flatMap { node =>
+    KeyValueListNode.delete(node, key, reader)
+  }
+}
+
+object KeyValueListNode {
+  def apply(reader: ObjectReader,
+            pointer: KeyValueListPointer,
+            ordering: KeyOrdering,
+            kvos: KeyValueObjectState): KeyValueListNode = {
+    new KeyValueListNode(reader, pointer.pointer, ordering, pointer.minimum, kvos.revision,
+      kvos.contents, kvos.right.map(v => KeyValueListPointer(v.bytes)))
+  }
+
+  // Implemented as a non-class member to prevent accidental use of member variables instead of "node." attributes
+  private def insert(node: KeyValueListNode,
+                     ordering: KeyOrdering,
+                     key: Key,
+                     value: Value,
+                     maxNodeSize: Int,
+                     allocator: ObjectAllocator)(implicit tx: Transaction, ec: ExecutionContext): Future[Unit] =  {
 
     val currentSize = node.contents.foldLeft(0) { (sz, t) =>
-      sz + KVObjectState.idaEncodedPairSize(pointer.ida, t._1, t._2.value)
+      sz + KVObjectState.idaEncodedPairSize(node.pointer.ida, t._1, t._2.value)
     }
 
-    val newPairSize = KVObjectState.idaEncodedPairSize(pointer.ida, key, value)
+    val newPairSize = KVObjectState.idaEncodedPairSize(node.pointer.ida, key, value)
 
-    val maxSize = maxNodeSize - 4 - 4 - minimum.bytes.length - maximum.map(_.bytes.length).getOrElse(0) - tail.map{ p =>
+    val maxSize = maxNodeSize - 4 - 4 - node.minimum.bytes.length - node.maximum.map(_.bytes.length).getOrElse(0) - node.tail.map{ p =>
       p.encodedSize
     }.getOrElse(0)
 
@@ -90,17 +115,17 @@ class KeyValueListNode(val reader: ObjectReader,
       throw new NodeSizeExceeded
 
     if (newPairSize + currentSize < maxSize) {
-      tx.update(pointer, None, Nil, List(Insert(key, value.bytes)))
+      tx.update(node.pointer, Some(node.revision), Nil, List(Insert(key, value.bytes)))
       Future.successful(())
     } else {
-      val fullContent = contents + (key -> ValueState(value, tx.revision, HLCTimestamp.now))
+      val fullContent = node.contents + (key -> ValueState(value, tx.revision, HLCTimestamp.now))
       val keys = fullContent.keysIterator.toArray
 
       scala.util.Sorting.quickSort(keys)(ordering)
 
       val sizes = keys.iterator.map { k =>
         val vs = fullContent(k)
-        (k, KVObjectState.idaEncodedPairSize(pointer.ida, k, vs.value))
+        (k, KVObjectState.idaEncodedPairSize(node.pointer.ida, k, vs.value))
       }.toList
 
       val fullSize = sizes.foldLeft(0)((sz, t) => sz + t._2)
@@ -130,23 +155,45 @@ class KeyValueListNode(val reader: ObjectReader,
 
       val newContent = moveList.map(k => k -> fullContent(k).value).toMap
 
-      allocator.allocateKeyValueObject(ObjectRevisionGuard(pointer, revision), newContent,
-        Some(newMinimum), maximum, None, tail.map(p => Value(p.toArray))).map { newObjectPointer =>
+      allocator.allocateKeyValueObject(ObjectRevisionGuard(node.pointer, node.revision), newContent,
+        Some(newMinimum), None, None, node.tail.map(p => Value(p.toArray))).map { newObjectPointer =>
 
         val rightPtr = KeyValueListPointer(newMinimum, newObjectPointer)
 
-        tx.update(pointer, Some(revision), List(), SetMax(newMinimum) :: SetRight(rightPtr.toArray) :: oldOps)
+        tx.update(node.pointer, Some(node.revision), List(), SetRight(rightPtr.toArray) :: oldOps)
       }
     }
   }
-}
 
-object KeyValueListNode {
-  def apply(reader: ObjectReader,
-            pointer: KeyValueListPointer,
-            ordering: KeyOrdering,
-            kvos: KeyValueObjectState): KeyValueListNode = {
-    new KeyValueListNode(reader, pointer.pointer, ordering, pointer.minimum, kvos.revision,
-      kvos.contents, kvos.right.map(v => KeyValueListPointer(v.bytes)))
+  def delete(node: KeyValueListNode,
+             key: Key,
+             reader: ObjectReader)(implicit tx: Transaction, ec: ExecutionContext): Future[Unit] = {
+    if (! node.contents.contains(key))
+      Future.successful(())
+    else {
+      if (node.contents.size > 1) {
+        tx.update(node.pointer, None, List(KeyValueUpdate.Exists(key)), List(Delete(key)))
+        Future.successful(())
+      } else {
+        node.tail match {
+          case None =>
+            tx.update(node.pointer, None, List(KeyValueUpdate.Exists(key)), List(Delete(key)))
+            Future.successful(())
+          case Some(lp) =>
+            reader.read(lp.pointer).map { kvos =>
+              var ops: List[KeyValueOperation] = Delete(key) :: Nil
+              kvos.right match {
+                case None => ops = DeleteRight() :: ops
+                case Some(rp) => ops = SetRight(rp.bytes) :: ops
+              }
+              kvos.contents.foreach{ t =>
+                ops = Insert(t._1, t._2.value.bytes) :: ops
+              }
+              tx.update(node.pointer, Some(node.revision), List(), ops)
+              tx.setRefcount(lp.pointer, kvos.refcount, kvos.refcount.decrement())
+            }
+        }
+      }
+    }
   }
 }
