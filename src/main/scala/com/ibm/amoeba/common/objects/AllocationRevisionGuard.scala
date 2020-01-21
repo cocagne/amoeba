@@ -3,8 +3,8 @@ package com.ibm.amoeba.common.objects
 import java.nio.ByteBuffer
 import java.util.UUID
 
-import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp}
-import com.ibm.amoeba.common.transaction.{KeyValueUpdate, TransactionId}
+import com.ibm.amoeba.common.DataBuffer
+import com.ibm.amoeba.common.transaction.TransactionId
 
 object AllocationRevisionGuard {
   def deserialize(db: DataBuffer): AllocationRevisionGuard = {
@@ -19,22 +19,12 @@ object AllocationRevisionGuard {
         ObjectRevisionGuard(ptr, rev)
       case 1 =>
         val ptr = KeyValueObjectPointer(bb)
-        val klen = bb.getInt()
+        val rev = ObjectRevision(bb)
+        val klen = bb.remaining()
         val karr = new Array[Byte](klen)
         bb.get(karr)
-        val key = Key(karr)
-        val code = bb.get()
-        val ts = bb.getLong()
-        val req = code match {
-          case 0 => KeyValueUpdate.Exists(key)
-          case 1 => KeyValueUpdate.MayExist(key)
-          case 2 => KeyValueUpdate.DoesNotExist(key)
-          case 3 => KeyValueUpdate.TimestampEquals(key, HLCTimestamp(ts))
-          case 4 => KeyValueUpdate.TimestampLessThan(key, HLCTimestamp(ts))
-          case 5 => KeyValueUpdate.TimestampGreaterThan(key, HLCTimestamp(ts))
-        }
 
-        KeyRevisionGuard(ptr, req)
+        KeyRevisionGuard(ptr, Key(karr), rev)
 
       case _ => throw new Exception("Unexpected Error")
     }
@@ -61,25 +51,16 @@ case class ObjectRevisionGuard( pointer: ObjectPointer,
 
 case class KeyRevisionGuard(
                            pointer: KeyValueObjectPointer,
-                           requirement: KeyValueUpdate.KeyRequirement
+                           key: Key,
+                           keyRevision: ObjectRevision
                            ) extends AllocationRevisionGuard {
 
   def serialize(): DataBuffer = {
-    val arr = new Array[Byte](1 + pointer.encodedSize + 4 + requirement.key.bytes.length + 1 + 8)
+    val arr = new Array[Byte](1 + pointer.encodedSize + 16 + key.bytes.length)
     val bb = ByteBuffer.wrap(arr)
     bb.put(1.asInstanceOf[Byte])
     pointer.encodeInto(bb)
-    bb.putInt(requirement.key.bytes.length)
-    bb.put(requirement.key.bytes)
-    val (code, ts) = requirement match {
-      case KeyValueUpdate.Exists(_) => (0, 0L)
-      case KeyValueUpdate.MayExist(_) => (1, 0L)
-      case KeyValueUpdate.DoesNotExist(_) => (2, 0L)
-      case KeyValueUpdate.TimestampEquals(_, t) => (3, t.asLong)
-      case KeyValueUpdate.TimestampLessThan(_, t) => (4, t.asLong)
-      case KeyValueUpdate.TimestampGreaterThan(_, t) => (5, t.asLong)
-    }
-    bb.put(code.asInstanceOf[Byte])
-    bb.putLong(ts)
+    bb.put(keyRevision.toArray)
+    bb.put(key.bytes)
   }
 }

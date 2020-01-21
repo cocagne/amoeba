@@ -889,7 +889,7 @@ object NetworkCodec {
     val toStore = encode(builder, o.toStore)
     val keyReq = o.revisionGuard match {
       case _: ObjectRevisionGuard => -1
-      case krg: KeyRevisionGuard => encode(builder, krg.requirement)
+      case krg: KeyRevisionGuard => encode(builder, KeyValueUpdate.KeyRevision(krg.key, krg.keyRevision))
     }
 
     val allocObj = encode(builder, o.revisionGuard.pointer)
@@ -931,8 +931,8 @@ object NetworkCodec {
       val allocatingObjectRevision = decode(n.allocatingObjectRevision())
       ObjectRevisionGuard(allocatingObject, allocatingObjectRevision)
     } else {
-      val kreq = decode(n.allocatingObjectKeyRequirement())
-      KeyRevisionGuard(allocatingObject.asInstanceOf[KeyValueObjectPointer], kreq)
+      val kreq = decode(n.allocatingObjectKeyRequirement()).asInstanceOf[KeyValueUpdate.KeyRevision]
+      KeyRevisionGuard(allocatingObject.asInstanceOf[KeyValueObjectPointer], kreq.key, kreq.revision)
     }
 
     val timestamp = HLCTimestamp(n.timestamp())

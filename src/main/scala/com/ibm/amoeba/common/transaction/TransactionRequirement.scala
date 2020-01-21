@@ -56,7 +56,7 @@ object KeyValueUpdate {
 
   case class FullContentLock(fullContents: List[KeyRevision]) extends Requirement
 
-  abstract class KeyRequirement extends Requirement {
+  sealed abstract class KeyRequirement extends Requirement {
     val key: Key
   }
 

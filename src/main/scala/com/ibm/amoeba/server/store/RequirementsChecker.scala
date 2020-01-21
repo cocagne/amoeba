@@ -131,6 +131,10 @@ object RequirementsChecker {
           kvs.content.valuesIterator.foreach(checkLock)
         }
 
+        // Check for object revision lock and read-only locks
+        if (requiredRevision.nonEmpty && kvs.rangeLocks.nonEmpty)
+          throw ObjectErr(state.objectId, TransactionCollision(kvs.rangeLocks.head))
+
         for (req <- keyRequirements) {
           req match {
             case r: KeyValueUpdate.KeyRevision => kvs.content.get(r.key) match {

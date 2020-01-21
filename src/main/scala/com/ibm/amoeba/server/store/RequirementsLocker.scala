@@ -59,6 +59,13 @@ object RequirementsLocker {
 
         for (req <- keyRequirements) {
           req match {
+
+            case _: KeyValueUpdate.WithinRange => kvs.rangeLocks += transactionId
+
+            case r: KeyValueUpdate.KeyRevision => kvs.content.get(r.key).foreach { vs =>
+              vs.lockedToTransaction = Some(transactionId)
+            }
+
             case r: KeyValueUpdate.Exists => kvs.content.get(r.key).foreach { vs =>
               vs.lockedToTransaction = Some(transactionId)
             }
@@ -134,6 +141,13 @@ object RequirementsLocker {
 
         for (req <- keyRequirements) {
           req match {
+
+            case _: KeyValueUpdate.WithinRange => kvs.rangeLocks -= transactionId
+
+            case r: KeyValueUpdate.KeyRevision => kvs.content.get(r.key).foreach { vs =>
+              vs.lockedToTransaction = None
+            }
+
             case r: KeyValueUpdate.Exists => kvs.content.get(r.key).foreach { vs =>
               vs.lockedToTransaction = None
             }
