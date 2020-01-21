@@ -4,10 +4,11 @@ import java.util.UUID
 
 import com.ibm.amoeba.common.ida.Replication
 import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp}
-import com.ibm.amoeba.common.objects.{DataObjectPointer, Key, KeyValueObjectPointer, Metadata, ObjectId, ObjectRefcount, ObjectRevision, ObjectType, Value}
+import com.ibm.amoeba.common.objects.{ByteArrayKeyOrdering, DataObjectPointer, Key, KeyValueObjectPointer, Metadata, ObjectId, ObjectRefcount, ObjectRevision, ObjectType, Value}
 import com.ibm.amoeba.common.pool.PoolId
 import com.ibm.amoeba.common.store.StorePointer
-import com.ibm.amoeba.common.transaction.{DataUpdate, DataUpdateOperation, KeyExistenceError, KeyValueUpdate, LocalTimeError, LocalTimeRequirement, MissingObjectUpdate, RefcountMismatch, RefcountUpdate, RequirementError, RevisionLock, RevisionMismatch, TransactionCollision, TransactionId, VersionBump}
+import com.ibm.amoeba.common.transaction.KeyValueUpdate.{FullContentLock, KeyRevision}
+import com.ibm.amoeba.common.transaction.{ContentMismatch, DataUpdate, DataUpdateOperation, KeyExistenceError, KeyValueUpdate, LocalTimeError, LocalTimeRequirement, MissingObjectUpdate, RefcountMismatch, RefcountUpdate, RequirementError, RevisionLock, RevisionMismatch, TransactionCollision, TransactionId, VersionBump, WithinRangeError}
 import org.scalatest.{FunSuite, Matchers}
 
 import scala.collection.immutable.HashMap
@@ -495,7 +496,65 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
     updates += (o.objectId -> DataBuffer.Empty)
 
     {
-      val req = KeyValueUpdate(kp1, Some(rev1), List(KeyValueUpdate.Exists(k1)))
+      val lst = List(KeyRevision(k1, rev1), KeyRevision(k2, rev1))
+      val req = KeyValueUpdate(kp1, Some(rev1), Some(FullContentLock(lst)), List())
+
+      val (oerrs, errs) = RequirementsChecker.check(tx2, List(req), objects, updates)
+
+      assert(oerrs.isEmpty)
+      assert(errs.isEmpty)
+    }
+
+    {
+      val lst = List(KeyRevision(k1, rev1), KeyRevision(k2, rev1))
+      val req = KeyValueUpdate(kp1, Some(rev1), Some(FullContentLock(lst)), List())
+
+      val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+
+      var expected: HashMap[ObjectId, RequirementError] = new HashMap
+      expected += (o.objectId -> TransactionCollision(tx2))
+      assert(oerrs == expected)
+      assert(errs.isEmpty)
+    }
+
+    {
+      val lst = List(KeyRevision(k1, rev2), KeyRevision(k2, rev1))
+      val req = KeyValueUpdate(kp1, Some(rev1), Some(FullContentLock(lst)), List())
+
+      val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+
+      var expected: HashMap[ObjectId, RequirementError] = new HashMap
+      expected += (o.objectId -> ContentMismatch())
+      assert(oerrs == expected)
+      assert(errs.isEmpty)
+    }
+
+    {
+      val lst = List(KeyRevision(k1, rev1))
+      val req = KeyValueUpdate(kp1, Some(rev1), Some(FullContentLock(lst)), List())
+
+      val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+
+      var expected: HashMap[ObjectId, RequirementError] = new HashMap
+      expected += (o.objectId -> ContentMismatch())
+      assert(oerrs == expected)
+      assert(errs.isEmpty)
+    }
+
+    {
+      val lst = List(KeyRevision(k1, rev2), KeyRevision(k2, rev1), KeyRevision(k3, rev1))
+      val req = KeyValueUpdate(kp1, Some(rev1), Some(FullContentLock(lst)), List())
+
+      val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+
+      var expected: HashMap[ObjectId, RequirementError] = new HashMap
+      expected += (o.objectId -> ContentMismatch())
+      assert(oerrs == expected)
+      assert(errs.isEmpty)
+    }
+
+    {
+      val req = KeyValueUpdate(kp1, Some(rev1), None, List(KeyValueUpdate.KeyRevision(k1, rev1)))
 
       val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
 
@@ -504,7 +563,18 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
     }
 
     {
-      val req = KeyValueUpdate(kp1, Some(rev1), List(KeyValueUpdate.MayExist(k1)))
+      val req = KeyValueUpdate(kp1, Some(rev1), None, List(KeyValueUpdate.KeyRevision(k1, rev2)))
+
+      val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+
+      var expected: HashMap[ObjectId, RequirementError] = new HashMap
+      expected += (o.objectId -> RevisionMismatch())
+      assert(oerrs == expected)
+      assert(errs.isEmpty)
+    }
+
+    {
+      val req = KeyValueUpdate(kp1, Some(rev1), None, List(KeyValueUpdate.Exists(k1)))
 
       val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
 
@@ -513,7 +583,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
     }
 
     {
-      val req = KeyValueUpdate(kp1, Some(rev1), List(KeyValueUpdate.MayExist(k4)))
+      val req = KeyValueUpdate(kp1, Some(rev1), None, List(KeyValueUpdate.MayExist(k1)))
 
       val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
 
@@ -522,7 +592,16 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
     }
 
     {
-      val req = KeyValueUpdate(kp1, Some(rev1), List(KeyValueUpdate.DoesNotExist(k1)))
+      val req = KeyValueUpdate(kp1, Some(rev1), None, List(KeyValueUpdate.MayExist(k4)))
+
+      val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+
+      assert(oerrs.isEmpty)
+      assert(errs.isEmpty)
+    }
+
+    {
+      val req = KeyValueUpdate(kp1, Some(rev1), None, List(KeyValueUpdate.DoesNotExist(k1)))
 
       val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
 
@@ -533,7 +612,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
     }
 
     {
-      val req = KeyValueUpdate(kp1, Some(rev1), List(KeyValueUpdate.DoesNotExist(k4)))
+      val req = KeyValueUpdate(kp1, Some(rev1), None, List(KeyValueUpdate.DoesNotExist(k4)))
 
       val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
 
@@ -542,17 +621,18 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
     }
 
     {
-      val req = KeyValueUpdate(kp1, Some(rev1), List(KeyValueUpdate.Exists(k2)))
+      val req = KeyValueUpdate(kp1, Some(rev1), None, List(KeyValueUpdate.Exists(k2)))
 
       val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
 
       var expected: HashMap[ObjectId, RequirementError] = new HashMap
       expected += (o.objectId -> TransactionCollision(tx2))
+      assert(oerrs == expected)
       assert(errs.isEmpty)
     }
 
     {
-      val req = KeyValueUpdate(kp1, Some(rev1), List(KeyValueUpdate.TimestampEquals(k1, ts1)))
+      val req = KeyValueUpdate(kp1, Some(rev1), None, List(KeyValueUpdate.TimestampEquals(k1, ts1)))
 
       val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
 
@@ -561,7 +641,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
     }
 
     {
-      val req = KeyValueUpdate(kp1, Some(rev1), List(KeyValueUpdate.TimestampLessThan(k2, ts1)))
+      val req = KeyValueUpdate(kp1, Some(rev1), None, List(KeyValueUpdate.TimestampLessThan(k2, ts1)))
 
       val (oerrs, errs) = RequirementsChecker.check(tx2, List(req), objects, updates)
 
@@ -570,12 +650,99 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
     }
 
     {
-      val req = KeyValueUpdate(kp1, Some(rev1), List(KeyValueUpdate.TimestampGreaterThan(k1, ts2)))
+      val req = KeyValueUpdate(kp1, Some(rev1), None, List(KeyValueUpdate.TimestampGreaterThan(k1, ts2)))
 
       val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
 
       assert(oerrs.isEmpty)
       assert(errs.isEmpty)
+    }
+
+    {
+      val req = KeyValueUpdate(kp1, Some(rev1), None, List(KeyValueUpdate.WithinRange(k2, ByteArrayKeyOrdering)))
+
+      val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+
+      assert(oerrs.isEmpty)
+      assert(errs.isEmpty)
+    }
+
+    {
+      kvos.min = Some(k1)
+      val req = KeyValueUpdate(kp1, Some(rev1), None, List(KeyValueUpdate.WithinRange(k2, ByteArrayKeyOrdering)))
+
+      val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+
+      assert(oerrs.isEmpty)
+      assert(errs.isEmpty)
+      kvos.min = None
+    }
+
+    {
+      kvos.max = Some(k3)
+      val req = KeyValueUpdate(kp1, Some(rev1), None, List(KeyValueUpdate.WithinRange(k2, ByteArrayKeyOrdering)))
+
+      val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+
+      assert(oerrs.isEmpty)
+      assert(errs.isEmpty)
+      kvos.max = None
+    }
+
+    {
+      kvos.min = Some(k1)
+      kvos.max = Some(k3)
+      val req = KeyValueUpdate(kp1, Some(rev1), None, List(KeyValueUpdate.WithinRange(k2, ByteArrayKeyOrdering)))
+
+      val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+
+      assert(oerrs.isEmpty)
+      assert(errs.isEmpty)
+      kvos.min = None
+      kvos.max = None
+    }
+
+    {
+      kvos.min = Some(k3)
+      val req = KeyValueUpdate(kp1, Some(rev1), None, List(KeyValueUpdate.WithinRange(k2, ByteArrayKeyOrdering)))
+
+      val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+
+      var expected: HashMap[ObjectId, RequirementError] = new HashMap
+      expected += (o.objectId -> WithinRangeError())
+      assert(oerrs == expected)
+      assert(errs.isEmpty)
+      kvos.min = None
+    }
+
+    {
+      kvos.min = Some(k2)
+      kvos.max = Some(k4)
+      val req = KeyValueUpdate(kp1, Some(rev1), None, List(KeyValueUpdate.WithinRange(k1, ByteArrayKeyOrdering)))
+
+      val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+
+      var expected: HashMap[ObjectId, RequirementError] = new HashMap
+      expected += (o.objectId -> WithinRangeError())
+      assert(oerrs == expected)
+      assert(errs.isEmpty)
+      kvos.min = None
+      kvos.max = None
+    }
+
+    {
+      kvos.min = Some(k1)
+      kvos.max = Some(k3)
+      val req = KeyValueUpdate(kp1, Some(rev1), None, List(KeyValueUpdate.WithinRange(k4, ByteArrayKeyOrdering)))
+
+      val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+
+      var expected: HashMap[ObjectId, RequirementError] = new HashMap
+      expected += (o.objectId -> WithinRangeError())
+      assert(oerrs == expected)
+      assert(errs.isEmpty)
+      kvos.min = None
+      kvos.max = None
     }
   }
 

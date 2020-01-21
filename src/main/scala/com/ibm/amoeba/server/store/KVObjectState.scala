@@ -16,6 +16,7 @@ class KVObjectState(
   var right: Option[Value] = None,
   var content: Map[Key, ValueState] = Map(),
   var noExistenceLocks: Map[Key, TransactionId] = Map(),
+  var contentLocked: Option[TransactionId] = None,
 ) {
 
   def encode(): DataBuffer = {

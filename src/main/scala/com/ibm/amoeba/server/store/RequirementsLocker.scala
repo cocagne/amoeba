@@ -1,6 +1,7 @@
 package com.ibm.amoeba.server.store
 
 import com.ibm.amoeba.common.objects.{ObjectId, ObjectRevision}
+import com.ibm.amoeba.common.transaction.KeyValueUpdate.FullContentLock
 import com.ibm.amoeba.common.transaction._
 import com.ibm.amoeba.server.store.RequirementsChecker.ObjectErr
 
@@ -28,7 +29,7 @@ object RequirementsLocker {
           case r: DataUpdate => getState(r.objectPointer.id).lockedToTransaction = Some(transactionId)
 
           case r: KeyValueUpdate =>
-            lockKV(getState(r.objectPointer.id), transactionId, r.requiredRevision, r.requirements)
+            lockKV(getState(r.objectPointer.id), transactionId, r.requiredRevision, r.contentLock, r.requirements)
 
           case r: RefcountUpdate => getState(r.objectPointer.id).lockedToTransaction = Some(transactionId)
 
@@ -45,6 +46,7 @@ object RequirementsLocker {
   def lockKV(state: ObjectState,
              transactionId: TransactionId,
              requiredRevision: Option[ObjectRevision],
+             contentLock: Option[FullContentLock],
              keyRequirements: List[KeyValueUpdate.KeyRequirement]): Unit = {
 
     requiredRevision.foreach { rev => state.lockedToTransaction = Some(transactionId) }
@@ -52,6 +54,9 @@ object RequirementsLocker {
     state.kvState match {
       case None => throw ObjectErr(state.objectId, ObjectTypeError())
       case Some(kvs) =>
+
+        contentLock.foreach { _ => kvs.contentLocked = Some(transactionId) }
+
         for (req <- keyRequirements) {
           req match {
             case r: KeyValueUpdate.Exists => kvs.content.get(r.key).foreach { vs =>
@@ -99,7 +104,7 @@ object RequirementsLocker {
           case r: DataUpdate => getState(r.objectPointer.id).lockedToTransaction = None
 
           case r: KeyValueUpdate =>
-            lockKV(getState(r.objectPointer.id), transactionId, r.requiredRevision, r.requirements)
+            unlockKV(getState(r.objectPointer.id), transactionId, r.requiredRevision, r.contentLock, r.requirements)
 
           case r: RefcountUpdate => getState(r.objectPointer.id).lockedToTransaction = None
 
@@ -116,6 +121,7 @@ object RequirementsLocker {
   def unlockKV(state: ObjectState,
                transactionId: TransactionId,
                requiredRevision: Option[ObjectRevision],
+               contentLock: Option[FullContentLock],
                keyRequirements: List[KeyValueUpdate.KeyRequirement]): Unit = {
 
     requiredRevision.foreach { rev => state.lockedToTransaction = None }
@@ -123,6 +129,9 @@ object RequirementsLocker {
     state.kvState match {
       case None => throw ObjectErr(state.objectId, ObjectTypeError())
       case Some(kvs) =>
+
+        contentLock.foreach { _ => kvs.contentLocked = None }
+
         for (req <- keyRequirements) {
           req match {
             case r: KeyValueUpdate.Exists => kvs.content.get(r.key).foreach { vs =>

@@ -1,6 +1,7 @@
 package com.ibm.amoeba.server.store
 
 import com.ibm.amoeba.common.objects.{ObjectId, ObjectRefcount, ObjectRevision}
+import com.ibm.amoeba.common.transaction.KeyValueUpdate.FullContentLock
 import com.ibm.amoeba.common.transaction._
 import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp}
 
@@ -47,7 +48,9 @@ object RequirementsChecker {
               throw ObjectErr(r.objectPointer.id, MissingObjectUpdate())
 
           case r: KeyValueUpdate =>
-            checkKVRequirements(getState(r.objectPointer.id), transactionId, r.requiredRevision, r.requirements)
+            checkKVRequirements(getState(r.objectPointer.id), transactionId, r.requiredRevision,
+              r.contentLock, r.requirements)
+
             if (!objectUpdates.contains(r.objectPointer.id))
               throw ObjectErr(r.objectPointer.id, MissingObjectUpdate())
 
@@ -97,6 +100,7 @@ object RequirementsChecker {
   def checkKVRequirements(state: ObjectState,
                           transactionId: TransactionId,
                           requiredRevision: Option[ObjectRevision],
+                          contentLock: Option[FullContentLock],
                           keyRequirements: List[KeyValueUpdate.KeyRequirement]): Unit = {
 
     requiredRevision.foreach { rev =>
@@ -111,11 +115,42 @@ object RequirementsChecker {
       }
     }
 
+
     state.kvState match {
       case None => throw ObjectErr(state.objectId, ObjectTypeError())
       case Some(kvs) =>
+
+        // Check for full content lock
+        contentLock.foreach { cl =>
+          val expected = cl.fullContents.map(kr => kr.key -> kr.revision).toSet
+          val actual = kvs.content.map(t => t._1 -> t._2.revision).toSet
+
+          if (expected != actual)
+            throw ObjectErr(state.objectId, ContentMismatch())
+
+          kvs.content.valuesIterator.foreach(checkLock)
+        }
+
         for (req <- keyRequirements) {
           req match {
+            case r: KeyValueUpdate.KeyRevision => kvs.content.get(r.key) match {
+              case None => throw ObjectErr(state.objectId, KeyExistenceError())
+              case Some(vs) =>
+                checkLock(vs)
+                if (vs.revision != r.revision)
+                  throw ObjectErr(state.objectId, RevisionMismatch())
+            }
+
+            case r: KeyValueUpdate.WithinRange =>
+              kvs.min.foreach { min =>
+                if (r.ordering.compare(r.key, min) < 0)
+                  throw ObjectErr(state.objectId, WithinRangeError())
+              }
+              kvs.max.foreach { max =>
+                if (r.ordering.compare(r.key, max) > 0)
+                  throw ObjectErr(state.objectId, WithinRangeError())
+              }
+
             case r: KeyValueUpdate.Exists => kvs.content.get(r.key) match {
               case None => throw ObjectErr(state.objectId, KeyExistenceError())
               case Some(vs) => checkLock(vs)

@@ -22,6 +22,7 @@ class BasicIntegrationSuite extends IntegrationTestSuite {
       val tx = client.newTransaction()
       tx.update(nucleus,
         Some(kvos.revision),
+        None,
         List(KeyValueUpdate.DoesNotExist(key)),
         List(Insert(key, value.bytes)))
 
@@ -51,6 +52,7 @@ class BasicIntegrationSuite extends IntegrationTestSuite {
 
       _ = tx.update(nucleus,
         Some(ikvos.revision),
+        None,
         List(KeyValueUpdate.DoesNotExist(key)),
         List(Insert(key, value.bytes)))
 
@@ -79,6 +81,7 @@ class BasicIntegrationSuite extends IntegrationTestSuite {
     implicit val tx = client.newTransaction()
 
     tx.update(nucleus,
+      None,
       None,
       List(KeyValueUpdate.DoesNotExist(key)),
       List(Insert(key, value.bytes)))
@@ -120,6 +123,7 @@ class BasicIntegrationSuite extends IntegrationTestSuite {
 
       _ = tx.update(nucleus,
         Some(ikvos.revision),
+        None,
         List(KeyValueUpdate.DoesNotExist(key)),
         List(Insert(key, value.bytes)))
 

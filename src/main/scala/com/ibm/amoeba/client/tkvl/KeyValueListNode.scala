@@ -118,7 +118,7 @@ object KeyValueListNode {
       throw new NodeSizeExceeded
 
     if (newPairSize + currentSize < maxSize) {
-      tx.update(node.pointer, Some(node.revision), Nil, List(Insert(key, value.bytes)))
+      tx.update(node.pointer, Some(node.revision), None, Nil, List(Insert(key, value.bytes)))
       Future.successful(())
     } else {
       val fullContent = node.contents + (key -> ValueState(value, tx.revision, HLCTimestamp.now))
@@ -163,7 +163,7 @@ object KeyValueListNode {
 
         val rightPtr = KeyValueListPointer(newMinimum, newObjectPointer)
 
-        tx.update(node.pointer, Some(node.revision), List(), SetRight(rightPtr.toArray) :: oldOps)
+        tx.update(node.pointer, Some(node.revision), None, List(), SetRight(rightPtr.toArray) :: oldOps)
 
         prepareForSplit(newMinimum, newObjectPointer)
       }
@@ -178,12 +178,12 @@ object KeyValueListNode {
       Future.successful(())
     else {
       if (node.contents.size > 1) {
-        tx.update(node.pointer, None, List(KeyValueUpdate.Exists(key)), List(Delete(key)))
+        tx.update(node.pointer, None, None, List(KeyValueUpdate.Exists(key)), List(Delete(key)))
         Future.successful(())
       } else {
         node.tail match {
           case None =>
-            tx.update(node.pointer, None, List(KeyValueUpdate.Exists(key)), List(Delete(key)))
+            tx.update(node.pointer, None, None, List(KeyValueUpdate.Exists(key)), List(Delete(key)))
             Future.successful(())
           case Some(lp) =>
             reader.read(lp.pointer).flatMap { kvos =>
@@ -196,7 +196,7 @@ object KeyValueListNode {
                 ops = Insert(t._1, t._2.value.bytes) :: ops
               }
 
-              tx.update(node.pointer, Some(node.revision), List(), ops)
+              tx.update(node.pointer, Some(node.revision), None, List(), ops)
               tx.setRefcount(lp.pointer, kvos.refcount, kvos.refcount.decrement())
 
               prepareForJoin(lp.minimum, lp.pointer)

@@ -5,6 +5,7 @@ import java.util.UUID
 import com.ibm.amoeba.client.{AmoebaClient, PostCommitTransactionModification, Transaction, TransactionAborted}
 import com.ibm.amoeba.common.objects._
 import com.ibm.amoeba.common.store.StoreId
+import com.ibm.amoeba.common.transaction.KeyValueUpdate.FullContentLock
 import com.ibm.amoeba.common.transaction.{FinalizationActionId, KeyValueUpdate, TransactionId}
 import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp}
 import org.apache.logging.log4j.scala.Logging
@@ -60,11 +61,12 @@ class TransactionImpl(val client: AmoebaClient,
   def update(
               pointer: KeyValueObjectPointer,
               requiredRevision: Option[ObjectRevision],
+              contentLock: Option[FullContentLock],
               requirements: List[KeyValueUpdate.KeyRequirement],
               operations: List[KeyValueOperation]): Unit = synchronized { state } match {
     case Right(bldr) =>
       havePendingUpdates = true
-      bldr.update(pointer, requiredRevision, requirements, operations)
+      bldr.update(pointer, requiredRevision, contentLock, requirements, operations)
     case Left(_) => throw PostCommitTransactionModification()
   }
 

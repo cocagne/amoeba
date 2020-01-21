@@ -5,6 +5,7 @@ import com.ibm.amoeba.client.{ConflictingRequirements, MultipleDataUpdatesToObje
 import com.ibm.amoeba.common.network.ClientId
 import com.ibm.amoeba.common.objects._
 import com.ibm.amoeba.common.store.StoreId
+import com.ibm.amoeba.common.transaction.KeyValueUpdate.FullContentLock
 import com.ibm.amoeba.common.transaction._
 import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp}
 
@@ -12,6 +13,7 @@ object TransactionBuilder {
   case class KVUpdate(
                        pointer: KeyValueObjectPointer,
                        requiredRevision: Option[ObjectRevision],
+                       contentLock: Option[FullContentLock],
                        requirements: List[KeyValueUpdate.KeyRequirement],
                        operations: List[KeyValueOperation])
 
@@ -49,7 +51,7 @@ class TransactionBuilder(
     val startTimestamp = HLCTimestamp.now
 
     keyValueUpdates.valuesIterator.foreach { kvu =>
-      requirements = KeyValueUpdate(kvu.pointer, kvu.requiredRevision, kvu.requirements) :: requirements
+      requirements = KeyValueUpdate(kvu.pointer, kvu.requiredRevision, kvu.contentLock, kvu.requirements) :: requirements
     }
 
     // Ensure the transaction has at least one requirement
@@ -149,6 +151,7 @@ class TransactionBuilder(
   def update(
               pointer: KeyValueObjectPointer,
               requiredRevision: Option[ObjectRevision],
+              contentLock: Option[FullContentLock],
               requirements: List[KeyValueUpdate.KeyRequirement],
               operations: List[KeyValueOperation]): Unit = synchronized {
     //println(s"   TXB KV Append txid $transactionUUID object ${pointer.uuid}")
@@ -157,7 +160,7 @@ class TransactionBuilder(
     if (revisionLocks.contains(pointer))
       throw ConflictingRequirements(pointer)
 
-    keyValueUpdates += (pointer -> KVUpdate(pointer, requiredRevision, requirements, operations))
+    keyValueUpdates += (pointer -> KVUpdate(pointer, requiredRevision, contentLock, requirements, operations))
   }
 
   def setRefcount(objectPointer: ObjectPointer, requiredRefcount: ObjectRefcount, refcount: ObjectRefcount): Unit = synchronized {

@@ -3,6 +3,7 @@ package com.ibm.amoeba.client
 import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp}
 import com.ibm.amoeba.common.objects.{DataObjectPointer, KeyValueObjectPointer, KeyValueOperation, ObjectPointer, ObjectRefcount, ObjectRevision}
 import com.ibm.amoeba.common.store.StoreId
+import com.ibm.amoeba.common.transaction.KeyValueUpdate.FullContentLock
 import com.ibm.amoeba.common.transaction.{FinalizationActionId, KeyValueUpdate, TransactionId}
 
 import scala.concurrent.Future
@@ -24,6 +25,7 @@ trait Transaction {
 
   def update(pointer: KeyValueObjectPointer,
              requiredRevision: Option[ObjectRevision],
+             contentLock: Option[FullContentLock],
              requirements: List[KeyValueUpdate.KeyRequirement],
              operations: List[KeyValueOperation]): Unit
 

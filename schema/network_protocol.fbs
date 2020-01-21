@@ -9,6 +9,13 @@ struct UUID {
   least_sig_bits: long;
 }
 
+enum KeyComparison:byte
+{
+  ByteArray,
+  Integer,
+  Lexical
+}
+
 table Replication {
   width: int;
   write_threshold: int;
@@ -72,6 +79,8 @@ enum DataUpdateOperation:byte {
 }
 
 enum KeyRequirement:byte {
+  KeyRevision,
+  WithinRange,
   Exists,
   MayExist,
   DoesNotExist,
@@ -105,12 +114,20 @@ table RevisionLock {
 table KVReq {
   requirement: KeyRequirement;
   timestamp: long;
+  revision: ObjectRevision;
+  comparison: KeyComparison;
   key: [byte];
+}
+
+table KeyRevision {
+  key: [byte];
+  revision: ObjectRevision;
 }
 
 table KeyValueUpdate {
   object_pointer: ObjectPointer;
   required_revision: ObjectRevision;
+  content_lock: [KeyRevision];
   requirements: [KVReq];
 }
 
@@ -268,13 +285,6 @@ enum LockType:byte
   RevisionReadLock,
   RefcountWriteLock,
   RefcountReadLock
-}
-
-enum KeyComparison:byte
-{
-  ByteArray,
-  Integer,
-  Lexical
 }
 
 enum ReadType:byte {

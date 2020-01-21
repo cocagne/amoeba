@@ -12,6 +12,7 @@ import com.ibm.amoeba.common.objects.{ByteArrayKeyOrdering, ByteRange, DataObjec
 import com.ibm.amoeba.common.paxos.ProposalId
 import com.ibm.amoeba.common.pool.PoolId
 import com.ibm.amoeba.common.store.{StoreId, StorePointer}
+import com.ibm.amoeba.common.transaction.KeyValueUpdate.{FullContentLock, KeyRevision}
 import com.ibm.amoeba.common.transaction.{DataUpdate, DataUpdateOperation, FinalizationActionId, KeyValueUpdate, LocalTimeRequirement, RefcountUpdate, RevisionLock, SerializedFinalizationAction, TransactionDescription, TransactionDisposition, TransactionId, TransactionRequirement, TransactionStatus, VersionBump}
 
 
@@ -246,15 +247,39 @@ object NetworkCodec {
     
     RevisionLock(optr, rrev)
   }
-  
-  
+
+
+  def encode(builder:FlatBufferBuilder, o:KeyValueUpdate.KeyRevision): Int = {
+    val key = P.KVReq.createKeyVector(builder, o.key.bytes)
+    P.KeyRevision.startKeyRevision(builder)
+    P.KeyRevision.addRevision(builder, encodeObjectRevision(builder, o.revision))
+    P.KeyRevision.addKey(builder, key)
+    P.KeyRevision.endKeyRevision(builder)
+  }
+  def decode(n: P.KeyRevision): KeyValueUpdate.KeyRevision = {
+    val karr = new Array[Byte](n.keyLength())
+    n.keyAsByteBuffer().get(karr)
+    val key = Key(karr)
+    val rev = decode(n.revision())
+    KeyRevision(key, rev)
+  }
+
   def encode(builder:FlatBufferBuilder, o:KeyValueUpdate.KeyRequirement): Int = {
     val key = P.KVReq.createKeyVector(builder, o.key.bytes)
     P.KVReq.startKVReq(builder)
     val req = o match {
+      case r: KeyValueUpdate.KeyRevision =>
+        P.KVReq.addRevision(builder, encodeObjectRevision(builder, r.revision))
+        P.KeyRequirement.KeyRevision
+
+      case r: KeyValueUpdate.WithinRange =>
+        P.KVReq.addComparison(builder, encodeKeyComparison(r.ordering))
+        P.KeyRequirement.WithinRange
+
       case _: KeyValueUpdate.Exists => P.KeyRequirement.Exists
       case _: KeyValueUpdate.MayExist => P.KeyRequirement.MayExist
       case _: KeyValueUpdate.DoesNotExist => P.KeyRequirement.DoesNotExist
+
       case r: KeyValueUpdate.TimestampEquals =>
         P.KVReq.addTimestamp(builder, r.timestamp.asLong)
         P.KeyRequirement.TimestampEquals
@@ -266,7 +291,6 @@ object NetworkCodec {
       case r: KeyValueUpdate.TimestampGreaterThan =>
         P.KVReq.addTimestamp(builder, r.timestamp.asLong)
         P.KeyRequirement.TimestampGreaterThan
-
     }
 
     P.KVReq.addRequirement(builder, req)
@@ -287,6 +311,13 @@ object NetworkCodec {
       case P.KeyRequirement.TimestampEquals => KeyValueUpdate.TimestampEquals(key, timestamp)
       case P.KeyRequirement.TimestampLessThan => KeyValueUpdate.TimestampLessThan(key, timestamp)
       case P.KeyRequirement.TimestampGreaterThan => KeyValueUpdate.TimestampGreaterThan(key, timestamp)
+      case P.KeyRequirement.KeyRevision =>
+        val rev = decode(n.revision())
+        KeyValueUpdate.KeyRevision(key, rev)
+      case P.KeyRequirement.WithinRange =>
+        val ord = decodeKeyComparison(n.comparison())
+        KeyValueUpdate.WithinRange(key, ord)
+
     }
   }
   
@@ -294,10 +325,18 @@ object NetworkCodec {
   def encode(builder:FlatBufferBuilder, o:KeyValueUpdate): Int = {
     val objectPointer = encode(builder, o.objectPointer)
     val requirements = P.KeyValueUpdate.createRequirementsVector(builder, o.requirements.map(r => encode(builder, r)).toArray)
+
+    val contentLock = o.contentLock match {
+      case None => -1
+      case Some(cl) =>
+        P.KeyValueUpdate.createContentLockVector(builder, cl.fullContents.map(kr => encode(builder, kr)).toArray)
+    }
     
     P.KeyValueUpdate.startKeyValueUpdate(builder)
     P.KeyValueUpdate.addObjectPointer(builder, objectPointer)
-    o.requiredRevision.foreach { rr => P.KeyValueUpdate.addRequiredRevision(builder, encodeObjectRevision(builder, rr)) } 
+    o.requiredRevision.foreach { rr => P.KeyValueUpdate.addRequiredRevision(builder, encodeObjectRevision(builder, rr)) }
+    if (contentLock > 0)
+      P.KeyValueUpdate.addContentLock(builder, contentLock)
     P.KeyValueUpdate.addRequirements(builder, requirements)
     P.KeyValueUpdate.endKeyValueUpdate(builder)
   }
@@ -309,8 +348,19 @@ object NetworkCodec {
         l
       else
         requirements(idx-1, decode(n.requirements(idx)) :: l)
+
+    def contentLock(idx: Int, l:List[KeyValueUpdate.KeyRevision]): List[KeyValueUpdate.KeyRevision] = if (idx == -1)
+      l
+    else
+      contentLock(idx-1, decode(n.contentLock(idx)) :: l)
+
+    val ocl = if (n.contentLockLength() == 0)
+      None
+    else
+      Some(FullContentLock(contentLock(n.contentLockLength()-1, Nil)))
         
-    KeyValueUpdate(objectPointer.asInstanceOf[KeyValueObjectPointer], requiredRevision, requirements(n.requirementsLength()-1, Nil))
+    KeyValueUpdate(objectPointer.asInstanceOf[KeyValueObjectPointer],
+      requiredRevision, ocl, requirements(n.requirementsLength()-1, Nil))
   }
 
   def encode(builder:FlatBufferBuilder, o:LocalTimeRequirement): Int = {

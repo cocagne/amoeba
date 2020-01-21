@@ -1,7 +1,7 @@
 package com.ibm.amoeba.common.transaction
 
 import com.ibm.amoeba.common.HLCTimestamp
-import com.ibm.amoeba.common.objects.{Key, KeyValueObjectPointer, ObjectPointer, ObjectRefcount, ObjectRevision}
+import com.ibm.amoeba.common.objects.{Key, KeyOrdering, KeyValueObjectPointer, ObjectPointer, ObjectRefcount, ObjectRevision}
 
 sealed abstract class TransactionRequirement
 
@@ -47,14 +47,21 @@ sealed abstract class KeyValueTransactionRequirement extends TransactionObjectRe
 case class KeyValueUpdate(
                            objectPointer: KeyValueObjectPointer,
                            requiredRevision: Option[ObjectRevision],
+                           contentLock: Option[KeyValueUpdate.FullContentLock],
                            requirements: List[KeyValueUpdate.KeyRequirement]) extends KeyValueTransactionRequirement
 
 object KeyValueUpdate {
 
-  sealed abstract class KeyRequirement {
+  sealed abstract class Requirement
+
+  case class FullContentLock(fullContents: List[KeyRevision]) extends Requirement
+
+  abstract class KeyRequirement extends Requirement {
     val key: Key
   }
 
+  case class KeyRevision(key: Key, revision: ObjectRevision) extends KeyRequirement
+  case class WithinRange(key: Key, ordering: KeyOrdering) extends KeyRequirement
   case class Exists(key: Key) extends KeyRequirement
   case class MayExist(key: Key) extends KeyRequirement
   case class DoesNotExist(key: Key) extends KeyRequirement

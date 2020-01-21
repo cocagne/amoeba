@@ -12,4 +12,6 @@ case class RevisionMismatch() extends RequirementError
 case class RefcountMismatch() extends RequirementError
 case class KeyTimestampError() extends RequirementError
 case class KeyExistenceError() extends RequirementError
+case class ContentMismatch() extends RequirementError
+case class WithinRangeError() extends  RequirementError
 
