@@ -75,12 +75,14 @@ class KeyValueListNode(val reader: ObjectReader,
   def insert(key: Key,
              value: Value,
              maxNodeSize: Int,
-             allocator: ObjectAllocator)(implicit tx: Transaction): Future[Unit] = fetchContainingNode(key).flatMap { node =>
-    KeyValueListNode.insert(node, ordering, key, value, maxNodeSize, allocator)
+             allocator: ObjectAllocator,
+             prepareForSplit: (Key, KeyValueObjectPointer) => Future[Unit] = (_,_) => Future.successful(()))(implicit tx: Transaction): Future[Unit] = fetchContainingNode(key).flatMap { node =>
+    KeyValueListNode.insert(node, ordering, key, value, maxNodeSize, allocator, prepareForSplit)
   }
 
-  def delete(key: Key)(implicit tx: Transaction): Future[Unit] = fetchContainingNode(key).flatMap { node =>
-    KeyValueListNode.delete(node, key, reader)
+  def delete(key: Key,
+             prepareForJoin: (Key, KeyValueObjectPointer) => Future[Unit] = (_,_) => Future.successful(()))(implicit tx: Transaction): Future[Unit] = fetchContainingNode(key).flatMap { node =>
+    KeyValueListNode.delete(node, key, reader, prepareForJoin)
   }
 }
 
@@ -99,7 +101,8 @@ object KeyValueListNode {
                      key: Key,
                      value: Value,
                      maxNodeSize: Int,
-                     allocator: ObjectAllocator)(implicit tx: Transaction, ec: ExecutionContext): Future[Unit] =  {
+                     allocator: ObjectAllocator,
+                     prepareForSplit: (Key, KeyValueObjectPointer) => Future[Unit] = (_,_) => Future.successful(()))(implicit tx: Transaction, ec: ExecutionContext): Future[Unit] =  {
 
     val currentSize = node.contents.foldLeft(0) { (sz, t) =>
       sz + KVObjectState.idaEncodedPairSize(node.pointer.ida, t._1, t._2.value)
@@ -156,18 +159,21 @@ object KeyValueListNode {
       val newContent = moveList.map(k => k -> fullContent(k).value).toMap
 
       allocator.allocateKeyValueObject(ObjectRevisionGuard(node.pointer, node.revision), newContent,
-        Some(newMinimum), None, None, node.tail.map(p => Value(p.toArray))).map { newObjectPointer =>
+        Some(newMinimum), None, None, node.tail.map(p => Value(p.toArray))).flatMap { newObjectPointer =>
 
         val rightPtr = KeyValueListPointer(newMinimum, newObjectPointer)
 
         tx.update(node.pointer, Some(node.revision), List(), SetRight(rightPtr.toArray) :: oldOps)
+
+        prepareForSplit(newMinimum, newObjectPointer)
       }
     }
   }
 
   def delete(node: KeyValueListNode,
              key: Key,
-             reader: ObjectReader)(implicit tx: Transaction, ec: ExecutionContext): Future[Unit] = {
+             reader: ObjectReader,
+             prepareForJoin: (Key, KeyValueObjectPointer) => Future[Unit] = (_,_) => Future.successful(()))(implicit tx: Transaction, ec: ExecutionContext): Future[Unit] = {
     if (! node.contents.contains(key))
       Future.successful(())
     else {
@@ -180,7 +186,7 @@ object KeyValueListNode {
             tx.update(node.pointer, None, List(KeyValueUpdate.Exists(key)), List(Delete(key)))
             Future.successful(())
           case Some(lp) =>
-            reader.read(lp.pointer).map { kvos =>
+            reader.read(lp.pointer).flatMap { kvos =>
               var ops: List[KeyValueOperation] = Delete(key) :: Nil
               kvos.right match {
                 case None => ops = DeleteRight() :: ops
@@ -189,8 +195,11 @@ object KeyValueListNode {
               kvos.contents.foreach{ t =>
                 ops = Insert(t._1, t._2.value.bytes) :: ops
               }
+
               tx.update(node.pointer, Some(node.revision), List(), ops)
               tx.setRefcount(lp.pointer, kvos.refcount, kvos.refcount.decrement())
+
+              prepareForJoin(lp.minimum, lp.pointer)
             }
         }
       }
