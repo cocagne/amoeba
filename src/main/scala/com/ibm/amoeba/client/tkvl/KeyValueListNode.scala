@@ -5,6 +5,7 @@ import com.ibm.amoeba.client.{KeyValueObjectState, ObjectAllocator, ObjectReader
 import com.ibm.amoeba.common.HLCTimestamp
 import com.ibm.amoeba.common.objects._
 import com.ibm.amoeba.common.transaction.KeyValueUpdate
+import com.ibm.amoeba.common.transaction.KeyValueUpdate.{FullContentLock, KeyRevision, WithinRange}
 import com.ibm.amoeba.server.store.KVObjectState
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
@@ -20,7 +21,7 @@ class KeyValueListNode(val reader: ObjectReader,
 
   implicit val ec: ExecutionContext = reader.client.clientContext
 
-  def maximum: Option[Key] = tail.map(lp => lp.minimum)
+  def maximum: Option[Key] = tail.map(rp => rp.minimum)
 
   def refresh(): Future[KeyValueListNode] = reader.read(pointer).map { kvos =>
     new KeyValueListNode(reader, pointer, ordering, minimum,
@@ -30,6 +31,8 @@ class KeyValueListNode(val reader: ObjectReader,
   def keyInRange(key: Key): Boolean = {
     ordering.compare(key, minimum) >= 0 && maximum.forall( ordering.compare(key, _) < 0 )
   }
+
+  def fullContentLock: FullContentLock = FullContentLock(contents.iterator.map(t => KeyRevision(t._1, t._2.revision)).toList)
 
   def fetchContainingNode(target: Key,
                           blacklist: Set[ObjectId] = Set()): Future[KeyValueListNode] = {
@@ -118,7 +121,8 @@ object KeyValueListNode {
       throw new NodeSizeExceeded
 
     if (newPairSize + currentSize < maxSize) {
-      tx.update(node.pointer, Some(node.revision), None, Nil, List(Insert(key, value.bytes)))
+      tx.update(node.pointer, Some(node.revision), None,
+        List(WithinRange(key, ordering)), List(Insert(key, value.bytes)))
       Future.successful(())
     } else {
       val fullContent = node.contents + (key -> ValueState(value, tx.revision, HLCTimestamp.now))
@@ -163,7 +167,7 @@ object KeyValueListNode {
 
         val rightPtr = KeyValueListPointer(newMinimum, newObjectPointer)
 
-        tx.update(node.pointer, Some(node.revision), None, List(), SetRight(rightPtr.toArray) :: oldOps)
+        tx.update(node.pointer, Some(node.revision), Some(node.fullContentLock), List(), SetRight(rightPtr.toArray) :: oldOps)
 
         prepareForSplit(newMinimum, newObjectPointer)
       }
@@ -185,8 +189,8 @@ object KeyValueListNode {
           case None =>
             tx.update(node.pointer, None, None, List(KeyValueUpdate.Exists(key)), List(Delete(key)))
             Future.successful(())
-          case Some(lp) =>
-            reader.read(lp.pointer).flatMap { kvos =>
+          case Some(rp) =>
+            reader.read(rp.pointer).flatMap { kvos =>
               var ops: List[KeyValueOperation] = Delete(key) :: Nil
               kvos.right match {
                 case None => ops = DeleteRight() :: ops
@@ -196,10 +200,14 @@ object KeyValueListNode {
                 ops = Insert(t._1, t._2.value.bytes) :: ops
               }
 
-              tx.update(node.pointer, Some(node.revision), None, List(), ops)
-              tx.setRefcount(lp.pointer, kvos.refcount, kvos.refcount.decrement())
+              tx.update(node.pointer, Some(node.revision), None, List(KeyValueUpdate.Exists(key)), ops)
 
-              prepareForJoin(lp.minimum, lp.pointer)
+              val rightContentLock = FullContentLock(kvos.contents.iterator.map(t => KeyRevision(t._1, t._2.revision)).toList)
+              tx.update(rp.pointer, Some(kvos.revision), Some(rightContentLock), Nil, Nil)
+
+              tx.setRefcount(rp.pointer, kvos.refcount, kvos.refcount.decrement())
+
+              prepareForJoin(rp.minimum, rp.pointer)
             }
         }
       }
