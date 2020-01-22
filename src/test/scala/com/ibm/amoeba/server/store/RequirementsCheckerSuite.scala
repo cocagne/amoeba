@@ -573,6 +573,19 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
       assert(errs.isEmpty)
     }
 
+    {// content lock prevents regular locking
+      kvos.contentLocked = Some(tx2)
+      val req = KeyValueUpdate(kp1, Some(rev1), None, List(KeyValueUpdate.Exists(k1)))
+
+      val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+
+      var expected: HashMap[ObjectId, RequirementError] = new HashMap
+      expected += (o.objectId -> TransactionCollision(tx2))
+      assert(oerrs == expected)
+      assert(errs.isEmpty)
+      kvos.contentLocked = None
+    }
+
     {
       val req = KeyValueUpdate(kp1, Some(rev1), None, List(KeyValueUpdate.Exists(k1)))
 

@@ -108,10 +108,16 @@ object RequirementsChecker {
         throw ObjectErr(state.objectId, RevisionMismatch())
     }
 
-    def checkLock(vs: ValueState): Unit = {
+    def checkLock(vs: ValueState, kvs: KVObjectState): Unit = {
       vs.lockedToTransaction.foreach { lockedTransactionId =>
         if (lockedTransactionId != transactionId)
           throw ObjectErr(state.objectId, TransactionCollision(lockedTransactionId))
+      }
+      kvs.contentLocked match {
+        case None =>
+        case Some(lockedTransactionId) =>
+          if (lockedTransactionId != transactionId)
+            throw ObjectErr(state.objectId, TransactionCollision(lockedTransactionId))
       }
     }
 
@@ -128,7 +134,7 @@ object RequirementsChecker {
           if (expected != actual)
             throw ObjectErr(state.objectId, ContentMismatch())
 
-          kvs.content.valuesIterator.foreach(checkLock)
+          kvs.content.valuesIterator.foreach(checkLock(_, kvs))
         }
 
         // Check for object revision lock and read-only locks
@@ -140,7 +146,7 @@ object RequirementsChecker {
             case r: KeyValueUpdate.KeyRevision => kvs.content.get(r.key) match {
               case None => throw ObjectErr(state.objectId, KeyExistenceError())
               case Some(vs) =>
-                checkLock(vs)
+                checkLock(vs, kvs)
                 if (vs.revision != r.revision)
                   throw ObjectErr(state.objectId, RevisionMismatch())
             }
@@ -157,14 +163,14 @@ object RequirementsChecker {
 
             case r: KeyValueUpdate.Exists => kvs.content.get(r.key) match {
               case None => throw ObjectErr(state.objectId, KeyExistenceError())
-              case Some(vs) => checkLock(vs)
+              case Some(vs) => checkLock(vs, kvs)
             }
 
             case r: KeyValueUpdate.MayExist => kvs.content.get(r.key) match {
               case None =>
                 if (kvs.noExistenceLocks.contains(r.key))
                   throw ObjectErr(state.objectId, KeyExistenceError())
-              case Some(vs) => checkLock(vs)
+              case Some(vs) => checkLock(vs, kvs)
             }
 
             case r: KeyValueUpdate.DoesNotExist => kvs.content.get(r.key) match {
@@ -179,7 +185,7 @@ object RequirementsChecker {
               case Some(vs) =>
                 if (vs.timestamp != r.timestamp)
                   throw ObjectErr(state.objectId, KeyTimestampError())
-                checkLock(vs)
+                checkLock(vs, kvs)
             }
 
             case r: KeyValueUpdate.TimestampLessThan => kvs.content.get(r.key) match {
@@ -187,7 +193,7 @@ object RequirementsChecker {
               case Some(vs) =>
                 if (vs.timestamp < r.timestamp)
                   throw ObjectErr(state.objectId, KeyTimestampError())
-                checkLock(vs)
+                checkLock(vs, kvs)
             }
 
             case r: KeyValueUpdate.TimestampGreaterThan => kvs.content.get(r.key) match {
@@ -195,7 +201,7 @@ object RequirementsChecker {
               case Some(vs) =>
                 if (vs.timestamp > r.timestamp)
                   throw ObjectErr(state.objectId, KeyTimestampError())
-                checkLock(vs)
+                checkLock(vs, kvs)
             }
           }
         }
