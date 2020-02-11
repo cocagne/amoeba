@@ -24,3 +24,5 @@ class InvalidConfiguration extends KeyValueError
 
 class EmptyTree extends KeyValueError
 
+class BrokenTree extends KeyValueError
+

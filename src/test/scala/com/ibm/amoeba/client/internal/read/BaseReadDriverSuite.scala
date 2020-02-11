@@ -5,7 +5,7 @@ import java.util.UUID
 import com.ibm.amoeba.client.internal.OpportunisticRebuildManager
 import com.ibm.amoeba.client.internal.allocation.AllocationManager
 import com.ibm.amoeba.client.internal.network.Messenger
-import com.ibm.amoeba.client.{AmoebaClient, CorruptedObject, DataObjectState, InvalidObject, KeyValueObjectState, ObjectCache, RetryStrategy, StoragePool, Transaction, TransactionStatusCache}
+import com.ibm.amoeba.client.{AmoebaClient, CorruptedObject, DataObjectState, InvalidObject, KeyValueObjectState, ObjectCache, RetryStrategy, StoragePool, Transaction, TransactionStatusCache, TypeRegistry}
 import com.ibm.amoeba.common.network.{ClientId, ClientResponse, ReadResponse}
 import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp}
 import com.ibm.amoeba.common.ida.Replication
@@ -18,7 +18,6 @@ import org.scalatest.{AsyncFunSuite, Matchers}
 
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration._
-import scala.util.Failure
 
 object BaseReadDriverSuite {
   val awaitDuration = Duration(100, MILLISECONDS)
@@ -52,6 +51,8 @@ object BaseReadDriverSuite {
   class TClient(override val clientId: ClientId) extends AmoebaClient {
 
     val txStatusCache: TransactionStatusCache = TransactionStatusCache.NoCache
+
+    val typeRegistry: TypeRegistry = null
 
     def read(pointer: DataObjectPointer): Future[DataObjectState] = Future.failed(new Exception("TODO"))
     def read(pointer: KeyValueObjectPointer): Future[KeyValueObjectState] = Future.failed(new Exception("TODO"))

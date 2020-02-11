@@ -79,12 +79,14 @@ class KeyValueListNode(val reader: ObjectReader,
              value: Value,
              maxNodeSize: Int,
              allocator: ObjectAllocator,
-             prepareForSplit: (Key, KeyValueObjectPointer) => Future[Unit] = (_,_) => Future.successful(()))(implicit tx: Transaction): Future[Unit] = fetchContainingNode(key).flatMap { node =>
+             prepareForSplit: (Key, KeyValueObjectPointer) => Future[Unit] = (_,_) => Future.successful(())
+            )(implicit tx: Transaction): Future[Unit] = fetchContainingNode(key).flatMap { node =>
     KeyValueListNode.insert(node, ordering, key, value, maxNodeSize, allocator, prepareForSplit)
   }
 
   def delete(key: Key,
-             prepareForJoin: (Key, KeyValueObjectPointer) => Future[Unit] = (_,_) => Future.successful(()))(implicit tx: Transaction): Future[Unit] = fetchContainingNode(key).flatMap { node =>
+             prepareForJoin: (Key, KeyValueObjectPointer) => Future[Unit] = (_,_) => Future.successful(())
+            )(implicit tx: Transaction): Future[Unit] = fetchContainingNode(key).flatMap { node =>
     KeyValueListNode.delete(node, key, reader, prepareForJoin)
   }
 }
@@ -105,7 +107,8 @@ object KeyValueListNode {
                      value: Value,
                      maxNodeSize: Int,
                      allocator: ObjectAllocator,
-                     prepareForSplit: (Key, KeyValueObjectPointer) => Future[Unit] = (_,_) => Future.successful(()))(implicit tx: Transaction, ec: ExecutionContext): Future[Unit] =  {
+                     prepareForSplit: (Key, KeyValueObjectPointer) => Future[Unit] = (_,_) => Future.successful(())
+                    )(implicit tx: Transaction, ec: ExecutionContext): Future[Unit] =  {
 
     val currentSize = node.contents.foldLeft(0) { (sz, t) =>
       sz + KVObjectState.idaEncodedPairSize(node.pointer.ida, t._1, t._2.value)

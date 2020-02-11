@@ -10,6 +10,8 @@ import scala.concurrent.Future
 
 trait Transaction {
 
+  def client: AmoebaClient
+
   val id: TransactionId
 
   def revision: ObjectRevision = ObjectRevision(id)

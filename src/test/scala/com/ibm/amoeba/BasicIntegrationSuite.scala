@@ -1,9 +1,9 @@
 package com.ibm.amoeba
 
-import com.ibm.amoeba.client.{KeyValueObjectState, ObjectAllocator}
+import com.ibm.amoeba.client.KeyValueObjectState
 import com.ibm.amoeba.common.Nucleus
 import com.ibm.amoeba.common.ida.Replication
-import com.ibm.amoeba.common.objects.{Insert, Key, KeyValueObjectPointer, ObjectRevision, ObjectRevisionGuard, Value}
+import com.ibm.amoeba.common.objects.{Insert, Key, ObjectRevision, ObjectRevisionGuard, Value}
 import com.ibm.amoeba.common.transaction.KeyValueUpdate
 
 import scala.concurrent.Future

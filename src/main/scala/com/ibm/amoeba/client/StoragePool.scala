@@ -1,5 +1,7 @@
 package com.ibm.amoeba.client
 
+import java.util.UUID
+
 import com.ibm.amoeba.common.ida.IDA
 import com.ibm.amoeba.common.pool.PoolId
 
@@ -10,6 +12,10 @@ trait StoragePool {
   val numberOfStores: Int
 
   val maxObjectSize: Option[Int]
+
+  val defaultIDA: IDA
+
+  val allocationTreeAllocatorConfig: Option[UUID]
 
   def supportsIDA(ida: IDA): Boolean
 

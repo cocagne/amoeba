@@ -2,9 +2,9 @@ package com.ibm.amoeba
 
 import java.util.UUID
 
-import com.ibm.amoeba.client.internal.OpportunisticRebuildManager
+import com.ibm.amoeba.client.internal.{OpportunisticRebuildManager, StaticTypeRegistry}
 import com.ibm.amoeba.client.internal.allocation.{AllocationManager, BaseAllocationDriver}
-import com.ibm.amoeba.client.{AmoebaClient, DataObjectState, ExponentialBackoffRetryStrategy, KeyValueObjectState, ObjectCache, RetryStrategy, StoragePool, Transaction, TransactionStatusCache}
+import com.ibm.amoeba.client.{AmoebaClient, DataObjectState, ExponentialBackoffRetryStrategy, KeyValueObjectState, ObjectCache, RetryStrategy, StoragePool, Transaction, TransactionStatusCache, TypeRegistry}
 import com.ibm.amoeba.client.internal.network.{Messenger => ClientMessenger}
 import com.ibm.amoeba.client.internal.pool.SimpleStoragePool
 import com.ibm.amoeba.client.internal.read.{BaseReadDriver, ReadManager}
@@ -80,6 +80,8 @@ object TestNetwork {
 
     val txStatusCache: TransactionStatusCache = TransactionStatusCache.NoCache
 
+    val typeRegistry: TypeRegistry = new TypeRegistry(StaticTypeRegistry.types.toMap)
+
     val rmgr = new ReadManager(this, BaseReadDriver.noErrorRecoveryReadDriver)
 
     def read(pointer: DataObjectPointer): Future[DataObjectState] = {
@@ -96,7 +98,8 @@ object TestNetwork {
       new TransactionImpl(this, txManager, _ => 0, None)
     }
 
-    def getStoragePool(poolId: PoolId): Future[StoragePool] = Future.successful(new SimpleStoragePool(this, poolId, 3, None))
+    def getStoragePool(poolId: PoolId): Future[StoragePool] = Future.successful(new SimpleStoragePool(this,
+      poolId, 3, Replication(3,2), None, None))
 
     val retryStrategy: RetryStrategy = new ExponentialBackoffRetryStrategy(this)
 

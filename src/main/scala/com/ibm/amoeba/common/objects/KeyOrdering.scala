@@ -2,14 +2,27 @@ package com.ibm.amoeba.common.objects
 
 import java.nio.charset.StandardCharsets
 
+import com.ibm.amoeba.AmoebaError
+
 sealed abstract class KeyOrdering extends Ordering[Key] {
   def compare(a: Key, b: Key): Int
   def compare(a: Key, b: Array[Byte]): Int = compare(a, Key(b))
   def compare(a: Array[Byte], b: Key): Int = compare(Key(a), b)
   def compare(a: Array[Byte], b: Array[Byte]): Int = compare(Key(a), Key(b))
+  def code: Byte
+}
+
+object KeyOrdering {
+  def fromCode(code: Byte): KeyOrdering = code match {
+    case 0 => ByteArrayKeyOrdering
+    case 1 => IntegerKeyOrdering
+    case 2 => LexicalKeyOrdering
+    case _ => throw InvalidKeyOrdering()
+  }
 }
 
 object ByteArrayKeyOrdering extends KeyOrdering {
+  override def code: Byte = 0
   override def compare(a: Key, b: Key): Int = {
     if (b.bytes.length == 0 && a.bytes.length != 0) return 1
 
@@ -26,6 +39,7 @@ object ByteArrayKeyOrdering extends KeyOrdering {
 }
 
 object IntegerKeyOrdering extends KeyOrdering {
+  override def code: Byte = 1
   override def compare(a: Key, b: Key): Int = {
     if (a.bytes.length == 0 && b.bytes.length == 0)
       0
@@ -42,6 +56,7 @@ object IntegerKeyOrdering extends KeyOrdering {
 }
 
 object LexicalKeyOrdering extends KeyOrdering {
+  override def code: Byte = 2
   override def compare(a: Key, b: Key): Int = {
     val sa = new String(a.bytes, StandardCharsets.UTF_8)
     val sb = new String(b.bytes, StandardCharsets.UTF_8)

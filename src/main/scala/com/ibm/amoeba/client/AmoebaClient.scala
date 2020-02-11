@@ -16,6 +16,8 @@ trait AmoebaClient extends ObjectReader {
 
   val txStatusCache: TransactionStatusCache
 
+  val typeRegistry: TypeRegistry
+
   def client: AmoebaClient = this
 
   def read(pointer: DataObjectPointer): Future[DataObjectState]

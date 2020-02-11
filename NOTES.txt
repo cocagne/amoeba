@@ -1,17 +1,4 @@
 
-Object Allocater Interface
-    - SinglePoolObjectAllocater
-    - Special-case the Nucleus Pool allocater
-        - uses single pool allocater
-        - constant, zeroed pool id from Nucleus.poolId
-        - Special-case this in the getObjectAllocater(poolId: PoolId): Future[ObjectAllocater]
-            - all objects use same IDA as nucleus
-            - storeIds always use poolId + index
-
-Client Allocation Manager
-Client Allocation Driver
-
-    - Allocate a data object and test transactions on it
 
 StoragePool
     - port over the full interface

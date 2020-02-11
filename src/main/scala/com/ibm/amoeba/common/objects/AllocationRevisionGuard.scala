@@ -19,7 +19,9 @@ object AllocationRevisionGuard {
         ObjectRevisionGuard(ptr, rev)
       case 1 =>
         val ptr = KeyValueObjectPointer(bb)
-        val rev = ObjectRevision(bb)
+        val msb = bb.getLong()
+        val lsb = bb.getLong()
+        val rev = if (msb == 0 && lsb == 0) None else Some(ObjectRevision(TransactionId(new UUID(msb, lsb))))
         val klen = bb.remaining()
         val karr = new Array[Byte](klen)
         bb.get(karr)
@@ -52,7 +54,7 @@ case class ObjectRevisionGuard( pointer: ObjectPointer,
 case class KeyRevisionGuard(
                            pointer: KeyValueObjectPointer,
                            key: Key,
-                           keyRevision: ObjectRevision
+                           keyRevision: Option[ObjectRevision]
                            ) extends AllocationRevisionGuard {
 
   def serialize(): DataBuffer = {
@@ -60,7 +62,12 @@ case class KeyRevisionGuard(
     val bb = ByteBuffer.wrap(arr)
     bb.put(1.asInstanceOf[Byte])
     pointer.encodeInto(bb)
-    bb.put(keyRevision.toArray)
+    keyRevision match {
+      case Some(r) => bb.put(r.toArray)
+      case None =>
+        bb.putLong(0)
+        bb.putLong(0)
+    }
     bb.put(key.bytes)
   }
 }
