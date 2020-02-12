@@ -26,7 +26,7 @@ class TieredKeyValueList(val client: AmoebaClient,
 
   def set(key: Key, value: Value)(implicit t: Transaction): Future[Unit] = {
     def onSplit(newMinimum: Key, newNode: KeyValueObjectPointer): Future[Unit] = {
-      // TODO: Add Finalization Action
+      SplitFinalizationAction.addToTransaction(rootManager, 1, newMinimum, newNode, t)
       Future.successful(())
     }
     for {
@@ -99,7 +99,7 @@ object TieredKeyValueList {
       }
 
       val initialCandidates = currentNode.contents.iterator.
-        filter(t => ordering.compare(t._1, target) < 0).
+        filter(t => ordering.compare(t._1, target) <= 0).
         map(t => t._1 -> KeyValueObjectPointer(t._2.value.bytes)).
         filter(t => !initialBlacklist.contains(t._2.id)).
         toList.

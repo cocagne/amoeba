@@ -2,6 +2,7 @@ package com.ibm.amoeba
 
 import java.util.UUID
 
+import com.ibm.amoeba
 import com.ibm.amoeba.client.internal.{OpportunisticRebuildManager, StaticTypeRegistry}
 import com.ibm.amoeba.client.internal.allocation.{AllocationManager, BaseAllocationDriver}
 import com.ibm.amoeba.client.{AmoebaClient, DataObjectState, ExponentialBackoffRetryStrategy, KeyValueObjectState, ObjectCache, RetryStrategy, StoragePool, Transaction, TransactionStatusCache, TypeRegistry}
@@ -17,7 +18,7 @@ import com.ibm.amoeba.common.pool.PoolId
 import com.ibm.amoeba.common.store.StoreId
 import com.ibm.amoeba.common.transaction.{TransactionDescription, TransactionId}
 import com.ibm.amoeba.common.util.{BackgroundTask, BackgroundTaskPool}
-import com.ibm.amoeba.server.StoreManager
+import com.ibm.amoeba.server.{StoreManager, transaction}
 import com.ibm.amoeba.server.crl.{AllocSaveComplete, AllocationRecoveryState, CrashRecoveryLog, CrashRecoveryLogClient, CrashRecoveryLogFactory, SaveCompletionHandler, TransactionRecoveryState, TxSaveComplete, TxSaveId}
 import com.ibm.amoeba.server.network.{Messenger => ServerMessenger}
 import com.ibm.amoeba.server.store.Bootstrap
@@ -54,6 +55,7 @@ object TestNetwork {
     override def createCRL(completionHandler: SaveCompletionHandler): CrashRecoveryLog = new TestCRL(completionHandler)
   }
 
+  /*
   class NullFinalizer extends TransactionFinalizer {
     override def complete: Future[Unit] = Future.successful(())
 
@@ -68,7 +70,7 @@ object TestNetwork {
   object NullFinalizer extends TransactionFinalizer.Factory {
     override def create(txd: TransactionDescription, messenger: ServerMessenger): TransactionFinalizer = new NullFinalizer
   }
-
+  */
 
   class TClient(msngr: ClientMessenger) extends AmoebaClient {
 
@@ -148,8 +150,16 @@ class TestNetwork extends ServerMessenger {
 
   val nucleus: KeyValueObjectPointer = Bootstrap.initialize(ida, List(store0, store1, store2))
 
+  object FinalizerFactory extends TransactionFinalizer.Factory {
+    var client: AmoebaClient = null
+
+    def create(txd: TransactionDescription, messenger: ServerMessenger): TransactionFinalizer = {
+      new amoeba.server.transaction.TransactionFinalizer.TransactionFinalizerWrapper(client.createFinalizerFor(txd))
+    }
+  }
+
   val smgr = new StoreManager(objectCacheFactory, this, BackgroundTask.NoBackgroundTasks,
-    TestCRL, NullFinalizer, TransactionDriver.noErrorRecoveryFactory,
+    TestCRL, FinalizerFactory, TransactionDriver.noErrorRecoveryFactory,
     List(store0, store1, store2))
 
 
@@ -172,6 +182,8 @@ class TestNetwork extends ServerMessenger {
   }
 
   val client = new TClient(cliMessenger)
+
+  FinalizerFactory.client = client
 
   // process load store events
   smgr.handleEvents()

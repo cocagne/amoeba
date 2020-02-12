@@ -6,6 +6,7 @@ import com.ibm.amoeba.client.internal.network.Messenger
 import com.ibm.amoeba.common.network.{ClientId, ClientResponse}
 import com.ibm.amoeba.common.objects.{DataObjectPointer, KeyValueObjectPointer}
 import com.ibm.amoeba.common.pool.PoolId
+import com.ibm.amoeba.common.transaction.TransactionDescription
 import com.ibm.amoeba.common.util.BackgroundTask
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -74,4 +75,12 @@ trait AmoebaClient extends ObjectReader {
 
   private[amoeba] def getSystemAttribute(key: String): Option[String]
   private[amoeba] def setSystemAttribute(key: String, value: String): Unit
+
+  private[amoeba] def createFinalizerFor(txd: TransactionDescription): TransactionFinalizer = {
+    val actions = txd.finalizationActions.map { sfa =>
+      typeRegistry.getType[FinalizationActionFactory](sfa.typeId.uuid).get.createFinalizationAction(this, sfa.data)
+    }
+
+    new TransactionFinalizer(this, actions)
+  }
 }

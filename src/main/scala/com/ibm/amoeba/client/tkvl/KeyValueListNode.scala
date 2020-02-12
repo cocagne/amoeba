@@ -50,7 +50,8 @@ class KeyValueListNode(val reader: ObjectReader,
           kvos.revision, kvos.contents, kvos.right.map(v => KeyValueListPointer(v.bytes)))
 
         node.tail match {
-          case None => p.success(node)
+          case None =>
+            p.success(node)
           case Some(next) =>
             if (node.keyInRange(target) || blacklist.contains(next.pointer.id))
               p.success(node)
@@ -124,7 +125,8 @@ object KeyValueListNode {
       throw new NodeSizeExceeded
 
     if (newPairSize + currentSize < maxSize) {
-      tx.update(node.pointer, Some(node.revision), None,
+
+      tx.update(node.pointer, None, None,
         List(WithinRange(key, ordering)), List(Insert(key, value.bytes)))
       Future.successful(())
     } else {

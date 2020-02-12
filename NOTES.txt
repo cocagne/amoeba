@@ -1,4 +1,5 @@
-
+Need a finalizer factory
+    - for testing, use null client pointer
 
 StoragePool
     - port over the full interface

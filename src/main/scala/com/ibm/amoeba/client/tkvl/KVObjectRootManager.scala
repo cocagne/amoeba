@@ -18,39 +18,36 @@ class KVObjectRootManager(val client: AmoebaClient,
 
   implicit val ec: ExecutionContext = client.clientContext
 
-  private var oroot: Option[Future[RData]] = None
-
   def typeId: RootManagerTypeId = RootManagerTypeId(typeUUID)
 
   /** Returns (numTiers, keyOrdering, rootNode) */
-  private def getRoot(): Future[RData] = synchronized {
-    oroot match {
-      case Some(future) => future
-      case None =>
-        val p = Promise[RData]()
+  private def getRoot(): Future[RData] = {
+    val p = Promise[RData]()
 
-        oroot = Some(p.future)
-
-        client.read(pointer).onComplete {
-          case Failure(err) => p.failure(err)
-          case Success(container) => container.contents.get(treeKey) match {
-            case None => p.failure(new InvalidRoot)
-            case Some(v) => try {
-              val root = Root(client, v.value.bytes)
-              client.read(root.rootObject).onComplete {
-                case Failure(err) => p.failure(err)
-                case Success(rootKvos) =>
-                  val rootLp = KeyValueListPointer(Key.AbsoluteMinimum, root.rootObject)
-                  val node = KeyValueListNode(client, rootLp, root.ordering, rootKvos)
-                  p.success(RData(root, v.revision, node))
-              }
-            } catch {
-              case _: Throwable => p.failure(new InvalidRoot)
-            }
+    client.read(pointer).onComplete {
+      case Failure(err) => p.failure(err)
+      case Success(container) => container.contents.get(treeKey) match {
+        case None => p.failure(new InvalidRoot)
+        case Some(v) => try {
+          val root = Root(client, v.value.bytes)
+          client.read(root.rootObject).onComplete {
+            case Failure(err) => p.failure(err)
+            case Success(rootKvos) =>
+              val rootLp = KeyValueListPointer(Key.AbsoluteMinimum, root.rootObject)
+              val node = KeyValueListNode(client, rootLp, root.ordering, rootKvos)
+              p.success(RData(root, v.revision, node))
           }
+        } catch {
+          case _: Throwable => p.failure(new InvalidRoot)
         }
-        p.future
+      }
     }
+
+    p.future
+  }
+
+  def getTree(): Future[TieredKeyValueList] = getRoot().map { rd =>
+    new TieredKeyValueList(client, this)
   }
 
   def getAllocatorForTier(tier: Int): Future[ObjectAllocator] = getRoot().flatMap { rd =>
@@ -75,9 +72,7 @@ class KVObjectRootManager(val client: AmoebaClient,
     arr
   }
 
-  def prepareRootUpdate(newTier: Int, newRoot: KeyValueObjectPointer)(implicit tx: Transaction): Future[Unit] = synchronized {
-    oroot = None
-
+  def prepareRootUpdate(newTier: Int, newRoot: KeyValueObjectPointer)(implicit tx: Transaction): Future[Unit] = {
     getRoot().map { rd =>
       if (rd.root.tier != newTier) {
         val data = rd.root.copy(tier=newTier, rootObject=newRoot).encode()
@@ -90,8 +85,8 @@ class KVObjectRootManager(val client: AmoebaClient,
     }
   }
 
-  def getRootRevisionGuard(): Future[AllocationRevisionGuard] = synchronized {
-    oroot = None
+  def getRootRevisionGuard(): Future[AllocationRevisionGuard] = {
+
     getRoot().map { rd =>
       KeyRevisionGuard(rd.node.pointer, treeKey, Some(rd.rootRevision))
     }

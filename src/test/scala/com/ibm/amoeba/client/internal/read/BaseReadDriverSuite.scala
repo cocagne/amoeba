@@ -5,7 +5,7 @@ import java.util.UUID
 import com.ibm.amoeba.client.internal.OpportunisticRebuildManager
 import com.ibm.amoeba.client.internal.allocation.AllocationManager
 import com.ibm.amoeba.client.internal.network.Messenger
-import com.ibm.amoeba.client.{AmoebaClient, CorruptedObject, DataObjectState, InvalidObject, KeyValueObjectState, ObjectCache, RetryStrategy, StoragePool, Transaction, TransactionStatusCache, TypeRegistry}
+import com.ibm.amoeba.client.{AmoebaClient, CorruptedObject, DataObjectState, InvalidObject, KeyValueObjectState, ObjectCache, RetryStrategy, StoragePool, Transaction, TransactionFinalizer, TransactionStatusCache, TypeRegistry}
 import com.ibm.amoeba.common.network.{ClientId, ClientResponse, ReadResponse}
 import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp}
 import com.ibm.amoeba.common.ida.Replication
@@ -79,6 +79,8 @@ object BaseReadDriverSuite {
 
     private[amoeba] def getSystemAttribute(key: String): Option[String] = None
     private[amoeba] def setSystemAttribute(key: String, value: String): Unit = ()
+
+    //private[amoeba] def createFinalizerFor(txd: TransactionDescription): TransactionFinalizer = null
   }
 
 }

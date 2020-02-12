@@ -3,13 +3,20 @@ package com.ibm.amoeba.client
 import com.ibm.amoeba.common.objects.ObjectId
 import com.ibm.amoeba.common.store.StoreId
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future, Promise}
 
-trait FinalizationAction {
+class TransactionFinalizer(client: AmoebaClient,
+                           actions: List[FinalizationAction]) {
 
-  def complete: Future[Unit]
+  implicit val ec: ExecutionContext = client.clientContext
 
-  def execute(): Unit
+  private val completionPromise: Promise[Unit] = Promise()
+
+  completionPromise.completeWith(Future.sequence(actions.map(_.complete)).map(_=>()))
+
+  actions.foreach(_.execute())
+
+  def complete: Future[Unit] = completionPromise.future
 
   /** Called each time an TxCommitted message is received from a new peer. The provided map contains the
     * aggregated content from all previously-received TxCommitted messages. The list of UUIDs contains the
@@ -21,12 +28,16 @@ trait FinalizationAction {
     * them sending Accepted messages) may delay action for some time to receive additional notifications
     * via this callback.
     */
-  def updateCommitErrors(commitErrors: Map[StoreId, List[ObjectId]]): Unit = ()
-
-  def debugStatus: (String, Boolean) = synchronized {
-    (this.getClass.toString, complete.isCompleted)
+  def updateCommitErrors(commitErrors: Map[StoreId, List[ObjectId]]): Unit = {
+    actions.foreach(_.updateCommitErrors(commitErrors))
   }
 
+  /**
+    * @return List of (test-class-name, is-complete)
+    */
+  def debugStatus: List[(String, Boolean)] = actions.map(_.debugStatus)
+
   /** Called when a TxFinalized message is received. */
-  def cancel(): Unit = ()
+  def cancel(): Unit = actions.foreach(_.cancel())
+
 }

@@ -7,7 +7,7 @@ import com.ibm.amoeba.client._
 import com.ibm.amoeba.common.objects.{Key, KeyOrdering, KeyValueObjectPointer, ObjectId, Value}
 import com.ibm.amoeba.common.transaction.FinalizationActionId
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future, Promise}
 
 class SplitFinalizationAction(val client: AmoebaClient,
                               val rootManager: RootManager,
@@ -17,64 +17,72 @@ class SplitFinalizationAction(val client: AmoebaClient,
 
   implicit val ec: ExecutionContext = client.clientContext
 
-  def execute(): Future[Unit] = client.retryStrategy.retryUntilSuccessful {
+  private val completionPromise: Promise[Unit] = Promise()
 
-    def createNewRoot(rootTier: Int, ordering: KeyOrdering, rootNode: KeyValueListNode): Future[Unit] = {
-      implicit val tx: Transaction = client.newTransaction()
+  def complete: Future[Unit] = completionPromise.future
 
-      val rootContent = Map(
-        rootNode.minimum -> Value(rootNode.pointer.toArray),
-        newMinimum -> Value(newNode.toArray)
-      )
+  def execute(): Unit = {
+    val fcomplete = client.retryStrategy.retryUntilSuccessful {
 
-      for {
-        alloc <- rootManager.getAllocatorForTier(tier)
-        guard <- rootManager.getRootRevisionGuard()
-        nroot <- alloc.allocateKeyValueObject(guard, rootContent)
-        _ <- rootManager.prepareRootUpdate(tier, nroot)
-        _ <- tx.commit()
-      } yield ()
-    }
+      def createNewRoot(rootTier: Int, ordering: KeyOrdering, rootNode: KeyValueListNode): Future[Unit] = {
+        implicit val tx: Transaction = client.newTransaction()
 
-    def insertIntoExistingTier(rootTier: Int, ordering: KeyOrdering, rootNode: KeyValueListNode): Future[Unit] = {
+        val rootContent = Map(
+          rootNode.minimum -> Value(rootNode.pointer.toArray),
+          newMinimum -> Value(newNode.toArray)
+        )
 
-      implicit val tx: Transaction = client.newTransaction()
-
-      val fe = TieredKeyValueList.fetchContainingNode(client, rootTier, tier, ordering, newMinimum, rootNode, Set())
-      val fnodeSize = rootManager.getMaxNodeSize(tier)
-      val falloc = rootManager.getAllocatorForTier(tier)
-
-      def prepareInsert(e: Either[Set[ObjectId], KeyValueListNode], nodeSize: Int, alloc: ObjectAllocator): Future[Unit] = {
-        e match {
-          case Left(_) => Future.failed(new BrokenTree)
-          case Right(node) =>
-
-            def onSplit(min: Key, ptr: KeyValueObjectPointer): Future[Unit] = {
-              SplitFinalizationAction.addToTransaction(rootManager, tier+1, min, ptr, tx)
-              Future.successful(())
-            }
-
-            node.insert(newMinimum, Value(newNode.toArray), nodeSize, alloc, onSplit)
-
-        }
+        for {
+          alloc <- rootManager.getAllocatorForTier(tier)
+          guard <- rootManager.getRootRevisionGuard()
+          nroot <- alloc.allocateKeyValueObject(guard, rootContent)
+          _ <- rootManager.prepareRootUpdate(tier, nroot)
+          _ <- tx.commit()
+        } yield ()
       }
 
-      for {
-        e <- fe
-        nodeSize <- fnodeSize
-        alloc <- falloc
-        _ <- prepareInsert(e, nodeSize, alloc)
-        _ <- tx.commit()
-      } yield ()
+      def insertIntoExistingTier(rootTier: Int, ordering: KeyOrdering, rootNode: KeyValueListNode): Future[Unit] = {
+
+        implicit val tx: Transaction = client.newTransaction()
+
+        val fe = TieredKeyValueList.fetchContainingNode(client, rootTier, tier, ordering, newMinimum, rootNode, Set())
+        val fnodeSize = rootManager.getMaxNodeSize(tier)
+        val falloc = rootManager.getAllocatorForTier(tier)
+
+        def prepareInsert(e: Either[Set[ObjectId], KeyValueListNode], nodeSize: Int, alloc: ObjectAllocator): Future[Unit] = {
+          e match {
+            case Left(_) => Future.failed(new BrokenTree)
+            case Right(node) =>
+
+              def onSplit(min: Key, ptr: KeyValueObjectPointer): Future[Unit] = {
+                SplitFinalizationAction.addToTransaction(rootManager, tier+1, min, ptr, tx)
+                Future.successful(())
+              }
+
+              node.insert(newMinimum, Value(newNode.toArray), nodeSize, alloc, onSplit)
+
+          }
+        }
+
+        for {
+          e <- fe
+          nodeSize <- fnodeSize
+          alloc <- falloc
+          _ <- prepareInsert(e, nodeSize, alloc)
+          _ <- tx.commit()
+        } yield ()
+      }
+
+      rootManager.getRootNode().flatMap { t =>
+        val (rootTier, ordering, rootNode) = t
+        if (tier > rootTier)
+          createNewRoot(rootTier, ordering, rootNode)
+        else
+          insertIntoExistingTier(rootTier, ordering, rootNode)
+      }
     }
 
-    rootManager.getRootNode().flatMap { t =>
-      val (rootTier, ordering, rootNode) = t
-      if (tier > rootTier)
-        createNewRoot(rootTier, ordering, rootNode)
-      else
-        insertIntoExistingTier(rootTier, ordering, rootNode)
-    }
+    completionPromise.completeWith(fcomplete)
   }
 }
 
