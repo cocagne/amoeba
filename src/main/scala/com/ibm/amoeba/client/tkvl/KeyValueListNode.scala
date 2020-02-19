@@ -16,6 +16,7 @@ class KeyValueListNode(val reader: ObjectReader,
                        val ordering: KeyOrdering,
                        val minimum: Key,
                        val revision: ObjectRevision,
+                       val refcount: ObjectRefcount,
                        val contents: Map[Key, ValueState],
                        val tail: Option[KeyValueListPointer]) {
 
@@ -25,7 +26,7 @@ class KeyValueListNode(val reader: ObjectReader,
 
   def refresh(): Future[KeyValueListNode] = reader.read(pointer).map { kvos =>
     new KeyValueListNode(reader, pointer, ordering, minimum,
-      kvos.revision, kvos.contents, kvos.right.map(v => KeyValueListPointer(v.bytes)))
+      kvos.revision, kvos.refcount, kvos.contents, kvos.right.map(v => KeyValueListPointer(v.bytes)))
   }
 
   def keyInRange(key: Key): Boolean = {
@@ -47,7 +48,7 @@ class KeyValueListNode(val reader: ObjectReader,
 
       case Success(kvos) =>
         val node = new KeyValueListNode(reader, right.pointer, ordering, right.minimum,
-          kvos.revision, kvos.contents, kvos.right.map(v => KeyValueListPointer(v.bytes)))
+          kvos.revision, kvos.refcount, kvos.contents, kvos.right.map(v => KeyValueListPointer(v.bytes)))
 
         node.tail match {
           case None =>
@@ -98,7 +99,7 @@ object KeyValueListNode {
             ordering: KeyOrdering,
             kvos: KeyValueObjectState): KeyValueListNode = {
     new KeyValueListNode(reader, pointer.pointer, ordering, pointer.minimum, kvos.revision,
-      kvos.contents, kvos.right.map(v => KeyValueListPointer(v.bytes)))
+      kvos.refcount, kvos.contents, kvos.right.map(v => KeyValueListPointer(v.bytes)))
   }
 
   // Implemented as a non-class member to prevent accidental use of member variables instead of "node." attributes
@@ -172,7 +173,8 @@ object KeyValueListNode {
 
         val rightPtr = KeyValueListPointer(newMinimum, newObjectPointer)
 
-        tx.update(node.pointer, Some(node.revision), Some(node.fullContentLock), List(), SetRight(rightPtr.toArray) :: oldOps)
+        tx.update(node.pointer, Some(node.revision), Some(node.fullContentLock), List(),
+          SetMax(newMinimum) :: SetRight(rightPtr.toArray) :: oldOps)
 
         prepareForSplit(newMinimum, newObjectPointer)
       }
@@ -183,18 +185,22 @@ object KeyValueListNode {
              key: Key,
              reader: ObjectReader,
              prepareForJoin: (Key, KeyValueObjectPointer) => Future[Unit] = (_,_) => Future.successful(()))(implicit tx: Transaction, ec: ExecutionContext): Future[Unit] = {
+    println(s"In delete for key $key. Node: ${node.pointer.id} Contents size ${node.contents.size}. Keys ${node.contents.keys.toList}")
     if (! node.contents.contains(key))
       Future.successful(())
     else {
       if (node.contents.size > 1) {
+        println("    Multi-key delete")
         tx.update(node.pointer, None, None, List(KeyValueUpdate.Exists(key)), List(Delete(key)))
         Future.successful(())
       } else {
         node.tail match {
           case None =>
+            println(s"   Simple single key Delete")
             tx.update(node.pointer, None, None, List(KeyValueUpdate.Exists(key)), List(Delete(key)))
             Future.successful(())
           case Some(rp) =>
+            println(s"    Joining Delete")
             reader.read(rp.pointer).flatMap { kvos =>
               var ops: List[KeyValueOperation] = Delete(key) :: Nil
               kvos.right match {

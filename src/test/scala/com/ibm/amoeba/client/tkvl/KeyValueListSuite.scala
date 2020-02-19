@@ -3,7 +3,7 @@ package com.ibm.amoeba.client.tkvl
 import com.ibm.amoeba.IntegrationTestSuite
 import com.ibm.amoeba.common.Nucleus
 import com.ibm.amoeba.common.ida.Replication
-import com.ibm.amoeba.common.objects.{ByteArrayKeyOrdering, Key, ObjectRevisionGuard, Value}
+import com.ibm.amoeba.common.objects.{ByteArrayKeyOrdering, Key, ObjectRefcount, ObjectRevisionGuard, Value}
 
 class KeyValueListSuite extends IntegrationTestSuite {
 
@@ -21,7 +21,7 @@ class KeyValueListSuite extends IntegrationTestSuite {
       lptr <- alloc.allocateKeyValueObject(ObjectRevisionGuard(nucleus, ikvos.revision), Map(), None, None, None)
 
       lst = new KeyValueListNode(client, lptr, ByteArrayKeyOrdering, Key.AbsoluteMinimum, tx.revision,
-        Map(), None)
+        ObjectRefcount(0,1), Map(), None)
 
       _ <- lst.insert(key, value, 100, alloc)
 
@@ -56,7 +56,7 @@ class KeyValueListSuite extends IntegrationTestSuite {
       lptr <- alloc.allocateKeyValueObject(ObjectRevisionGuard(nucleus, ikvos.revision), Map(), None, None, None)(tx)
 
       lst = new KeyValueListNode(client, lptr, ByteArrayKeyOrdering, Key.AbsoluteMinimum, tx.revision,
-        Map(), None)
+        ObjectRefcount(0,1), Map(), None)
 
       _ <- lst.insert(key, value, 100, alloc)(tx)
 
@@ -98,7 +98,7 @@ class KeyValueListSuite extends IntegrationTestSuite {
       lptr <- alloc.allocateKeyValueObject(ObjectRevisionGuard(nucleus, ikvos.revision), Map(), None, None, None)(tx)
 
       lst = new KeyValueListNode(client, lptr, ByteArrayKeyOrdering, Key.AbsoluteMinimum, tx.revision,
-        Map(), None)
+        ObjectRefcount(0,1), Map(), None)
 
 
       _ <- lst.insert(key, value, 100, alloc)(tx)
@@ -141,7 +141,7 @@ class KeyValueListSuite extends IntegrationTestSuite {
       lptr <- alloc.allocateKeyValueObject(ObjectRevisionGuard(nucleus, ikvos.revision), Map(), None, None, None)(tx)
 
       lst = new KeyValueListNode(client, lptr, ByteArrayKeyOrdering, Key.AbsoluteMinimum, tx.revision,
-        Map(), None)
+        ObjectRefcount(0,1), Map(), None)
 
       _ <- lst.insert(key, value, 100, alloc)(tx)
 
@@ -186,7 +186,7 @@ class KeyValueListSuite extends IntegrationTestSuite {
       lptr <- alloc.allocateKeyValueObject(ObjectRevisionGuard(nucleus, ikvos.revision), Map(), None, None, None)(tx)
 
       lst = new KeyValueListNode(client, lptr, ByteArrayKeyOrdering, Key.AbsoluteMinimum, tx.revision,
-        Map(), None)
+        ObjectRefcount(0,1), Map(), None)
 
       _ <- lst.insert(key, value, 100, alloc)(tx)
 
@@ -238,7 +238,7 @@ class KeyValueListSuite extends IntegrationTestSuite {
       lptr <- alloc.allocateKeyValueObject(ObjectRevisionGuard(nucleus, ikvos.revision), Map(), None, None, None)(tx)
 
       lst = new KeyValueListNode(client, lptr, ByteArrayKeyOrdering, Key.AbsoluteMinimum, tx.revision,
-        Map(), None)
+        ObjectRefcount(0,1), Map(), None)
 
       _ <- lst.insert(key, value, 100, alloc)(tx)
       _ <- tx.commit().map(_=>())
@@ -306,7 +306,7 @@ class KeyValueListSuite extends IntegrationTestSuite {
       lptr <- alloc.allocateKeyValueObject(ObjectRevisionGuard(nucleus, ikvos.revision), Map(), None, None, None)(tx)
 
       lst = new KeyValueListNode(client, lptr, ByteArrayKeyOrdering, Key.AbsoluteMinimum, tx.revision,
-        Map(), None)
+        ObjectRefcount(0,1), Map(), None)
 
       _ <- lst.insert(key, value, 100, alloc)(tx)
       _ <- tx.commit().map(_=>())

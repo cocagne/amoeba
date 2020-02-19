@@ -51,8 +51,9 @@ class KeyValueObjectReader(metadataOnly: Boolean, pointer: KeyValueObjectPointer
 
       if (lright.size < threshold)
         throw BaseObjectReader.NotRestorable(s"KVObject right object attribute is below threshold")
-      else
+      else {
         Some(Value(pointer.ida.restoreArray(lright)))
+      }
     } else {
       None
     }

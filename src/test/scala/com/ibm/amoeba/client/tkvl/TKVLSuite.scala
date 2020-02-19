@@ -131,4 +131,63 @@ class TKVLSuite extends IntegrationTestSuite {
       numTiers should be (1)
     }
   }
+
+  test("Joining tree deletion with tier reduction") {
+    val treeKey = Key(Array[Byte](0))
+    val key = Key(Array[Byte](1))
+    val value = Value(Array[Byte](3))
+
+    val key2 = Key(Array[Byte](4))
+    val value2 = Value(new Array[Byte](512*1024))
+
+    val key3 = Key(Array[Byte](7))
+    val value3 = Value(new Array[Byte](512*1024))
+
+    implicit val tx1: Transaction = client.newTransaction()
+
+    for {
+      ikvos <- client.read(nucleus)
+      pool <- client.getStoragePool(Nucleus.poolId)
+      alloc = pool.createAllocater(Replication(3,2))
+
+      ptr <- alloc.allocateKeyValueObject(ObjectRevisionGuard(nucleus, ikvos.revision), Map(), None, None, None)
+
+      nodeAllocator = new SinglePoolNodeAllocator(client, Nucleus.poolId)
+
+      froot <- KVObjectRootManager.createNewTree(client, ptr, treeKey, ByteArrayKeyOrdering, nodeAllocator, Map(key -> value))
+
+      _ <- tx1.commit()
+
+      root <- froot
+      tree <- root.getTree()
+
+      tx = client.newTransaction()
+      _ <- tree.set(key2, value2)(tx)
+      r <- tx.commit()
+
+      tx = client.newTransaction()
+      _ <- tree.set(key3, value3)(tx)
+      r <- tx.commit()
+
+      tx = client.newTransaction()
+      _ <- tree.delete(key2)(tx)
+      r <- tx.commit()
+
+      tx = client.newTransaction()
+      _ <- tree.delete(key)(tx)
+      r <- tx.commit()
+
+      _ <- waitForTransactionsToComplete()
+
+      tree <- root.getTree()
+      v <- tree.get(key3)
+      (numTiers, _, _) <- tree.rootManager.getRootNode()
+
+    } yield {
+      v.isEmpty should be (false)
+      val vs = v.get
+      vs.value.bytes.length should be (512*1024)
+      numTiers should be (1)
+    }
+  }
 }

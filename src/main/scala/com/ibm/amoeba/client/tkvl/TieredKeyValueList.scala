@@ -45,8 +45,10 @@ class TieredKeyValueList(val client: AmoebaClient,
   }
 
   def delete(key: Key)(implicit t: Transaction): Future[Unit] = {
+    println(s"Deletin key $key")
     def onJoin(delMinimum: Key, delNode: KeyValueObjectPointer): Future[Unit] = {
-      // TODO: Add Finalization Action
+      println(s"ON JOIN CB")
+      JoinFinalizationAction.addToTransaction(rootManager, 1, delMinimum, delNode, t)
       Future.successful(())
     }
     for {
@@ -130,11 +132,11 @@ object TieredKeyValueList {
         case Failure(_) => p.success(Left(blacklist + pointer.id))
 
         case Success(kvos) =>
-          val tail = kvos.maximum.map { max =>
-            KeyValueListPointer(max, KeyValueObjectPointer(kvos.right.get.bytes))
-          }
+
+          val tail = kvos.right.map(right => KeyValueListPointer(right.bytes))
+
           val node = new KeyValueListNode(client, pointer, ordering, minimum,
-            kvos.revision, kvos.contents, tail)
+            kvos.revision, kvos.refcount, kvos.contents, tail)
           p.success(Right(node))
       }
 

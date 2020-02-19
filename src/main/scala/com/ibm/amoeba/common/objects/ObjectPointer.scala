@@ -196,6 +196,7 @@ object ObjectPointer {
     val totalSize = numBytesNeededToEncode(o) + numPaddingBytes.getOrElse(0)
     val arr = new Array[Byte](totalSize)
     val bb = ByteBuffer.wrap(arr)
+    bb.order(ByteOrder.BIG_ENDIAN) // ensure big-endian
 
     encodeInto(bb, o)
 
