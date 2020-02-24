@@ -80,19 +80,19 @@ class StoreManager(val objectCacheFactory: () => ObjectCache,
   }
 
   def loadStore(backend: Backend): Unit = {
-    events.add(LoadStore(backend))
+    events.put(LoadStore(backend))
   }
 
   def receiveTransactionMessage(msg: TxMessage): Unit = {
-    events.add(TransactionMessage(msg))
+    events.put(TransactionMessage(msg))
   }
 
   def receiveClientRequest(msg: ClientRequest): Unit = {
-    events.add(ClientReq(msg))
+    events.put(ClientReq(msg))
   }
 
   def shutdown()(implicit ec: ExecutionContext): Future[Unit] = {
-    events.add(Exit())
+    events.put(Exit())
     shutdownPromise.future
   }
 

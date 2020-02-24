@@ -148,20 +148,23 @@ class TransactionImpl(val client: AmoebaClient,
         if (txd.requirements.isEmpty)
           promise.success(txd.startTimestamp)
         else {
+
           txManager.runTransaction(txd, transactionData, transactionDriverStrategy) onComplete {
             case Failure(cause) =>
               // TODO Catch transaction timeout from lower layer and convert to TransactionError.TransactionTimedOut
               client.txStatusCache.transactionAborted(txd.transactionId)
               promise.failure(cause)
             case Success(committed) =>
+
               if (committed) {
                 val ts = txd.startTimestamp
                 HLCTimestamp.update(ts)
                 client.txStatusCache.transactionCommitted(txd.transactionId)
                 promise.success(ts)
-              } else
+              } else {
+                client.txStatusCache.transactionAborted(txd.transactionId)
                 promise.failure(TransactionAborted(txd))
-
+              }
           }
         }
       }

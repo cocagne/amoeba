@@ -162,20 +162,23 @@ class TestNetwork extends ServerMessenger {
     TestCRL, FinalizerFactory, TransactionDriver.noErrorRecoveryFactory,
     List(store0, store1, store2))
 
+  private def handleEvents(): Unit = {
+    smgr.handleEvents()
+    //while (smgr.hasTransactions) {
+      //smgr.handleEvents()
+    //}
+  }
 
   private val cliMessenger = new ClientMessenger {
 
     def sendClientRequest(msg: ClientRequest): Unit = {
       smgr.receiveClientRequest(msg)
-      while (smgr.hasEvents)
-        smgr.handleEvents()
+      handleEvents()
     }
 
     def sendTransactionMessage(msg: TxMessage): Unit = {
       smgr.receiveTransactionMessage(msg)
-
-      while (smgr.hasEvents)
-        smgr.handleEvents()
+      handleEvents()
     }
 
     def sendTransactionMessages(msg: List[TxMessage]): Unit = sendTransactionMessages(msg)
@@ -190,18 +193,18 @@ class TestNetwork extends ServerMessenger {
 
   override def sendClientResponse(msg: ClientResponse): Unit = {
     client.receiveClientResponse(msg)
+    handleEvents()
   }
 
   override def sendTransactionMessage(msg: TxMessage): Unit = {
-
     smgr.receiveTransactionMessage(msg)
-
-    while (smgr.hasEvents)
-      smgr.handleEvents()
-
+    handleEvents()
   }
 
-  override def sendTransactionMessages(msg: List[TxMessage]): Unit = msg.foreach(sendTransactionMessage)
+  override def sendTransactionMessages(msg: List[TxMessage]): Unit = {
+    msg.foreach(smgr.receiveTransactionMessage)
+    handleEvents()
+  }//msg.foreach(sendTransactionMessage)
 
   def printTransactionStatus(): Unit = {
     println("*********** Transaction Status ***********")

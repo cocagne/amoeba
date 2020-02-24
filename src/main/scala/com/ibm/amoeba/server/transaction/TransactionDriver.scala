@@ -381,6 +381,7 @@ abstract class TransactionDriver(
         messenger.sendClientResponse(TransactionResolved(clientId, storeId, txd.transactionId, committed))
       }
     }
+
   }
 }
 

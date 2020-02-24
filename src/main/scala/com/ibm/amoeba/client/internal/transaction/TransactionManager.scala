@@ -33,6 +33,7 @@ class TransactionManager(val client: AmoebaClient,
   }
 
   def receive(resolved: TransactionResolved): Unit = {
+
     val otd = synchronized { transactions.get(resolved.transactionId) }
     otd.foreach { td =>
       td.receive(resolved)

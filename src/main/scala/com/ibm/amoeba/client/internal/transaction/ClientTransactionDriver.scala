@@ -58,8 +58,10 @@ class ClientTransactionDriver(
 
   def receive(resolved: TransactionResolved): Unit = synchronized { complete(resolved.committed) }
 
-  protected def sendPrepareMessages(): Unit = synchronized {
-    if (!promise.isCompleted) {
+  protected def sendPrepareMessages(): Unit = {
+    val isCompleted = synchronized { promise.isCompleted }
+
+    if (!isCompleted) {
       val poolId = txd.primaryObject.poolId
 
       val fromStore = StoreId(poolId, txd.designatedLeaderUID)

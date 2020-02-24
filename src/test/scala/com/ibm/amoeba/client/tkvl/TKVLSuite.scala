@@ -168,16 +168,18 @@ class TKVLSuite extends IntegrationTestSuite {
       tx = client.newTransaction()
       _ <- tree.set(key3, value3)(tx)
       r <- tx.commit()
-
+      _=println("-- Pre Delete")
       tx = client.newTransaction()
       _ <- tree.delete(key2)(tx)
+      _=println("Committing first delete")
       r <- tx.commit()
-
+      _=println("-- Post Delete 1")
       tx = client.newTransaction()
       _ <- tree.delete(key)(tx)
       r <- tx.commit()
-
+      _=println("-- Post Delete 2")
       _ <- waitForTransactionsToComplete()
+      _=println("-- all tx complete")
 
       tree <- root.getTree()
       v <- tree.get(key3)
