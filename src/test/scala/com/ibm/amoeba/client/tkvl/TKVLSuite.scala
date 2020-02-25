@@ -188,7 +188,7 @@ class TKVLSuite extends IntegrationTestSuite {
       v.isEmpty should be (false)
       val vs = v.get
       vs.value.bytes.length should be (512*1024)
-      numTiers should be (1)
+      numTiers should be (0)
     }
   }
 }

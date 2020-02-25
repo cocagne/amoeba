@@ -22,9 +22,9 @@ class JoinFinalizationAction(val client: AmoebaClient,
   def complete: Future[Unit] = completionPromise.future
 
   def execute(): Unit = {
-    println("In JoinFA")
+
     val fcomplete = client.retryStrategy.retryUntilSuccessful {
-      println(s"Attempting Join")
+
       def setNewRoot(rootTier: Int, ordering: KeyOrdering, rootNode: KeyValueListNode): Future[Unit] = {
         implicit val tx: Transaction = client.newTransaction()
 
@@ -32,7 +32,7 @@ class JoinFinalizationAction(val client: AmoebaClient,
         val newRoot = KeyValueObjectPointer(rootNode.contents(Key.AbsoluteMinimum).value.bytes)
 
         tx.setRefcount(rootNode.pointer, rootNode.refcount, rootNode.refcount.decrement())
-        println("****** Setting new root")
+
         for {
           _ <- rootManager.prepareRootUpdate(tier-1, newRoot)
           _ <- tx.commit()
@@ -107,7 +107,7 @@ object JoinFinalizationAction extends RegisteredTypeFactory with FinalizationAct
 
     val rootManager = factory.createRootManager(client, emgr)
 
-    new SplitFinalizationAction(client, rootManager, tier, Key(karr), ptr)
+    new JoinFinalizationAction(client, rootManager, tier, Key(karr), ptr)
   }
 
   def addToTransaction(mgr: RootManager,
