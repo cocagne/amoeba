@@ -185,22 +185,20 @@ object KeyValueListNode {
              key: Key,
              reader: ObjectReader,
              prepareForJoin: (Key, KeyValueObjectPointer) => Future[Unit] = (_,_) => Future.successful(()))(implicit tx: Transaction, ec: ExecutionContext): Future[Unit] = {
-    println(s"In delete for key $key. Node: ${node.pointer.id} Contents size ${node.contents.size}. Keys ${node.contents.keys.toList}")
+
     if (! node.contents.contains(key))
       Future.successful(())
     else {
       if (node.contents.size > 1) {
-        println("    Multi-key delete")
         tx.update(node.pointer, None, None, List(KeyValueUpdate.Exists(key)), List(Delete(key)))
         Future.successful(())
       } else {
         node.tail match {
           case None =>
-            println(s"   Simple single key Delete")
             tx.update(node.pointer, None, None, List(KeyValueUpdate.Exists(key)), List(Delete(key)))
             Future.successful(())
+
           case Some(rp) =>
-            println(s"    Joining Delete")
             reader.read(rp.pointer).flatMap { kvos =>
               var ops: List[KeyValueOperation] = Delete(key) :: Nil
               kvos.right match {

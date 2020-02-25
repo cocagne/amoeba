@@ -103,6 +103,12 @@ abstract class TransactionDriver(
 
   private val completionPromise: Promise[TransactionDescription] = Promise()
 
+  private var shouldSendAcceptMessages: Boolean = false
+  private var targetedPrepare: Option[StoreId] = None
+  private var clientResolved: Option[TransactionResolved] = None
+  private var clientFinalized: Option[TransactionFinalized] = None
+  private var txMessages: Option[List[TxMessage]] = None
+
   def complete: Future[TransactionDescription] = completionPromise.future
 
   {
@@ -141,146 +147,198 @@ abstract class TransactionDriver(
     messenger.sendTransactionMessages(allDataStores.map(toStoreId => TxHeartbeat(toStoreId, storeId, txd.transactionId)))
   }
 
+  // Must be called outside a syncrhonized block. Doing so avoids a race condition within the unit test
+  // which can lead to a deadlock
+  private def sendMessages(): Unit = {
+    val (sendAccept, tprep, cliResolved, cliFinalized, txMsgs) = synchronized {
+      val sa = shouldSendAcceptMessages
+      val tp = targetedPrepare
+      val cm = clientResolved
+      val cf = clientFinalized
+      val tm = txMessages
+      shouldSendAcceptMessages = false
+      clientResolved = None
+      clientFinalized = None
+      txMessages = None
+      (sa, tp, cm, cf, tm)
+    }
+
+    if (sendAccept)
+      sendAcceptMessages()
+
+    tprep.foreach(sendPrepareMessage)
+    cliResolved.foreach(messenger.sendClientResponse)
+    cliFinalized.foreach(messenger.sendClientResponse)
+    txMsgs.foreach(messenger.sendTransactionMessages)
+  }
+
   def receiveTxPrepare(msg: TxPrepare): Unit = synchronized {
     proposer.updateHighestProposalId(msg.proposalId)
   }
 
   def receiveTxPrepareResponse(msg: TxPrepareResponse,
-                               transactionCache: TransactionStatusCache): Unit = synchronized {
+                               transactionCache: TransactionStatusCache): Unit = {
 
-    if (msg.proposalId != proposer.currentProposalId)
-      return
+    synchronized {
+      if (msg.proposalId != proposer.currentProposalId)
+        return
 
-    // If the response says there is a transaction collision with a transaction we know has successfully completed,
-    // there's a race condition. Drop the response and re-send the prepare. Eventually it will either be successfully
-    // processed or a different error will occur
-    val collisionsWithCompletedTransactions = msg.collisions.nonEmpty && msg.collisions.forall { txid =>
-      transactionCache.getStatus(txid) match {
-        case None => false
-        case Some(e) => e.status == TransactionStatus.Committed || e.status == TransactionStatus.Aborted
+      // If the response says there is a transaction collision with a transaction we know has successfully completed,
+      // there's a race condition. Drop the response and re-send the prepare. Eventually it will either be successfully
+      // processed or a different error will occur
+      val collisionsWithCompletedTransactions = msg.collisions.nonEmpty && msg.collisions.forall { txid =>
+        transactionCache.getStatus(txid) match {
+          case None => false
+          case Some(e) => e.status == TransactionStatus.Committed || e.status == TransactionStatus.Aborted
+        }
+      }
+
+      if (collisionsWithCompletedTransactions) {
+        // Race condition. Drop this message and re-send the prepare
+        targetedPrepare = Some(msg.from)
+        return
+      }
+
+      msg.response match {
+        case Left(nack) =>
+          onNack(nack.promisedId)
+
+        case Right(promise) =>
+
+          peerDispositions += (msg.from -> msg.disposition)
+
+          if (isValidAcceptor(msg.from))
+            proposer.receivePromise(paxos.Promise(msg.from.poolIndex, msg.proposalId, promise.lastAccepted))
+
+          if (proposer.prepareQuorumReached && !proposer.haveLocalProposal) {
+
+            var canCommitTransaction = true
+
+            // Before we can make a decision, we must ensure that we have a write-threshold number of replies for
+            // each of the objects referenced by the transaction
+            for (ptr <- allObjects) {
+              var nReplies = 0
+              var nAbortVotes = 0
+              var nCommitVotes = 0
+              var canCommitObject = true
+
+              ptr.storePointers.foreach(sp => peerDispositions.get(StoreId(ptr.poolId, sp.poolIndex)).foreach(disposition => {
+                nReplies += 1
+                disposition match {
+                  case TransactionDisposition.VoteCommit => nCommitVotes += 1
+                  case _ =>
+                    // TODO: We can be quite a bit smarter about choosing when we must abort
+                    nAbortVotes += 1
+                }
+              }))
+
+              if (nReplies < ptr.ida.writeThreshold)
+                return
+
+              if (nReplies != ptr.ida.width && nCommitVotes < ptr.ida.writeThreshold && ptr.ida.width - nAbortVotes >= ptr.ida.writeThreshold)
+                return
+
+              if (ptr.ida.width - nAbortVotes < ptr.ida.writeThreshold)
+                canCommitObject = false
+
+              // Once canCommitTransaction flips to false, it stays there
+              canCommitTransaction = canCommitTransaction && canCommitObject
+            }
+
+            // If we get here, we've made our decision
+            proposer.setLocalProposal(canCommitTransaction)
+
+            shouldSendAcceptMessages = true
+          }
       }
     }
 
-    if (collisionsWithCompletedTransactions) {
-      // Race condition. Drop this message and re-send the prepare
-      sendPrepareMessage(msg.from)
-      return
+    // call outside synchronization block
+    sendMessages()
+  }
+
+  def receiveTxAcceptResponse(msg: TxAcceptResponse): Unit = {
+
+    synchronized {
+      if (msg.proposalId != proposer.currentProposalId)
+        return
+
+      // We shouldn't ever receive an AcceptResponse from a non-acceptor but just to be safe...
+      if (!isValidAcceptor(msg.from))
+        return
+
+      msg.response match {
+        case Left(nack) =>
+          onNack(nack.promisedId)
+
+        case Right(accepted) =>
+          acceptedPeers += msg.from
+
+          learner.receiveAccepted(paxos.Accepted(msg.from.poolIndex, msg.proposalId, accepted.value))
+
+          learner.finalValue.foreach(onResolution(_, sendResolutionMessage = true))
+      }
     }
 
-    msg.response match {
-      case Left(nack) =>
-        onNack(nack.promisedId)
+    // call outside synchronization block
+    sendMessages()
+  }
 
-      case Right(promise) =>
+  def receiveTxResolved(msg: TxResolved): Unit = {
+    synchronized {
+      knownResolved += msg.from
+      onResolution(msg.committed, sendResolutionMessage=false)
+    }
 
-        peerDispositions += (msg.from -> msg.disposition)
+    // call outside synchronization block
+    sendMessages()
+  }
 
-        if (isValidAcceptor(msg.from))
-          proposer.receivePromise(paxos.Promise(msg.from.poolIndex, msg.proposalId, promise.lastAccepted))
-
-        if (proposer.prepareQuorumReached && !proposer.haveLocalProposal) {
-
-          var canCommitTransaction = true
-
-          // Before we can make a decision, we must ensure that we have a write-threshold number of replies for
-          // each of the objects referenced by the transaction
-          for (ptr <- allObjects) {
-            var nReplies = 0
-            var nAbortVotes = 0
-            var nCommitVotes = 0
-            var canCommitObject = true
-
-            ptr.storePointers.foreach(sp => peerDispositions.get(StoreId(ptr.poolId, sp.poolIndex)).foreach(disposition => {
-              nReplies += 1
-              disposition match {
-                case TransactionDisposition.VoteCommit => nCommitVotes += 1
-                case _ =>
-                  // TODO: We can be quite a bit smarter about choosing when we must abort
-                  nAbortVotes += 1
-              }
-            }))
-
-            if (nReplies < ptr.ida.writeThreshold)
-              return
-
-            if (nReplies != ptr.ida.width && nCommitVotes < ptr.ida.writeThreshold && ptr.ida.width - nAbortVotes >= ptr.ida.writeThreshold)
-              return
-
-            if (ptr.ida.width - nAbortVotes < ptr.ida.writeThreshold)
-              canCommitObject = false
-
-            // Once canCommitTransaction flips to false, it stays there
-            canCommitTransaction = canCommitTransaction && canCommitObject
-          }
-
-          // If we get here, we've made our decision
-          proposer.setLocalProposal(canCommitTransaction)
-
-          sendAcceptMessages()
-        }
+  def receiveTxCommitted(msg: TxCommitted): Unit = {
+    synchronized {
+      knownResolved += msg.from
+      commitErrors += (msg.from -> msg.objectCommitErrors)
+      finalizer.foreach(_.updateCommitErrors(commitErrors))
     }
   }
 
-  def receiveTxAcceptResponse(msg: TxAcceptResponse): Unit = synchronized {
-
-    if (msg.proposalId != proposer.currentProposalId)
-      return
-
-    // We shouldn't ever receive an AcceptResponse from a non-acceptor but just to be safe...
-    if (!isValidAcceptor(msg.from))
-      return
-
-    msg.response match {
-      case Left(nack) =>
-        onNack(nack.promisedId)
-
-      case Right(accepted) =>
-        acceptedPeers += msg.from
-
-        learner.receiveAccepted(paxos.Accepted(msg.from.poolIndex, msg.proposalId, accepted.value))
-
-        learner.finalValue.foreach(onResolution(_, sendResolutionMessage = true))
+  def receiveTxFinalized(msg: TxFinalized): Unit = {
+    synchronized {
+      knownResolved += msg.from
+      finalizer.foreach( _.cancel() )
+      onFinalized(msg.committed)
     }
-  }
 
-  def receiveTxResolved(msg: TxResolved): Unit = synchronized {
-    knownResolved += msg.from
-    onResolution(msg.committed, sendResolutionMessage=false)
-  }
-
-  def receiveTxCommitted(msg: TxCommitted): Unit = synchronized {
-    knownResolved += msg.from
-    commitErrors += (msg.from -> msg.objectCommitErrors)
-    finalizer.foreach(_.updateCommitErrors(commitErrors))
-  }
-
-  def receiveTxFinalized(msg: TxFinalized): Unit = synchronized {
-    knownResolved += msg.from
-    finalizer.foreach( _.cancel() )
-    onFinalized(msg.committed)
+    // call outside synchronization block
+    sendMessages()
   }
 
   def mayBeDiscarded: Boolean = synchronized { finalized }
 
-  protected def onFinalized(committed: Boolean): Unit = synchronized {
-    if (!finalized) {
-      finalized = true
+  protected def onFinalized(committed: Boolean): Unit = {
+    synchronized {
+      if (!finalized) {
+        finalized = true
 
-      shutdown() // release retry resources
+        shutdown() // release retry resources
 
-      txd.originatingClient.foreach(client => {
-        logger.trace(s"Sending TxFinalized(${txd.transactionId}) to originating client $client)")
-        messenger.sendClientResponse(TransactionFinalized(client, storeId, txd.transactionId, committed))
-      })
+        txd.originatingClient.foreach(client => {
+          logger.trace(s"Sending TxFinalized(${txd.transactionId}) to originating client $client)")
+          clientFinalized = Some(TransactionFinalized(client, storeId, txd.transactionId, committed))
+        })
 
-      val messages = allDataStores.map(toStoreId => TxFinalized(toStoreId, storeId, txd.transactionId, committed))
+        val messages = allDataStores.map(toStoreId => TxFinalized(toStoreId, storeId, txd.transactionId, committed))
 
-      logger.trace(s"Sending TxFinalized(${txd.transactionId}) to ${messages.head.to.poolId}:(${messages.map(_.to.poolIndex)})")
+        logger.trace(s"Sending TxFinalized(${txd.transactionId}) to ${messages.head.to.poolId}:(${messages.map(_.to.poolIndex)})")
 
-      messenger.sendTransactionMessages(messages)
+        txMessages = Some(messages)
 
-      completionPromise.success(txd)
+        completionPromise.success(txd)
+      }
     }
+
+    // call outside synchronization block
+    sendMessages()
   }
 
   protected def nextRound(): Unit = {
@@ -374,11 +432,11 @@ abstract class TransactionDriver(
 
       logger.trace(s"Sending TxResolved(${txd.transactionId}) committed = $committed to ${messages.head.to.poolId}:(${messages.map(_.to.poolIndex)})")
 
-      messenger.sendTransactionMessages(messages)
+      txMessages = Some(messages)
 
-      txd.originatingClient.foreach { clientId =>
+      clientResolved = txd.originatingClient.map { clientId =>
         logger.trace(s"Sending TxResolved(${txd.transactionId}) committed = $committed to originating client $clientId")
-        messenger.sendClientResponse(TransactionResolved(clientId, storeId, txd.transactionId, committed))
+        TransactionResolved(clientId, storeId, txd.transactionId, committed)
       }
     }
 

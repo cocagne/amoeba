@@ -45,7 +45,6 @@ class TieredKeyValueList(val client: AmoebaClient,
   }
 
   def delete(key: Key)(implicit t: Transaction): Future[Unit] = {
-    println(s"Deletin key $key")
     def onJoin(delMinimum: Key, delNode: KeyValueObjectPointer): Future[Unit] = {
       println(s"ON JOIN CB")
       JoinFinalizationAction.addToTransaction(rootManager, 1, delMinimum, delNode, t)
