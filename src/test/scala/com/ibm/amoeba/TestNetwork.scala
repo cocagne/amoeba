@@ -10,10 +10,11 @@ import com.ibm.amoeba.client.internal.network.{Messenger => ClientMessenger}
 import com.ibm.amoeba.client.internal.pool.SimpleStoragePool
 import com.ibm.amoeba.client.internal.read.{BaseReadDriver, ReadManager}
 import com.ibm.amoeba.client.internal.transaction.{ClientTransactionDriver, TransactionImpl, TransactionManager}
+import com.ibm.amoeba.client.tkvl.{KVObjectRootManager, TieredKeyValueList}
 import com.ibm.amoeba.common.Nucleus
 import com.ibm.amoeba.common.ida.Replication
 import com.ibm.amoeba.common.network.{AllocateResponse, ClientId, ClientRequest, ClientResponse, ReadResponse, TransactionCompletionResponse, TransactionFinalized, TransactionResolved, TxMessage}
-import com.ibm.amoeba.common.objects.{DataObjectPointer, KeyValueObjectPointer, ObjectId}
+import com.ibm.amoeba.common.objects.{DataObjectPointer, Key, KeyValueObjectPointer, ObjectId}
 import com.ibm.amoeba.common.pool.PoolId
 import com.ibm.amoeba.common.store.StoreId
 import com.ibm.amoeba.common.transaction.{TransactionDescription, TransactionId}
@@ -72,7 +73,7 @@ object TestNetwork {
   }
   */
 
-  class TClient(msngr: ClientMessenger) extends AmoebaClient {
+  class TClient(msngr: ClientMessenger, val nucleus: KeyValueObjectPointer) extends AmoebaClient {
 
     import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -100,8 +101,16 @@ object TestNetwork {
       new TransactionImpl(this, txManager, _ => 0, None)
     }
 
-    def getStoragePool(poolId: PoolId): Future[StoragePool] = Future.successful(new SimpleStoragePool(this,
-      poolId, 3, Replication(3,2), None, None))
+    def getStoragePool(poolId: PoolId): Future[StoragePool] = {
+      val root = new KVObjectRootManager(this, Nucleus.PoolTreeKey, nucleus)
+      val tkvl = new TieredKeyValueList(this, root)
+      for {
+        poolPtr <- tkvl.get(Key(Nucleus.poolId.uuid))
+        poolKvos <- read(KeyValueObjectPointer(poolPtr.get.value.bytes))
+      } yield {
+        SimpleStoragePool(this, poolKvos)
+      }
+    }
 
     val retryStrategy: RetryStrategy = new ExponentialBackoffRetryStrategy(this)
 
@@ -184,7 +193,7 @@ class TestNetwork extends ServerMessenger {
     def sendTransactionMessages(msg: List[TxMessage]): Unit = sendTransactionMessages(msg)
   }
 
-  val client = new TClient(cliMessenger)
+  val client = new TClient(cliMessenger, nucleus)
 
   FinalizerFactory.client = client
 

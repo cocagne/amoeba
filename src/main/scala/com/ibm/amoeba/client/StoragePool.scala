@@ -2,8 +2,16 @@ package com.ibm.amoeba.client
 
 import java.util.UUID
 
+import com.ibm.amoeba.client.tkvl.TieredKeyValueList
 import com.ibm.amoeba.common.ida.IDA
+import com.ibm.amoeba.common.objects.Key
 import com.ibm.amoeba.common.pool.PoolId
+
+object StoragePool {
+  private [amoeba] val ConfigKey = Key(Array[Byte](0))
+  private [amoeba] val ErrorTreeKey = Key(Array[Byte](1))
+  private [amoeba] val AllocationTreeKey = Key(Array[Byte](2))
+}
 
 trait StoragePool {
 
@@ -23,6 +31,10 @@ trait StoragePool {
 
   /** Throws AllocationError: UnsupportedIDA if the IDA is not supported*/
   private[client] def selectStoresForAllocation(ida: IDA): Array[Int]
+
+  def allocationTree: TieredKeyValueList
+
+  def errorTree: TieredKeyValueList
 
   /*
   val poolDefinitionPointer: KeyValueObjectPointer

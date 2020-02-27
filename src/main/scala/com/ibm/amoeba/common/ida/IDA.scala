@@ -8,6 +8,8 @@ object IDA {
   val ReplicationCode: Byte = 0
   val ReedSolomonCode: Byte = 1
 
+  val EncodedIDASize: Int = 4
+
   /** Deserializes the IDA type and returns the matching IDA instance */
   def deserializeIDAType(bb: ByteBuffer): IDA = {
     val typeCode = bb.get()
@@ -16,6 +18,7 @@ object IDA {
       case ReplicationCode =>
         val width = bb.get()
         val writeThreshold = bb.get()
+        bb.get() // discard empty byte
         Replication(width, writeThreshold)
 
       case ReedSolomonCode =>
@@ -136,12 +139,13 @@ case class Replication(width: Int, writeThreshold: Int) extends IDA {
 
   def calculateRestoredObjectSize(objectSizeOnDataStore: Int): Int = objectSizeOnDataStore
 
-  def getSerializedIDATypeLength: Int = 3 // <type><width><writeThreshold>
+  def getSerializedIDATypeLength: Int = 4 // <type><width><writeThreshold>
 
   def serializeIDAType(bb: ByteBuffer): Unit = {
     bb.put(IDA.ReplicationCode)
     bb.put(width.asInstanceOf[Byte])
     bb.put(writeThreshold.asInstanceOf[Byte])
+    bb.put(0.asInstanceOf[Byte]) // reserved
   }
 }
 

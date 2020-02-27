@@ -10,8 +10,8 @@ import scala.concurrent.Future
 
 class BasicIntegrationSuite extends IntegrationTestSuite {
 
-  test("Read empty nucleus") {
-    client.read(nucleus).map( kvos => kvos.contents.isEmpty should be (true) )
+  test("Read nucleus") {
+    client.read(nucleus).map( kvos => kvos.contents.isEmpty should be (false) )
   }
 
   test("Insert key value pair into nucleus") {

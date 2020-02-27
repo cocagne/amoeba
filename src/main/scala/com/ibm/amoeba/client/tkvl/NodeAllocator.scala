@@ -5,7 +5,9 @@ import java.util.UUID
 
 import com.ibm.amoeba.client.{AmoebaClient, ObjectAllocator}
 import com.ibm.amoeba.client.internal.allocation.SinglePoolObjectAllocator
+import com.ibm.amoeba.common.Nucleus
 import com.ibm.amoeba.common.pool.PoolId
+import jdk.jshell.spi.ExecutionControl.NotImplementedException
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -28,6 +30,24 @@ object NodeAllocator {
         val poolId = PoolId(new UUID(msb, lsb))
         new SinglePoolNodeAllocator(client, poolId)
     }
+  }
+}
+
+object BootstrapPoolNodeAllocator extends NodeAllocator {
+
+  val poolId: PoolId = Nucleus.poolId
+
+  override val code: Int = 0
+  override val encodedSize = 17
+
+  override def getAllocatorForTier(tier: Int): Future[ObjectAllocator] = null
+
+  override def getMaxNodeSize(tier: Int): Int = 1 * 1024 * 1024
+
+  override def encodeInto(bb:ByteBuffer): Unit = {
+    bb.put(code.asInstanceOf[Byte])
+    bb.putLong(poolId.uuid.getMostSignificantBits)
+    bb.putLong(poolId.uuid.getLeastSignificantBits)
   }
 }
 
