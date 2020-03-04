@@ -171,7 +171,7 @@ class TestNetwork extends ServerMessenger {
     TestCRL, FinalizerFactory, TransactionDriver.noErrorRecoveryFactory,
     List(store0, store1, store2))
 
-  private def handleEvents(): Unit = {
+  private def handleEvents(): Unit = synchronized {
     smgr.handleEvents()
     //while (smgr.hasTransactions) {
       //smgr.handleEvents()
@@ -216,7 +216,8 @@ class TestNetwork extends ServerMessenger {
   }//msg.foreach(sendTransactionMessage)
 
   def printTransactionStatus(): Unit = {
-    println("*********** Transaction Status ***********")
+    val test = client.getSystemAttribute("unittest.name")
+    println(s"*********** Transaction Status. Test: $test ***********")
     smgr.logTransactionStatus(s => println(s))
     println("******************************************")
   }
@@ -224,17 +225,25 @@ class TestNetwork extends ServerMessenger {
   def waitForTransactionsToComplete(): Future[Unit] = {
     //val stack = com.ibm.aspen.util.getStack()
 
+    handleEvents()
+
     val bgTasks = new BackgroundTaskPool
 
     val p = Promise[Unit]()
     val pollDelay = Duration(5, MILLISECONDS)
 
+    var count = 1
+
     def check(): Unit = {
       if (!smgr.hasTransactions) {
         bgTasks.shutdown(pollDelay)
         p.success(())
-      } else
+      } else {
+        count += 1
+        if (count == 20)
+          printTransactionStatus()
         bgTasks.schedule(pollDelay)(check())
+      }
     }
 
     bgTasks.schedule(pollDelay)(check())

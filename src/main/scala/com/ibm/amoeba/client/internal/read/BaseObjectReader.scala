@@ -42,7 +42,7 @@ abstract class BaseObjectReader[PointerType <: ObjectPointer, StoreStateType <: 
 
   def numResponses: Int = responses.size
 
-  def debugLogStatus(readUUID: UUID, header: String, log: String => Unit): Unit = {
+  def debugLogStatus(header: String, log: String => Unit): Unit = {
     val sb = new StringBuilder
     sb.append(header)
     sb.append("\n")
@@ -61,6 +61,7 @@ abstract class BaseObjectReader[PointerType <: ObjectPointer, StoreStateType <: 
       }
     }
     log(sb.toString)
+    restore(true)
   }
 
   protected def createObjectState(storeId:StoreId, readTime: HLCTimestamp, cs: ReadResponse.CurrentState): StoreStateType
@@ -72,7 +73,7 @@ abstract class BaseObjectReader[PointerType <: ObjectPointer, StoreStateType <: 
     */
   protected def restoreObject(revision:ObjectRevision, refcount: ObjectRefcount, timestamp:HLCTimestamp,
                               readTime: HLCTimestamp, matchingStoreStates: List[StoreStateType],
-                              allStoreStates: List[StoreStateType]): ObjectState
+                              allStoreStates: List[StoreStateType], debug: Boolean=false): ObjectState
 
   def numErrors: Int = responses.valuesIterator.foldLeft(0) { (count, e) => e match {
     case Left(_) => count + 1
@@ -97,7 +98,7 @@ abstract class BaseObjectReader[PointerType <: ObjectPointer, StoreStateType <: 
     restore()
   }
 
-  protected def restore(): Option[Either[ClientReadError, ObjectState]] = endResult match {
+  protected def restore(debug: Boolean = false): Option[Either[ClientReadError, ObjectState]] = endResult match {
     case Some(r) => Some(r)
     case None =>
       if (responses.size >= threshold) {
@@ -121,29 +122,35 @@ abstract class BaseObjectReader[PointerType <: ObjectPointer, StoreStateType <: 
 
         }
         else
-          attemptRestore()
+          attemptRestore(debug)
       }
 
       endResult
   }
 
-  protected def attemptRestore(): Unit = {
+  protected def attemptRestore(debug: Boolean): Unit = {
 
-    val mostRecent = responses.valuesIterator.foldLeft((ObjectRevision.Null, HLCTimestamp.Zero)) { (t,r) => r match {
-      case Left(_) => t
-      case Right(ss) => if (ss.timestamp > t._2) (ss.revision, ss.timestamp) else t
+    val revisions = responses.valuesIterator.foldLeft(Map[ObjectRevision, Int]()) { (m, r) => r match {
+      case Left(_) => m
+      case Right(ss) =>
+        val count =  1 + m.getOrElse(ss.revision, 0)
+        m + (ss.revision -> count)
     }}
 
-    //val storeStates = responses.values.collect{ case Right(ss) if ss.revision == mostRecent._1 => ss }.toList
+    val (restorableRevision, restorableCount) = revisions.foldLeft(revisions.head) { (h, r) =>
+      if (h._2 > r._2) h else r
+    }
 
     val allStoreStates = responses.valuesIterator.collect { case Right(ss) => ss }.toList
 
     val matchingStoreStates = allStoreStates.filter { ss =>
-      if (mostRecent._1 == ss.revision) true else {
+      if (restorableRevision == ss.revision) true else {
         knownBehind += ss.storeId -> ss.readTimestamp
         false
       }
     }
+    if (debug)
+      println(s"** Matching size ${matchingStoreStates.size} >= $threshold")
 
     if (matchingStoreStates.size >= threshold) {
       // The current refcount is the one with the highest updateSerial
@@ -157,10 +164,13 @@ abstract class BaseObjectReader[PointerType <: ObjectPointer, StoreStateType <: 
         endResult = Some(Right(MetadataObjectState(pointer, revision, refcount, timestamp, readTime)))
       else {
         try {
-          val restoredObject = restoreObject(revision, refcount, timestamp, readTime, matchingStoreStates, allStoreStates)
+          val restoredObject = restoreObject(revision, refcount, timestamp, readTime, matchingStoreStates, allStoreStates, debug)
           endResult = Some(Right(restoredObject))
         } catch {
-          case NotRestorable(reason) => logger.info(s"Read $readUUID object ${pointer.id} cannot be restored due to: $reason")
+          case NotRestorable(reason) =>
+            if (debug)
+              println(s"****** READ ERROR: $reason")
+            logger.info(s"Read $readUUID object ${pointer.id} cannot be restored due to: $reason")
         }
       }
     }

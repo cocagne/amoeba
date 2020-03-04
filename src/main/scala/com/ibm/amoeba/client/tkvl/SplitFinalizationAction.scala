@@ -4,10 +4,12 @@ import java.nio.{ByteBuffer, ByteOrder}
 import java.util.UUID
 
 import com.ibm.amoeba.client._
+import com.ibm.amoeba.client.internal.read.BaseReadDriver
 import com.ibm.amoeba.common.objects.{Key, KeyOrdering, KeyValueObjectPointer, ObjectId, Value}
 import com.ibm.amoeba.common.transaction.FinalizationActionId
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.util.{Failure, Success}
 
 class SplitFinalizationAction(val client: AmoebaClient,
                               val rootManager: RootManager,
@@ -22,9 +24,11 @@ class SplitFinalizationAction(val client: AmoebaClient,
   def complete: Future[Unit] = completionPromise.future
 
   def execute(): Unit = {
+
     val fcomplete = client.retryStrategy.retryUntilSuccessful {
 
       def createNewRoot(rootTier: Int, ordering: KeyOrdering, rootNode: KeyValueListNode): Future[Unit] = {
+
         implicit val tx: Transaction = client.newTransaction()
 
         val rootContent = Map(
@@ -67,8 +71,11 @@ class SplitFinalizationAction(val client: AmoebaClient,
         for {
           e <- fe
           nodeSize <- fnodeSize
+
           alloc <- falloc
+
           _ <- prepareInsert(e, nodeSize, alloc)
+
           _ <- tx.commit()
         } yield ()
       }

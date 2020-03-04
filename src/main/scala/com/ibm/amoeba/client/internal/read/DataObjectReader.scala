@@ -17,7 +17,7 @@ class DataObjectReader(metadataOnly: Boolean, pointer: DataObjectPointer, readUU
 
   override protected def restoreObject(revision:ObjectRevision, refcount: ObjectRefcount, timestamp:HLCTimestamp,
                                        readTime: HLCTimestamp, matchingStoreStates: List[DataObjectStoreState],
-                                       allStoreStates: List[DataObjectStoreState]): ObjectState = {
+                                       allStoreStates: List[DataObjectStoreState], debug: Boolean): ObjectState = {
 
     val sizeOnStore = matchingStoreStates.head.sizeOnStore
 

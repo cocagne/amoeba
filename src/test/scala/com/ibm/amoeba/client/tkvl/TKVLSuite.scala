@@ -27,6 +27,8 @@ class TKVLSuite extends IntegrationTestSuite {
 
       _ <- tx1.commit()
 
+      _ <- waitForTransactionsToComplete()
+
       root <- froot
       tree <- root.getTree()
 
@@ -71,6 +73,8 @@ class TKVLSuite extends IntegrationTestSuite {
       _ <- tree.set(key2, value2)(tx)
       r <- tx.commit()
 
+      _ <- waitForTransactionsToComplete()
+
       v <- tree.get(key2)
 
     } yield {
@@ -95,6 +99,7 @@ class TKVLSuite extends IntegrationTestSuite {
 
     for {
       ikvos <- client.read(nucleus)
+
       pool <- client.getStoragePool(Nucleus.poolId)
       alloc = pool.createAllocater(Replication(3,2))
 
@@ -112,7 +117,6 @@ class TKVLSuite extends IntegrationTestSuite {
       tx = client.newTransaction()
       _ <- tree.set(key2, value2)(tx)
       r <- tx.commit()
-
 
       tx = client.newTransaction()
       _ <- tree.set(key3, value3)(tx)
@@ -165,14 +169,20 @@ class TKVLSuite extends IntegrationTestSuite {
       _ <- tree.set(key2, value2)(tx)
       r <- tx.commit()
 
+      _ <- waitForTransactionsToComplete()
+
       tx = client.newTransaction()
       _ <- tree.set(key3, value3)(tx)
       r <- tx.commit()
+
+      _ <- waitForTransactionsToComplete()
 
       tx = client.newTransaction()
       _ <- tree.delete(key2)(tx)
 
       r <- tx.commit()
+
+      _ <- waitForTransactionsToComplete()
 
       tx = client.newTransaction()
       _ <- tree.delete(key)(tx)

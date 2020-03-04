@@ -7,7 +7,7 @@ import com.ibm.amoeba.common.HLCTimestamp
 import com.ibm.amoeba.common.network.{OpportunisticRebuild, Read, ReadResponse}
 import com.ibm.amoeba.common.objects.{DataObjectPointer, FullObject, KeyValueObjectPointer, MetadataOnly, ObjectPointer, ReadType}
 import com.ibm.amoeba.common.store.StoreId
-import com.ibm.amoeba.common.util.BackgroundTask
+import com.ibm.amoeba.common.util.{BackgroundTask, BackgroundTaskPool}
 import org.apache.logging.log4j.scala.Logging
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
@@ -176,10 +176,13 @@ object BaseReadDriver {
 
       var hung = false
 
-      val hangCheckTask: BackgroundTask.ScheduledTask = client.backgroundTasks.schedule(Duration(10, SECONDS)) {
-        val test = client.getSystemAttribute("unittest.name").getOrElse("UNKNOWN TEST")
-        println(s"**** HUNG READ: $test")
+      val bgTasks = new BackgroundTaskPool
 
+      val hangCheckTask: BackgroundTask.ScheduledTask = bgTasks.schedule(Duration(2, SECONDS)) {
+        val test = client.getSystemAttribute("unittest.name").getOrElse("UNKNOWN TEST")
+        //println(s"**** HUNG READ: $test")
+
+        objectReader.debugLogStatus(s"*** HUNG READ in test $test", println)
         // KeyValueObjectCodec.isRestorable(objectPointer.ida,
         //   storeStates.valuesIterator.map(ss => ss.asInstanceOf[KeyValueObjectStoreState].kvoss).toList)
 
@@ -187,7 +190,9 @@ object BaseReadDriver {
       }
 
       readResult.foreach { _ =>
+
         hangCheckTask.cancel()
+        bgTasks.shutdown(Duration(0, SECONDS))
         synchronized {
           if (hung) {
             val test = client.getSystemAttribute("unittest.name").getOrElse("UNKNOWN TEST")

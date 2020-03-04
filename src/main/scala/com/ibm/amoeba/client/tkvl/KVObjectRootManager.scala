@@ -26,21 +26,26 @@ class KVObjectRootManager(val client: AmoebaClient,
 
     client.read(pointer).onComplete {
       case Failure(err) => p.failure(err)
-      case Success(container) => container.contents.get(treeKey) match {
-        case None => p.failure(new InvalidRoot)
-        case Some(v) => try {
-          val root = Root(client, v.value.bytes)
-          client.read(root.rootObject).onComplete {
-            case Failure(err) => p.failure(err)
-            case Success(rootKvos) =>
-              val rootLp = KeyValueListPointer(Key.AbsoluteMinimum, root.rootObject)
-              val node = KeyValueListNode(client, rootLp, root.ordering, rootKvos)
-              p.success(RData(root, v.revision, node))
+      case Success(container) =>
+
+        container.contents.get(treeKey) match {
+          case None => p.failure(new InvalidRoot)
+          case Some(v) => try {
+            val root = Root(client, v.value.bytes)
+
+            client.read(root.rootObject).onComplete {
+              case Failure(err) => p.failure(err)
+              case Success(rootKvos) =>
+
+                val rootLp = KeyValueListPointer(Key.AbsoluteMinimum, root.rootObject)
+                val node = KeyValueListNode(client, rootLp, root.ordering, rootKvos)
+
+                p.success(RData(root, v.revision, node))
+            }
+          } catch {
+            case _: Throwable => p.failure(new InvalidRoot)
           }
-        } catch {
-          case _: Throwable => p.failure(new InvalidRoot)
         }
-      }
     }
 
     p.future

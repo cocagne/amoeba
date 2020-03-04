@@ -31,14 +31,16 @@ class Store(val backend: Backend,
     .maximumSize(1000)
     .build[TransactionId, List[TxPrepareResponse]]()
 
-  def driveTransaction(txd: TransactionDescription): Unit = if (!transactionDrivers.contains(txd.transactionId)) {
-    val driver = txDriverFactory.create(storeId, net, backgroundTasks, txd, finalizerFactory)
+  def driveTransaction(txd: TransactionDescription): Unit = synchronized {
+    if (!transactionDrivers.contains(txd.transactionId)) {
+      val driver = txDriverFactory.create(storeId, net, backgroundTasks, txd, finalizerFactory)
 
-    transactionDrivers += txd.transactionId -> driver
+      transactionDrivers += txd.transactionId -> driver
 
-    prepareResponseCache.getIfPresent(txd.transactionId).foreach { lst =>
-      lst.foreach(driver.receiveTxPrepareResponse(_, txStatusCache))
-      prepareResponseCache.invalidate(txd.transactionId)
+      prepareResponseCache.getIfPresent(txd.transactionId).foreach { lst =>
+        lst.foreach(driver.receiveTxPrepareResponse(_, txStatusCache))
+        prepareResponseCache.invalidate(txd.transactionId)
+      }
     }
   }
 
@@ -48,7 +50,7 @@ class Store(val backend: Backend,
     transactionDrivers.values.foreach(_.printState(log))
   }
 
-  def receiveTransactionMessage(msg: TxMessage): Unit = {
+  def receiveTransactionMessage(msg: TxMessage): Unit = synchronized {
 
     msg match {
       case m: TxPrepare =>

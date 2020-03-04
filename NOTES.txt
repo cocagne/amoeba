@@ -1,12 +1,7 @@
-Need a finalizer factory
-    - for testing, use null client pointer
-
-StoragePool
-    - port over the full interface
-    - Skip the missed update handling for now
-
-TieredList
 FinalizationActions
+  - Add to Alloc Tree
+  - Del from Alloc Tree
+
 MissedUpdateErrorHandling
 AllocationErrorHandling
     - Fix sweeper bug

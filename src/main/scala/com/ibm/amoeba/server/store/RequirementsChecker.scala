@@ -14,6 +14,7 @@ object RequirementsChecker {
     * @return Tuple of object specific errors and a list of non-object errors
     */
   def check(transactionId: TransactionId,
+            txTimestamp: HLCTimestamp,
             requirements: List[TransactionRequirement],
             objects: Map[ObjectId, ObjectState],
             objectUpdates: Map[ObjectId, DataBuffer]):
@@ -43,22 +44,22 @@ object RequirementsChecker {
           case r: LocalTimeRequirement => checkLocalTime(r)
 
           case r: DataUpdate =>
-            checkRevision(getState(r.objectPointer.id), r.requiredRevision)
+            checkRevision(getState(r.objectPointer.id), r.requiredRevision, txTimestamp)
             if (!objectUpdates.contains(r.objectPointer.id))
               throw ObjectErr(r.objectPointer.id, MissingObjectUpdate())
 
           case r: KeyValueUpdate =>
             checkKVRequirements(getState(r.objectPointer.id), transactionId, r.requiredRevision,
-              r.contentLock, r.requirements)
+              txTimestamp, r.contentLock, r.requirements)
 
             if (!objectUpdates.contains(r.objectPointer.id))
               throw ObjectErr(r.objectPointer.id, MissingObjectUpdate())
 
           case r: RefcountUpdate => checkRefcount(getState(r.objectPointer.id), r.requiredRefcount)
 
-          case r: VersionBump => checkRevision(getState(r.objectPointer.id), r.requiredRevision)
+          case r: VersionBump => checkRevision(getState(r.objectPointer.id), r.requiredRevision, txTimestamp)
 
-          case r: RevisionLock => checkRevision(getState(r.objectPointer.id), r.requiredRevision)
+          case r: RevisionLock => checkRevision(getState(r.objectPointer.id), r.requiredRevision, txTimestamp)
         }
       } catch {
         case err: ObjectErr => objectErrors += (err.objectId -> err.err)
@@ -87,9 +88,12 @@ object RequirementsChecker {
     }
   }
 
-  def checkRevision(state: ObjectState, requiredRevision: ObjectRevision): Unit = {
+  def checkRevision(state: ObjectState, requiredRevision: ObjectRevision, txTimestamp: HLCTimestamp): Unit = {
     if (state.metadata.revision != requiredRevision)
       throw ObjectErr(state.objectId, RevisionMismatch())
+
+    if (state.metadata.timestamp > txTimestamp)
+      throw ObjectErr(state.objectId, ObjectTimestampError())
   }
 
   def checkRefcount(state: ObjectState, requiredRefcount: ObjectRefcount): Unit = {
@@ -100,12 +104,16 @@ object RequirementsChecker {
   def checkKVRequirements(state: ObjectState,
                           transactionId: TransactionId,
                           requiredRevision: Option[ObjectRevision],
+                          txTimestamp: HLCTimestamp,
                           contentLock: Option[FullContentLock],
                           keyRequirements: List[KeyValueUpdate.KeyRequirement]): Unit = {
 
     requiredRevision.foreach { rev =>
       if (rev != state.metadata.revision)
         throw ObjectErr(state.objectId, RevisionMismatch())
+
+      if (state.metadata.timestamp > txTimestamp)
+        throw ObjectErr(state.objectId, ObjectTimestampError())
     }
 
     def checkLock(vs: ValueState, kvs: KVObjectState): Unit = {
@@ -149,6 +157,8 @@ object RequirementsChecker {
                 checkLock(vs, kvs)
                 if (vs.revision != r.revision)
                   throw ObjectErr(state.objectId, RevisionMismatch())
+                if (vs.timestamp > txTimestamp)
+                  throw ObjectErr(state.objectId, KeyTimestampError())
             }
 
             case r: KeyValueUpdate.WithinRange =>

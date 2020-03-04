@@ -7,7 +7,6 @@ import com.ibm.amoeba.client.{AmoebaClient, ObjectAllocator}
 import com.ibm.amoeba.client.internal.allocation.SinglePoolObjectAllocator
 import com.ibm.amoeba.common.Nucleus
 import com.ibm.amoeba.common.pool.PoolId
-import jdk.jshell.spi.ExecutionControl.NotImplementedException
 
 import scala.concurrent.{ExecutionContext, Future}
 

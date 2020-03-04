@@ -121,7 +121,7 @@ class Tx( trs: TransactionRecoveryState,
     // Determine local disposition
     val ou = objectUpdates.iterator.map(ou => ou.objectId -> ou.data).toMap
 
-    val (m, l) = RequirementsChecker.check(transactionId, txd.requirements, objects, ou)
+    val (m, l) = RequirementsChecker.check(transactionId, txd.startTimestamp, txd.requirements, objects, ou)
 
     // Find all objects with transaction collisions for inclusion into the response message
     m.foreach { t => t._2 match {

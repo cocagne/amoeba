@@ -84,7 +84,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
     objects += (o.objectId -> o)
     updates += (o.objectId -> DataBuffer.Empty)
 
-    val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+    val (oerrs, errs) = RequirementsChecker.check(tx1, HLCTimestamp.now, List(req), objects, updates)
 
     assert(oerrs.isEmpty)
     assert(errs.isEmpty)
@@ -110,7 +110,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
     objects += (o.objectId -> o)
     updates += (o.objectId -> DataBuffer.Empty)
 
-    val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+    val (oerrs, errs) = RequirementsChecker.check(tx1,HLCTimestamp.now, List(req), objects, updates)
 
     assert(oerrs.isEmpty)
     assert(errs.isEmpty)
@@ -136,7 +136,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
     objects += (o.objectId -> o)
     updates += (o.objectId -> DataBuffer.Empty)
 
-    val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+    val (oerrs, errs) = RequirementsChecker.check(tx1, HLCTimestamp.now, List(req), objects, updates)
 
     assert(oerrs.isEmpty)
     assert(errs.isEmpty)
@@ -163,7 +163,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
     objects += (o.objectId -> o)
     updates += (o.objectId -> DataBuffer.Empty)
 
-    val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+    val (oerrs, errs) = RequirementsChecker.check(tx1, HLCTimestamp.now, List(req), objects, updates)
 
     expected += (o.objectId -> TransactionCollision(tx2))
     assert(oerrs == expected)
@@ -191,7 +191,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
     objects += (o.objectId -> o)
     updates += (o.objectId -> DataBuffer.Empty)
 
-    val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+    val (oerrs, errs) = RequirementsChecker.check(tx1, HLCTimestamp.now, List(req), objects, updates)
 
     expected += (o.objectId -> TransactionCollision(tx2))
     assert(oerrs == expected)
@@ -217,7 +217,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
     objects += (o.objectId -> o)
     updates += (o.objectId -> DataBuffer.Empty)
 
-    val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+    val (oerrs, errs) = RequirementsChecker.check(tx1, HLCTimestamp.now, List(req), objects, updates)
 
     expected += (o.objectId -> RevisionMismatch())
     assert(oerrs == expected)
@@ -243,7 +243,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
     objects += (o.objectId -> o)
     updates += (o.objectId -> DataBuffer.Empty)
 
-    val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+    val (oerrs, errs) = RequirementsChecker.check(tx1, HLCTimestamp.now, List(req), objects, updates)
 
     expected += (o.objectId -> RevisionMismatch())
     assert(oerrs == expected)
@@ -270,7 +270,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
     objects += (o.objectId -> o)
     updates += (o.objectId -> DataBuffer.Empty)
 
-    val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+    val (oerrs, errs) = RequirementsChecker.check(tx1, HLCTimestamp.now, List(req), objects, updates)
 
     assert(oerrs.isEmpty)
     assert(errs.isEmpty)
@@ -298,7 +298,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
 
     o.lockedToTransaction = Some(tx1)
 
-    val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+    val (oerrs, errs) = RequirementsChecker.check(tx1, HLCTimestamp.now, List(req), objects, updates)
 
     assert(oerrs.isEmpty)
     assert(errs.isEmpty)
@@ -324,7 +324,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
 
     objects += (o.objectId -> o)
 
-    val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+    val (oerrs, errs) = RequirementsChecker.check(tx1, HLCTimestamp.now, List(req), objects, updates)
 
     expected += (o.objectId -> MissingObjectUpdate())
     assert(oerrs == expected)
@@ -354,7 +354,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
 
     o.lockedToTransaction = Some(tx2)
 
-    val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+    val (oerrs, errs) = RequirementsChecker.check(tx1, HLCTimestamp.now, List(req), objects, updates)
 
     expected += (o.objectId -> TransactionCollision(tx2))
     assert(oerrs == expected)
@@ -382,7 +382,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
     objects += (o.objectId -> o)
     updates += (o.objectId -> DataBuffer.Empty)
 
-    val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+    val (oerrs, errs) = RequirementsChecker.check(tx1, HLCTimestamp.now, List(req), objects, updates)
 
     expected += (o.objectId -> RevisionMismatch())
     assert(oerrs == expected)
@@ -410,7 +410,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
     objects += (o.objectId -> o)
     updates += (o.objectId -> DataBuffer.Empty)
 
-    val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+    val (oerrs, errs) = RequirementsChecker.check(tx1, HLCTimestamp.now, List(req), objects, updates)
 
     expected += (o.objectId -> RefcountMismatch())
     assert(oerrs == expected)
@@ -434,7 +434,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
     var objects: HashMap[ObjectId, ObjectState] = new HashMap
     var updates: HashMap[ObjectId, DataBuffer] = new HashMap
 
-    val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+    val (oerrs, errs) = RequirementsChecker.check(tx1, HLCTimestamp.now, List(req), objects, updates)
 
     assert(oerrs.isEmpty)
     assert(errs == List(LocalTimeError()))
@@ -458,7 +458,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
     var updates: HashMap[ObjectId, DataBuffer] = new HashMap
     var expected: HashMap[ObjectId, RequirementError] = new HashMap
 
-    val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+    val (oerrs, errs) = RequirementsChecker.check(tx1, HLCTimestamp.now, List(req), objects, updates)
 
     assert(oerrs.isEmpty)
     assert(errs.isEmpty)
@@ -499,7 +499,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
       val lst = List(KeyRevision(k1, rev1), KeyRevision(k2, rev1))
       val req = KeyValueUpdate(kp1, Some(rev1), Some(FullContentLock(lst)), List())
 
-      val (oerrs, errs) = RequirementsChecker.check(tx2, List(req), objects, updates)
+      val (oerrs, errs) = RequirementsChecker.check(tx2, HLCTimestamp.now, List(req), objects, updates)
 
       assert(oerrs.isEmpty)
       assert(errs.isEmpty)
@@ -509,7 +509,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
       val lst = List(KeyRevision(k1, rev1), KeyRevision(k2, rev1))
       val req = KeyValueUpdate(kp1, Some(rev1), Some(FullContentLock(lst)), List())
 
-      val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+      val (oerrs, errs) = RequirementsChecker.check(tx1, HLCTimestamp.now, List(req), objects, updates)
 
       var expected: HashMap[ObjectId, RequirementError] = new HashMap
       expected += (o.objectId -> TransactionCollision(tx2))
@@ -521,7 +521,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
       val lst = List(KeyRevision(k1, rev2), KeyRevision(k2, rev1))
       val req = KeyValueUpdate(kp1, Some(rev1), Some(FullContentLock(lst)), List())
 
-      val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+      val (oerrs, errs) = RequirementsChecker.check(tx1, HLCTimestamp.now, List(req), objects, updates)
 
       var expected: HashMap[ObjectId, RequirementError] = new HashMap
       expected += (o.objectId -> ContentMismatch())
@@ -533,7 +533,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
       val lst = List(KeyRevision(k1, rev1))
       val req = KeyValueUpdate(kp1, Some(rev1), Some(FullContentLock(lst)), List())
 
-      val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+      val (oerrs, errs) = RequirementsChecker.check(tx1, HLCTimestamp.now, List(req), objects, updates)
 
       var expected: HashMap[ObjectId, RequirementError] = new HashMap
       expected += (o.objectId -> ContentMismatch())
@@ -545,7 +545,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
       val lst = List(KeyRevision(k1, rev2), KeyRevision(k2, rev1), KeyRevision(k3, rev1))
       val req = KeyValueUpdate(kp1, Some(rev1), Some(FullContentLock(lst)), List())
 
-      val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+      val (oerrs, errs) = RequirementsChecker.check(tx1, HLCTimestamp.now, List(req), objects, updates)
 
       var expected: HashMap[ObjectId, RequirementError] = new HashMap
       expected += (o.objectId -> ContentMismatch())
@@ -556,7 +556,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
     {
       val req = KeyValueUpdate(kp1, Some(rev1), None, List(KeyValueUpdate.KeyRevision(k1, rev1)))
 
-      val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+      val (oerrs, errs) = RequirementsChecker.check(tx1, HLCTimestamp.now, List(req), objects, updates)
 
       assert(oerrs.isEmpty)
       assert(errs.isEmpty)
@@ -565,7 +565,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
     {
       val req = KeyValueUpdate(kp1, Some(rev1), None, List(KeyValueUpdate.KeyRevision(k1, rev2)))
 
-      val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+      val (oerrs, errs) = RequirementsChecker.check(tx1, HLCTimestamp.now, List(req), objects, updates)
 
       var expected: HashMap[ObjectId, RequirementError] = new HashMap
       expected += (o.objectId -> RevisionMismatch())
@@ -577,7 +577,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
       kvos.contentLocked = Some(tx2)
       val req = KeyValueUpdate(kp1, Some(rev1), None, List(KeyValueUpdate.Exists(k1)))
 
-      val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+      val (oerrs, errs) = RequirementsChecker.check(tx1, HLCTimestamp.now, List(req), objects, updates)
 
       var expected: HashMap[ObjectId, RequirementError] = new HashMap
       expected += (o.objectId -> TransactionCollision(tx2))
@@ -589,7 +589,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
     {
       val req = KeyValueUpdate(kp1, Some(rev1), None, List(KeyValueUpdate.Exists(k1)))
 
-      val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+      val (oerrs, errs) = RequirementsChecker.check(tx1, HLCTimestamp.now, List(req), objects, updates)
 
       assert(oerrs.isEmpty)
       assert(errs.isEmpty)
@@ -598,7 +598,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
     {
       val req = KeyValueUpdate(kp1, Some(rev1), None, List(KeyValueUpdate.MayExist(k1)))
 
-      val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+      val (oerrs, errs) = RequirementsChecker.check(tx1, HLCTimestamp.now, List(req), objects, updates)
 
       assert(oerrs.isEmpty)
       assert(errs.isEmpty)
@@ -607,7 +607,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
     {
       val req = KeyValueUpdate(kp1, Some(rev1), None, List(KeyValueUpdate.MayExist(k4)))
 
-      val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+      val (oerrs, errs) = RequirementsChecker.check(tx1, HLCTimestamp.now, List(req), objects, updates)
 
       assert(oerrs.isEmpty)
       assert(errs.isEmpty)
@@ -616,7 +616,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
     {
       val req = KeyValueUpdate(kp1, Some(rev1), None, List(KeyValueUpdate.DoesNotExist(k1)))
 
-      val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+      val (oerrs, errs) = RequirementsChecker.check(tx1, HLCTimestamp.now, List(req), objects, updates)
 
       var expected: HashMap[ObjectId, RequirementError] = new HashMap
       expected += (o.objectId -> KeyExistenceError())
@@ -627,7 +627,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
     {
       val req = KeyValueUpdate(kp1, Some(rev1), None, List(KeyValueUpdate.DoesNotExist(k4)))
 
-      val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+      val (oerrs, errs) = RequirementsChecker.check(tx1, HLCTimestamp.now, List(req), objects, updates)
 
       assert(oerrs.isEmpty)
       assert(errs.isEmpty)
@@ -636,7 +636,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
     {
       val req = KeyValueUpdate(kp1, Some(rev1), None, List(KeyValueUpdate.Exists(k2)))
 
-      val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+      val (oerrs, errs) = RequirementsChecker.check(tx1, HLCTimestamp.now, List(req), objects, updates)
 
       var expected: HashMap[ObjectId, RequirementError] = new HashMap
       expected += (o.objectId -> TransactionCollision(tx2))
@@ -647,7 +647,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
     {
       val req = KeyValueUpdate(kp1, Some(rev1), None, List(KeyValueUpdate.TimestampEquals(k1, ts1)))
 
-      val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+      val (oerrs, errs) = RequirementsChecker.check(tx1, HLCTimestamp.now, List(req), objects, updates)
 
       assert(oerrs.isEmpty)
       assert(errs.isEmpty)
@@ -656,7 +656,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
     {
       val req = KeyValueUpdate(kp1, Some(rev1), None, List(KeyValueUpdate.TimestampLessThan(k2, ts1)))
 
-      val (oerrs, errs) = RequirementsChecker.check(tx2, List(req), objects, updates)
+      val (oerrs, errs) = RequirementsChecker.check(tx2, HLCTimestamp.now, List(req), objects, updates)
 
       assert(oerrs.isEmpty)
       assert(errs.isEmpty)
@@ -665,7 +665,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
     {
       val req = KeyValueUpdate(kp1, Some(rev1), None, List(KeyValueUpdate.TimestampGreaterThan(k1, ts2)))
 
-      val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+      val (oerrs, errs) = RequirementsChecker.check(tx1, HLCTimestamp.now, List(req), objects, updates)
 
       assert(oerrs.isEmpty)
       assert(errs.isEmpty)
@@ -674,7 +674,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
     {
       val req = KeyValueUpdate(kp1, Some(rev1), None, List(KeyValueUpdate.WithinRange(k2, ByteArrayKeyOrdering)))
 
-      val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+      val (oerrs, errs) = RequirementsChecker.check(tx1, HLCTimestamp.now, List(req), objects, updates)
 
       assert(oerrs.isEmpty)
       assert(errs.isEmpty)
@@ -684,7 +684,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
       kvos.min = Some(k1)
       val req = KeyValueUpdate(kp1, Some(rev1), None, List(KeyValueUpdate.WithinRange(k2, ByteArrayKeyOrdering)))
 
-      val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+      val (oerrs, errs) = RequirementsChecker.check(tx1, HLCTimestamp.now, List(req), objects, updates)
 
       assert(oerrs.isEmpty)
       assert(errs.isEmpty)
@@ -695,7 +695,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
       kvos.max = Some(k3)
       val req = KeyValueUpdate(kp1, Some(rev1), None, List(KeyValueUpdate.WithinRange(k2, ByteArrayKeyOrdering)))
 
-      val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+      val (oerrs, errs) = RequirementsChecker.check(tx1, HLCTimestamp.now, List(req), objects, updates)
 
       assert(oerrs.isEmpty)
       assert(errs.isEmpty)
@@ -707,7 +707,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
       kvos.max = Some(k3)
       val req = KeyValueUpdate(kp1, Some(rev1), None, List(KeyValueUpdate.WithinRange(k2, ByteArrayKeyOrdering)))
 
-      val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+      val (oerrs, errs) = RequirementsChecker.check(tx1, HLCTimestamp.now, List(req), objects, updates)
 
       assert(oerrs.isEmpty)
       assert(errs.isEmpty)
@@ -719,7 +719,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
       kvos.min = Some(k3)
       val req = KeyValueUpdate(kp1, Some(rev1), None, List(KeyValueUpdate.WithinRange(k2, ByteArrayKeyOrdering)))
 
-      val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+      val (oerrs, errs) = RequirementsChecker.check(tx1, HLCTimestamp.now, List(req), objects, updates)
 
       var expected: HashMap[ObjectId, RequirementError] = new HashMap
       expected += (o.objectId -> WithinRangeError())
@@ -733,7 +733,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
       kvos.max = Some(k4)
       val req = KeyValueUpdate(kp1, Some(rev1), None, List(KeyValueUpdate.WithinRange(k1, ByteArrayKeyOrdering)))
 
-      val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+      val (oerrs, errs) = RequirementsChecker.check(tx1, HLCTimestamp.now, List(req), objects, updates)
 
       var expected: HashMap[ObjectId, RequirementError] = new HashMap
       expected += (o.objectId -> WithinRangeError())
@@ -748,7 +748,7 @@ class RequirementsCheckerSuite extends FunSuite with Matchers {
       kvos.max = Some(k3)
       val req = KeyValueUpdate(kp1, Some(rev1), None, List(KeyValueUpdate.WithinRange(k4, ByteArrayKeyOrdering)))
 
-      val (oerrs, errs) = RequirementsChecker.check(tx1, List(req), objects, updates)
+      val (oerrs, errs) = RequirementsChecker.check(tx1, HLCTimestamp.now, List(req), objects, updates)
 
       var expected: HashMap[ObjectId, RequirementError] = new HashMap
       expected += (o.objectId -> WithinRangeError())

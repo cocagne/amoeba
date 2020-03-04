@@ -55,8 +55,7 @@ class AllocationManager( val client: AmoebaClient,
     }
 
     val r = driver.futureResult map { newObjectPtr =>
-      // TODO Add Allocation Finalization Action!
-      //AllocationFinalizationAction.addToAllocationTree(transaction, pool.poolDefinitionPointer, newObjectPtr)
+      AllocationFinalizationAction.addToTransaction(newObjectPtr, transaction)
       newObjectPtr.asInstanceOf[PointerType]
     }
 

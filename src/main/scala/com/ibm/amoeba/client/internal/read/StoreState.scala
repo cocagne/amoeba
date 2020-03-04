@@ -63,6 +63,10 @@ class KeyValueObjectStoreState(
 
   def debugLogStatus(log: String => Unit): Unit = {
     log(s"  KVOSS ${storeId.poolIndex} Rev $revision Ref $refcount TS $timestamp")
+    kvoss.contents.foreach { t =>
+      val (key, vs) = t
+      log(s"    $key revision ${vs.revision} ${vs.timestamp}")
+    }
     //kvoss.debugLogStatus(log)
   }
 }

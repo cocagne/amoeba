@@ -28,8 +28,10 @@ class KeyValueObjectReader(metadataOnly: Boolean, pointer: KeyValueObjectPointer
 
   override protected def restoreObject(revision:ObjectRevision, refcount: ObjectRefcount, timestamp:HLCTimestamp,
                                        readTime: HLCTimestamp, matchingStoreStates: List[KeyValueObjectStoreState],
-                                       allStoreStates: List[KeyValueObjectStoreState]): ObjectState = {
+                                       allStoreStates: List[KeyValueObjectStoreState], debug: Boolean): ObjectState = {
 
+    if (debug)
+      println(s"DEBUG KV Restore Object")
     val storeStates = allStoreStates
 
     val min = matchingStoreStates.head.kvoss.minimum

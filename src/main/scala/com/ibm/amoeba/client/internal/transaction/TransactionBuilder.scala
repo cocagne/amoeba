@@ -1,6 +1,7 @@
 package com.ibm.amoeba.client.internal.transaction
 
 import com.ibm.amoeba.client.internal.OpportunisticRebuildManager
+import com.ibm.amoeba.client.internal.allocation.DeletionFinalizationAction
 import com.ibm.amoeba.client.{ConflictingRequirements, MultipleDataUpdatesToObject, MultipleRefcountUpdatesToObject}
 import com.ibm.amoeba.common.network.ClientId
 import com.ibm.amoeba.common.objects._
@@ -171,8 +172,8 @@ class TransactionBuilder(
     refcountUpdates += objectPointer
     requirements  = RefcountUpdate(objectPointer, requiredRefcount, refcount) :: requirements
 
-    //if (refcount.count == 0)
-    //  finalizationActions = DeleteFinalizationAction.createSerializedFA(objectPointer) :: finalizationActions
+    if (refcount.count == 0)
+      finalizationActions = DeletionFinalizationAction.createSerializedFA(objectPointer) :: finalizationActions
   }
 
   def bumpVersion(objectPointer: ObjectPointer, requiredRevision: ObjectRevision): Unit = synchronized {

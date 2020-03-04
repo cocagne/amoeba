@@ -16,7 +16,7 @@ object RequirementsApplyer {
             objectUpdates: Map[ObjectId, DataBuffer]): Set[ObjectId] = {
 
     // Get a list of all objects that are unfit for accepting the changes in this transaction
-    val skippedObjects = RequirementsChecker.check(transactionId, requirements, objects, objectUpdates)._1.keySet
+    val skippedObjects = RequirementsChecker.check(transactionId, timestamp, requirements, objects, objectUpdates)._1.keySet
 
     // Filter out all non-object requirements and any objects not fit for accepting tx changes
     val reqIter = requirements.iterator.filter(r => r.isInstanceOf[TransactionObjectRequirement]).map { r =>

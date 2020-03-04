@@ -5,6 +5,7 @@ sealed abstract class RequirementError
 case class TransactionCollision(txid: TransactionId) extends RequirementError
 
 case class LocalTimeError() extends RequirementError
+case class ObjectTimestampError() extends RequirementError
 case class MissingObject() extends RequirementError
 case class MissingObjectUpdate() extends RequirementError
 case class ObjectTypeError() extends RequirementError

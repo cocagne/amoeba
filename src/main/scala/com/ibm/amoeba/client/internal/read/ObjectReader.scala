@@ -27,6 +27,6 @@ trait ObjectReader {
 
   def receivedResponsesFromAllStores: Boolean = numResponses == pointer.ida.width
 
-  def debugLogStatus(readUUID: UUID, header: String, log: String => Unit): Unit
+  def debugLogStatus(header: String, log: String => Unit): Unit
 }
 
