@@ -4,6 +4,7 @@ import java.util.UUID
 
 import com.ibm.amoeba.client.RegisteredTypeFactory
 import com.ibm.amoeba.client.internal.allocation.{AllocationFinalizationAction, DeletionFinalizationAction}
+import com.ibm.amoeba.client.internal.transaction.MissedUpdateFinalizationAction
 import com.ibm.amoeba.client.tkvl.{JoinFinalizationAction, KVObjectRootManager, SplitFinalizationAction}
 
 object StaticTypeRegistry {
@@ -13,7 +14,8 @@ object StaticTypeRegistry {
     SplitFinalizationAction,
     JoinFinalizationAction,
     AllocationFinalizationAction,
-    DeletionFinalizationAction
+    DeletionFinalizationAction,
+    MissedUpdateFinalizationAction
   )
 
   val types: List[(UUID, RegisteredTypeFactory)] = registry.map(t => t.typeUUID -> t)

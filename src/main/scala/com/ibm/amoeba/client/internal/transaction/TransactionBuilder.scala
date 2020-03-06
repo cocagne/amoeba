@@ -66,8 +66,8 @@ class TransactionBuilder(
     val designatedLeaderUID = chooseDesignatedLeader(primaryObject)
     val originatingClient = Some(clientId)
 
-    //if (addMissedUpdateTrackingFA)
-    //  finalizationActions = MissedUpdateFinalizationAction.createSerializedFA(missedCommitDelayInMs) :: finalizationActions
+    if (addMissedUpdateTrackingFA)
+      finalizationActions = MissedUpdateFinalizationAction.createSerializedFA(missedCommitDelayInMs) :: finalizationActions
 
     val txd = TransactionDescription(transactionId, startTimestamp, primaryObject, designatedLeaderUID,
       requirements, finalizationActions, originatingClient, notifyOnResolution.toList,
