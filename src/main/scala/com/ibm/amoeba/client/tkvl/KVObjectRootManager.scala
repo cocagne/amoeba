@@ -104,7 +104,7 @@ object KVObjectRootManager extends RegisteredTypeFactory with RootManagerFactory
 
   val typeUUID: UUID = UUID.fromString("CE36789D-42F1-43F9-9464-E9B44419D8C4")
 
-  def createRootManager(client: AmoebaClient, data: Array[Byte]): RootManager = {
+  def createRootManager(client: AmoebaClient, data: Array[Byte]): KVObjectRootManager = {
     val bb = ByteBuffer.wrap(data)
     bb.order(ByteOrder.BIG_ENDIAN)
     val klen = bb.getInt()

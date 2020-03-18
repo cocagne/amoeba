@@ -91,6 +91,34 @@ class KeyValueListNode(val reader: ObjectReader,
             )(implicit tx: Transaction): Future[Unit] = fetchContainingNode(key).flatMap { node =>
     KeyValueListNode.delete(node, key, reader, prepareForJoin)
   }
+
+  def foldLeft[B](initialZ: B)(fn: (B, Map[Key, ValueState]) => B): Future[B] = {
+    val p = Promise[B]()
+
+    def recurse(z: B, node: KeyValueListNode): Unit = {
+      val newz = fn(z, node.contents)
+
+      node.tail match {
+        case None => p.success(newz)
+
+        case Some(nodeTail) => reader.read(nodeTail.pointer) onComplete {
+
+          case Failure(err) => p.failure(err)
+
+          case Success(kvos) =>
+            val nextNode = new KeyValueListNode(reader, kvos.pointer, ordering, nodeTail.minimum,
+              kvos.revision, kvos.refcount, kvos.contents,
+              kvos.right.map(v => KeyValueListPointer(v.bytes)))
+
+            recurse(newz, nextNode)
+        }
+      }
+    }
+
+    recurse(initialZ, this)
+
+    p.future
+  }
 }
 
 object KeyValueListNode {

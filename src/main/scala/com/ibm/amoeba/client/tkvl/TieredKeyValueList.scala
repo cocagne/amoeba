@@ -61,6 +61,20 @@ class TieredKeyValueList(val client: AmoebaClient,
       ()
     }
   }
+
+  def foldLeft[B](z: B)(fn: (B, Map[Key, ValueState]) => B): Future[B] = {
+    for {
+      (tier, ordering, root) <- rootManager.getRootNode()
+      e <- fetchContainingNode(client, tier, 0, ordering, Key.AbsoluteMinimum, root, Set())
+      node = e match {
+        case Left(_) => throw new BrokenTree()
+        case Right(n) => n
+      }
+      result <- node.foldLeft(z)(fn)
+    } yield {
+      result
+    }
+  }
 }
 
 object TieredKeyValueList {

@@ -65,7 +65,7 @@ object BaseReadDriverSuite {
 
     private[client] def backgroundTasks: BackgroundTask = BackgroundTask.NoBackgroundTasks
 
-    private[client] def clientContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
+    private[amoeba] def clientContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
 
     private[client] def opportunisticRebuildManager: OpportunisticRebuildManager = OpportunisticRebuildManager.None
 
