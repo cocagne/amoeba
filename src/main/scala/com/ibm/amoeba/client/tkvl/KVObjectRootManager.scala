@@ -4,7 +4,7 @@ import java.nio.{ByteBuffer, ByteOrder}
 import java.util.UUID
 
 import com.ibm.amoeba.client.{AmoebaClient, ObjectAllocator, RegisteredTypeFactory, Transaction}
-import com.ibm.amoeba.common.objects.{AllocationRevisionGuard, Insert, Key, KeyOrdering, KeyRevisionGuard, KeyValueObjectPointer, ObjectRevision, Value}
+import com.ibm.amoeba.common.objects.{AllocationRevisionGuard, Insert, Key, KeyOrdering, KeyRevisionGuard, KeyValueObjectPointer, ObjectRevision, ObjectRevisionGuard, Value}
 import com.ibm.amoeba.common.transaction.KeyValueUpdate
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
@@ -93,7 +93,7 @@ class KVObjectRootManager(val client: AmoebaClient,
   def getRootRevisionGuard(): Future[AllocationRevisionGuard] = {
 
     getRoot().map { rd =>
-      KeyRevisionGuard(rd.node.pointer, treeKey, Some(rd.rootRevision))
+      KeyRevisionGuard(rd.node.pointer, treeKey, rd.rootRevision)
     }
   }
 }
@@ -132,7 +132,8 @@ object KVObjectRootManager extends RegisteredTypeFactory with RootManagerFactory
 
     for {
       alloc <- nodeAllocator.getAllocatorForTier(0)
-      rptr <- alloc.allocateKeyValueObject(KeyRevisionGuard(pointer, key, None), initialContent)
+      kvos <- client.read(pointer)
+      rptr <- alloc.allocateKeyValueObject(ObjectRevisionGuard(pointer, kvos.revision), initialContent)
     } yield {
       val root = Root(0, ordering, rptr, nodeAllocator)
       tx.update(pointer, None, None, kreqs, Insert(key, root.encode()) :: Nil)

@@ -1,6 +1,6 @@
 package com.ibm.amoeba.common.objects
 
-import java.nio.ByteBuffer
+import java.nio.{ByteBuffer, ByteOrder}
 import java.util.UUID
 
 import com.ibm.amoeba.common.DataBuffer
@@ -21,7 +21,7 @@ object AllocationRevisionGuard {
         val ptr = KeyValueObjectPointer(bb)
         val msb = bb.getLong()
         val lsb = bb.getLong()
-        val rev = if (msb == 0 && lsb == 0) None else Some(ObjectRevision(TransactionId(new UUID(msb, lsb))))
+        val rev = ObjectRevision(TransactionId(new UUID(msb, lsb)))
         val klen = bb.remaining()
         val karr = new Array[Byte](klen)
         bb.get(karr)
@@ -54,20 +54,17 @@ case class ObjectRevisionGuard( pointer: ObjectPointer,
 case class KeyRevisionGuard(
                            pointer: KeyValueObjectPointer,
                            key: Key,
-                           keyRevision: Option[ObjectRevision]
+                           keyRevision: ObjectRevision
                            ) extends AllocationRevisionGuard {
 
   def serialize(): DataBuffer = {
     val arr = new Array[Byte](1 + pointer.encodedSize + 16 + key.bytes.length)
     val bb = ByteBuffer.wrap(arr)
+    bb.order(ByteOrder.BIG_ENDIAN)
     bb.put(1.asInstanceOf[Byte])
     pointer.encodeInto(bb)
-    keyRevision match {
-      case Some(r) => bb.put(r.toArray)
-      case None =>
-        bb.putLong(0)
-        bb.putLong(0)
-    }
+    bb.putLong(keyRevision.lastUpdateTxUUID.getMostSignificantBits)
+    bb.putLong(keyRevision.lastUpdateTxUUID.getLeastSignificantBits)
     bb.put(key.bytes)
   }
 }

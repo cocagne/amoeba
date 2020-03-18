@@ -890,10 +890,7 @@ object NetworkCodec {
     val keyReq = o.revisionGuard match {
       case _: ObjectRevisionGuard => -1
       case krg: KeyRevisionGuard =>
-        val rev = krg.keyRevision match {
-          case Some(r) => r
-          case None => ObjectRevision(TransactionId(new UUID(0,0)))
-        }
+        val rev = krg.keyRevision
         encode(builder, KeyValueUpdate.KeyRevision(krg.key, rev))
     }
 
@@ -937,11 +934,7 @@ object NetworkCodec {
       ObjectRevisionGuard(allocatingObject, allocatingObjectRevision)
     } else {
       val kreq = decode(n.allocatingObjectKeyRequirement()).asInstanceOf[KeyValueUpdate.KeyRevision]
-      val rev = if (kreq.revision.lastUpdateTxUUID.getMostSignificantBits == 0 &&
-        kreq.revision.lastUpdateTxUUID.getLeastSignificantBits == 0)
-          None
-      else
-        Some(kreq.revision)
+      val rev = kreq.revision
       KeyRevisionGuard(allocatingObject.asInstanceOf[KeyValueObjectPointer], kreq.key, rev)
     }
 
