@@ -10,5 +10,4 @@ trait TaskExecutor {
                    taskType: DurableTaskType,
                    initialState: List[(Key, Array[Byte])])(implicit tx: Transaction): Future[Future[Option[AnyRef]]]
 
-  def resume(): Unit
 }

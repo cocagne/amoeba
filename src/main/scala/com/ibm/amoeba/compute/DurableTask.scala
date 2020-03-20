@@ -22,13 +22,7 @@ trait DurableTask {
 
   val taskPointer: DurableTaskPointer
 
-  /** Future is to the revision of the object when the task completes plus an optional return value
-    *
-    *  The returned object revision is intended to facilitate re-use of existing Task objects by
-    *  allowing the TaskGroupExecutor to learn the revision of the completed task without having to
-    *  first read the state of the object
-    */
-  def completed: Future[(ObjectRevision, Option[AnyRef])]
+  def completed: Future[Option[AnyRef]]
 
   def resume(): Unit
 
