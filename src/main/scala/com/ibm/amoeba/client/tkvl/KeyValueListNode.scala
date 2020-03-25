@@ -5,7 +5,7 @@ import com.ibm.amoeba.client.{KeyValueObjectState, ObjectAllocator, ObjectReader
 import com.ibm.amoeba.common.HLCTimestamp
 import com.ibm.amoeba.common.objects._
 import com.ibm.amoeba.common.transaction.KeyValueUpdate
-import com.ibm.amoeba.common.transaction.KeyValueUpdate.{FullContentLock, KeyRevision, WithinRange}
+import com.ibm.amoeba.common.transaction.KeyValueUpdate.{DoesNotExist, FullContentLock, KeyRevision, WithinRange}
 import com.ibm.amoeba.server.store.KVObjectState
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
@@ -81,9 +81,10 @@ class KeyValueListNode(val reader: ObjectReader,
              value: Value,
              maxNodeSize: Int,
              allocator: ObjectAllocator,
-             prepareForSplit: (Key, KeyValueObjectPointer) => Future[Unit] = (_,_) => Future.successful(())
+             prepareForSplit: (Key, KeyValueObjectPointer) => Future[Unit] = (_,_) => Future.successful(()),
+             requireDoesNotExist: Boolean=false
             )(implicit tx: Transaction): Future[Unit] = fetchContainingNode(key).flatMap { node =>
-    KeyValueListNode.insert(node, ordering, key, value, maxNodeSize, allocator, prepareForSplit)
+    KeyValueListNode.insert(node, ordering, key, value, maxNodeSize, allocator, prepareForSplit, requireDoesNotExist)
   }
 
   def delete(key: Key,
@@ -137,7 +138,8 @@ object KeyValueListNode {
                      value: Value,
                      maxNodeSize: Int,
                      allocator: ObjectAllocator,
-                     prepareForSplit: (Key, KeyValueObjectPointer) => Future[Unit] = (_,_) => Future.successful(())
+                     prepareForSplit: (Key, KeyValueObjectPointer) => Future[Unit] = (_,_) => Future.successful(()),
+                     requireDoesNotExist: Boolean=false
                     )(implicit tx: Transaction, ec: ExecutionContext): Future[Unit] =  {
 
     val currentSize = node.contents.foldLeft(0) { (sz, t) =>
@@ -153,10 +155,16 @@ object KeyValueListNode {
     if (newPairSize > maxSize)
       throw new NodeSizeExceeded
 
+    if (requireDoesNotExist && node.contents.contains(key))
+      tx.invalidateTransaction(new KeyAlreadyExists(key))
+
+    val reqs = if (requireDoesNotExist) DoesNotExist(key) :: Nil else Nil
+
     if (newPairSize + currentSize < maxSize) {
 
       tx.update(node.pointer, None, None,
-        List(WithinRange(key, ordering)), List(Insert(key, value.bytes)))
+        WithinRange(key, ordering) :: reqs, List(Insert(key, value.bytes)))
+
       Future.successful(())
     } else {
       val fullContent = node.contents + (key -> ValueState(value, tx.revision, HLCTimestamp.now))
@@ -201,7 +209,7 @@ object KeyValueListNode {
 
         val rightPtr = KeyValueListPointer(newMinimum, newObjectPointer)
 
-        tx.update(node.pointer, Some(node.revision), Some(node.fullContentLock), List(),
+        tx.update(node.pointer, Some(node.revision), Some(node.fullContentLock), reqs,
           SetMax(newMinimum) :: SetRight(rightPtr.toArray) :: oldOps)
 
         prepareForSplit(newMinimum, newObjectPointer)

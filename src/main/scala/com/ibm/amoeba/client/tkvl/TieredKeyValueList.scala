@@ -1,8 +1,9 @@
 package com.ibm.amoeba.client.tkvl
 
-import com.ibm.amoeba.client.{AmoebaClient, Transaction}
+import com.ibm.amoeba.client.{AmoebaClient, ObjectAllocator, Transaction}
 import com.ibm.amoeba.client.KeyValueObjectState.ValueState
-import com.ibm.amoeba.common.objects.{Key, KeyOrdering, KeyValueObjectPointer, ObjectId, Value}
+import com.ibm.amoeba.common.DataBuffer
+import com.ibm.amoeba.common.objects.{AllocationRevisionGuard, DataObjectPointer, Key, KeyOrdering, KeyValueObjectPointer, ObjectId, ObjectPointer, ObjectRevisionGuard, Value}
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
@@ -24,7 +25,7 @@ class TieredKeyValueList(val client: AmoebaClient,
     }
   }
 
-  def set(key: Key, value: Value)(implicit t: Transaction): Future[Unit] = {
+  def set(key: Key, value: Value, requireDoesNotExist: Boolean=false)(implicit t: Transaction): Future[Unit] = {
     def onSplit(newMinimum: Key, newNode: KeyValueObjectPointer): Future[Unit] = {
       SplitFinalizationAction.addToTransaction(rootManager, 1, newMinimum, newNode, t)
       Future.successful(())
@@ -38,7 +39,7 @@ class TieredKeyValueList(val client: AmoebaClient,
         case Left(_) => throw new BrokenTree()
         case Right(n) => n
       }
-      _ <- node.insert(key, value, maxNodeSize, alloc, onSplit)
+      _ <- node.insert(key, value, maxNodeSize, alloc, onSplit, requireDoesNotExist)
     } yield {
       ()
     }
