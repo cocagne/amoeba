@@ -25,7 +25,10 @@ class TieredKeyValueList(val client: AmoebaClient,
     }
   }
 
-  def set(key: Key, value: Value, requireDoesNotExist: Boolean=false)(implicit t: Transaction): Future[Unit] = {
+  def set(key: Key,
+          value: Value,
+          requireDoesNotExist: Boolean=false,
+          onRelpacement: (Key, ValueState) => Future[Unit] = (_,_) => Future.successful(()))(implicit t: Transaction): Future[Unit] = {
     def onSplit(newMinimum: Key, newNode: KeyValueObjectPointer): Future[Unit] = {
       SplitFinalizationAction.addToTransaction(rootManager, 1, newMinimum, newNode, t)
       Future.successful(())
@@ -39,7 +42,7 @@ class TieredKeyValueList(val client: AmoebaClient,
         case Left(_) => throw new BrokenTree()
         case Right(n) => n
       }
-      _ <- node.insert(key, value, maxNodeSize, alloc, onSplit, requireDoesNotExist)
+      _ <- node.insert(key, value, maxNodeSize, alloc, onSplit, requireDoesNotExist, onRelpacement)
     } yield {
       ()
     }
