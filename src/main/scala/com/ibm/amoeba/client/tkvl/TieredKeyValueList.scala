@@ -28,7 +28,7 @@ class TieredKeyValueList(val client: AmoebaClient,
   def set(key: Key,
           value: Value,
           requireDoesNotExist: Boolean=false,
-          onRelpacement: (Key, ValueState) => Future[Unit] = (_,_) => Future.successful(()))(implicit t: Transaction): Future[Unit] = {
+          onRelpacement: Option[(Key, ValueState) => Future[Unit]] = None)(implicit t: Transaction): Future[Unit] = {
     def onSplit(newMinimum: Key, newNode: KeyValueObjectPointer): Future[Unit] = {
       SplitFinalizationAction.addToTransaction(rootManager, 1, newMinimum, newNode, t)
       Future.successful(())

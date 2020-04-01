@@ -83,7 +83,7 @@ class KeyValueListNode(val reader: ObjectReader,
              allocator: ObjectAllocator,
              prepareForSplit: (Key, KeyValueObjectPointer) => Future[Unit] = (_,_) => Future.successful(()),
              requireDoesNotExist: Boolean=false,
-             onRelpacement: (Key, ValueState) => Future[Unit] = (_,_) => Future.successful(())
+             onRelpacement: Option[(Key, ValueState) => Future[Unit]] = None
             )(implicit tx: Transaction): Future[Unit] = fetchContainingNode(key).flatMap { node =>
     KeyValueListNode.insert(node, ordering, key, value, maxNodeSize, allocator, prepareForSplit, requireDoesNotExist,
       onRelpacement)
@@ -142,7 +142,7 @@ object KeyValueListNode {
                      allocator: ObjectAllocator,
                      prepareForSplit: (Key, KeyValueObjectPointer) => Future[Unit] = (_,_) => Future.successful(()),
                      requireDoesNotExist: Boolean=false,
-                     onRelpacement: (Key, ValueState) => Future[Unit] = (_,_) => Future.successful(())
+                     onRelpacement: Option[(Key, ValueState) => Future[Unit]] = None
                     )(implicit tx: Transaction, ec: ExecutionContext): Future[Unit] =  {
 
     val currentSize = node.contents.foldLeft(0) { (sz, t) =>
@@ -161,12 +161,20 @@ object KeyValueListNode {
     if (requireDoesNotExist && node.contents.contains(key))
       tx.invalidateTransaction(new KeyAlreadyExists(key))
 
-    val freplace = if (node.contents.contains(key))
-      onRelpacement(key, node.contents(key))
-    else
-      Future.successful(())
-
-    val reqs = if (requireDoesNotExist) DoesNotExist(key) :: Nil else Nil
+    val (reqs, freplace) = onRelpacement match {
+      case None =>
+        if (requireDoesNotExist)
+          (DoesNotExist(key) :: Nil, Future.successful(()))
+        else
+          (Nil, Future.successful(()))
+      case Some(fn) =>
+        node.contents.get(key) match {
+          case  None =>
+            (DoesNotExist(key) :: Nil, Future.successful(()))
+          case Some(vs) =>
+            (KeyRevision(key, vs.revision) :: Nil, fn(key, vs))
+        }
+    }
 
     if (newPairSize + currentSize < maxSize) {
 
