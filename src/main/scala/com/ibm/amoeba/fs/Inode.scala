@@ -1,21 +1,23 @@
 package com.ibm.amoeba.fs
 
-import java.nio.ByteBuffer
+import java.nio.{ByteBuffer, ByteOrder}
 import java.nio.charset.StandardCharsets
 
-import com.ibm.amoeba.client.tkvl.RootManager
+import com.ibm.amoeba.client.AmoebaClient
+import com.ibm.amoeba.client.tkvl.{Root, RootManager}
 import com.ibm.amoeba.common.DataBuffer
 import com.ibm.amoeba.common.objects.{DataObjectPointer, KeyValueObjectPointer}
 import com.ibm.amoeba.common.util.Varint
+import com.ibm.amoeba.fs.impl.simple.SimpleDirectoryRootManager
 import org.apache.logging.log4j.scala.Logging
 
 object Inode {
 
-  def apply(
+  def apply( client: AmoebaClient,
              pointer: InodePointer,
              content: DataBuffer): Inode = pointer match {
     case _: FilePointer            => FileInode(content)
-    case _: DirectoryPointer       => DirectoryInode(content)
+    case _: DirectoryPointer       => DirectoryInode(client, content)
     case _: SymlinkPointer         => SymlinkInode(content)
     case _: UnixSocketPointer      => UnixSocketInode(content)
     case _: CharacterDevicePointer => CharacterDeviceInode(content)
@@ -97,20 +99,25 @@ sealed abstract class Inode(val inodeNumber: Long,
 
 object DirectoryInode {
 
-  def init(mode: Int, uid: Int, gid: Int, parentDirectory: Option[DirectoryPointer], oinodeNumber: Option[Long]=None): DirectoryInode = {
+  def init(mode: Int, uid: Int,
+           gid: Int,
+           parentDirectory: Option[DirectoryPointer],
+           oinodeNumber: Option[Long],
+           contents: Root): DirectoryInode = {
     val now = Timespec.now
     val correctedMode = FileType.ensureModeFileType(mode, FileType.Directory)
-    new DirectoryInode(oinodeNumber.getOrElse(0), correctedMode, uid, gid, 1, now, now, now, None, parentDirectory, None)
+    new DirectoryInode(oinodeNumber.getOrElse(0), correctedMode, uid, gid, 1, now, now, now, None,
+      parentDirectory, contents)
   }
 
-  def apply(content: DataBuffer): DirectoryInode = {
+  def apply(client: AmoebaClient, content: DataBuffer): DirectoryInode = {
     val bb = content.asReadOnlyBuffer()
     val (_, inodeNumber, mode, uid, gid, links, ctime, mtime, atime, oxattrs) = Inode.decode(bb)
     val mask = bb.get()
     val oparent = if ((mask & 1 << 1) == 0) None else Some(InodePointer(bb).asInstanceOf[DirectoryPointer])
-    val ocontent = if ((mask & 1 << 0) == 0) None else None //Some(TieredKeyValueListRoot(bb))
+    val dcontent = Root(client, bb)
 
-    new DirectoryInode(inodeNumber, mode, uid, gid, links, ctime, mtime, atime, oxattrs, oparent, ocontent)
+    new DirectoryInode(inodeNumber, mode, uid, gid, links, ctime, mtime, atime, oxattrs, oparent, dcontent)
   }
 }
 
@@ -124,7 +131,7 @@ class DirectoryInode(inodeNumber: Long,
                      atime: Timespec,
                      oxattrs: Option[KeyValueObjectPointer],
                      val oparent: Option[DirectoryPointer],
-                     val ocontents: Option[RootManager]) extends Inode(inodeNumber, mode, uid, gid, links,
+                     val contents: Root) extends Inode(inodeNumber, mode, uid, gid, links,
   ctime, mtime, atime, oxattrs) {
 
   override def update(mode: Option[Int] = None, uid: Option[Int] = None, gid: Option[Int] = None,
@@ -134,28 +141,28 @@ class DirectoryInode(inodeNumber: Long,
     new DirectoryInode(inodeNumber.getOrElse(this.inodeNumber), mode.getOrElse(this.mode), uid.getOrElse(this.uid),
       gid.getOrElse(this.gid),
       links.getOrElse(this.links), ctime.getOrElse(this.ctime), mtime.getOrElse(this.mtime),
-      atime.getOrElse(this.atime), oxattrs.getOrElse(this.oxattrs), this.oparent, this.ocontents)
+      atime.getOrElse(this.atime), oxattrs.getOrElse(this.oxattrs), this.oparent, this.contents)
   }
 
   def setParentDirectory(newParent: Option[DirectoryPointer]): DirectoryInode = {
-    new DirectoryInode(inodeNumber, mode, uid, gid, links, ctime, mtime, atime, oxattrs, newParent, ocontents)
+    new DirectoryInode(inodeNumber, mode, uid, gid, links, ctime, mtime, atime, oxattrs, newParent, contents)
   }
 
-  def setContentTree(newContents: Option[RootManager]): DirectoryInode = {
+  def setContentTree(newContents: Root): DirectoryInode = {
     new DirectoryInode(inodeNumber, mode, uid, gid, links, ctime, mtime, atime, oxattrs, oparent, newContents)
   }
 
   override def encodedSize: Int = {
-    //super.encodedSize + 1 + oparent.map(_.encodedSize).getOrElse(0) + ocontents.map(_.encodedSize).getOrElse(0)
+    super.encodedSize + 1 + oparent.map(_.encodedSize).getOrElse(0) + contents.encodedSize
     super.encodedSize + 1 + oparent.map(_.encodedSize).getOrElse(0) + 0
   }
 
   override def encodeInto(bb: ByteBuffer): Unit = {
     super.encodeInto(bb)
-    val mask = oparent.map(_ => 1 << 1).getOrElse(0) | ocontents.map(_ => 1 << 0).getOrElse(0)
+    val mask = oparent.map(_ => 1 << 1).getOrElse(0)
     bb.put(mask.asInstanceOf[Byte])
     oparent.foreach(_.encodeInto(bb))
-    //ocontents.foreach(_.encodeInto(bb))
+    contents.encodeInto(bb)
   }
 }
 

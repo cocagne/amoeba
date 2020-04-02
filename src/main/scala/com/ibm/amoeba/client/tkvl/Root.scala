@@ -24,6 +24,10 @@ case class Root(tier: Int,
     nodeAllocator.encodeInto(bb)
     arr
   }
+
+  def encodeInto(bb: ByteBuffer): Unit = {
+    bb.put(this.encode())
+  }
 }
 
 object Root {
@@ -46,6 +50,10 @@ object Root {
 
   def apply(client: AmoebaClient, arr: Array[Byte]): Root = {
     val bb = ByteBuffer.wrap(arr)
+    Root(client, bb)
+  }
+
+  def apply(client: AmoebaClient, bb: ByteBuffer): Root = {
     bb.order(ByteOrder.BIG_ENDIAN)
     val tier = bb.get()
     val ordering = KeyOrdering.fromCode(bb.get())
