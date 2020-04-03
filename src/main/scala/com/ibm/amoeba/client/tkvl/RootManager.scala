@@ -1,14 +1,16 @@
 package com.ibm.amoeba.client.tkvl
 
 import com.ibm.amoeba.client.{ObjectAllocator, Transaction}
-import com.ibm.amoeba.common.objects.{AllocationRevisionGuard, KeyOrdering, KeyValueObjectPointer}
+import com.ibm.amoeba.common.objects.{AllocationRevisionGuard, Key, KeyOrdering, KeyValueObjectPointer, Value}
 
 import scala.concurrent.Future
 
 trait RootManager {
 
   /** Returns (numTiers, keyOrdering, rootNode) */
-  def getRootNode(): Future[(Int, KeyOrdering, KeyValueListNode)]
+  def getRootNode(): Future[(Int, KeyOrdering, Option[KeyValueListNode])]
+
+  def createInitialNode(contents: Map[Key,Value])(implicit tx: Transaction): Future[Unit]
 
   def getAllocatorForTier(tier: Int): Future[ObjectAllocator]
 

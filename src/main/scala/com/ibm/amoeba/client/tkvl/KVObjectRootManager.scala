@@ -33,14 +33,18 @@ class KVObjectRootManager(val client: AmoebaClient,
           case Some(v) => try {
             val root = Root(client, v.value.bytes)
 
-            client.read(root.rootObject).onComplete {
-              case Failure(err) => p.failure(err)
-              case Success(rootKvos) =>
+            root.orootObject match {
+              case None => p.success(RData(root, v.revision, None))
+              case Some(rootObject) =>
+                client.read(rootObject).onComplete {
+                  case Failure(err) => p.failure(err)
+                  case Success(rootKvos) =>
 
-                val rootLp = KeyValueListPointer(Key.AbsoluteMinimum, root.rootObject)
-                val node = KeyValueListNode(client, rootLp, root.ordering, rootKvos)
+                    val rootLp = KeyValueListPointer(Key.AbsoluteMinimum, rootObject)
+                    val node = KeyValueListNode(client, rootLp, root.ordering, rootKvos)
 
-                p.success(RData(root, v.revision, node))
+                    p.success(RData(root, v.revision, Some(node)))
+                }
             }
           } catch {
             case _: Throwable => p.failure(new InvalidRoot)
@@ -59,8 +63,8 @@ class KVObjectRootManager(val client: AmoebaClient,
     rd.root.nodeAllocator.getAllocatorForTier(tier)
   }
 
-  def getRootNode(): Future[(Int, KeyOrdering, KeyValueListNode)] = getRoot().map { rd =>
-    (rd.root.tier, rd.root.ordering, rd.node)
+  def getRootNode(): Future[(Int, KeyOrdering, Option[KeyValueListNode])] = getRoot().map { rd =>
+    (rd.root.tier, rd.root.ordering, rd.onode)
   }
 
   def getMaxNodeSize(tier: Int): Future[Int] = getRoot().map { rd =>
@@ -80,7 +84,7 @@ class KVObjectRootManager(val client: AmoebaClient,
   def prepareRootUpdate(newTier: Int, newRoot: KeyValueObjectPointer)(implicit tx: Transaction): Future[Unit] = {
     getRoot().map { rd =>
       if (rd.root.tier != newTier) {
-        val data = rd.root.copy(tier=newTier, rootObject=newRoot).encode()
+        val data = rd.root.copy(tier=newTier, orootObject=Some(newRoot)).encode()
 
         val reqs = KeyValueUpdate.KeyRevision(treeKey, rd.rootRevision) :: Nil
         val ops = Insert(treeKey, data) :: Nil
@@ -93,14 +97,30 @@ class KVObjectRootManager(val client: AmoebaClient,
   def getRootRevisionGuard(): Future[AllocationRevisionGuard] = {
 
     getRoot().map { rd =>
-      KeyRevisionGuard(rd.node.pointer, treeKey, rd.rootRevision)
+      KeyRevisionGuard(pointer, treeKey, rd.rootRevision)
+    }
+  }
+
+  def createInitialNode(contents: Map[Key,Value])(implicit tx: Transaction): Future[Unit] = {
+    for {
+      RData(root, _, _) <- getRoot()
+      alloc <- root.nodeAllocator.getAllocatorForTier(0)
+      kvos <- client.read(pointer)
+      rptr <- alloc.allocateKeyValueObject(ObjectRevisionGuard(pointer, kvos.revision), contents)
+    } yield {
+      val newRoot = Root(0, root.ordering, Some(rptr), root.nodeAllocator)
+      val kreqs = KeyValueUpdate.KeyRevision(treeKey, kvos.contents(treeKey).revision) :: Nil
+      tx.update(pointer, None, None, kreqs, Insert(treeKey, newRoot.encode()) :: Nil)
+      tx.result.map { _ =>
+        new KVObjectRootManager(client, treeKey, pointer)
+      }
     }
   }
 }
 
 object KVObjectRootManager extends RegisteredTypeFactory with RootManagerFactory {
 
-  private case class RData(root: Root, rootRevision: ObjectRevision, node: KeyValueListNode)
+  private case class RData(root: Root, rootRevision: ObjectRevision, onode: Option[KeyValueListNode])
 
   val typeUUID: UUID = UUID.fromString("CE36789D-42F1-43F9-9464-E9B44419D8C4")
 
@@ -130,15 +150,19 @@ object KVObjectRootManager extends RegisteredTypeFactory with RootManagerFactory
 
     val kreqs = KeyValueUpdate.DoesNotExist(key) :: Nil
 
-    for {
-      alloc <- nodeAllocator.getAllocatorForTier(0)
-      kvos <- client.read(pointer)
-      rptr <- alloc.allocateKeyValueObject(ObjectRevisionGuard(pointer, kvos.revision), initialContent)
-    } yield {
-      val root = Root(0, ordering, rptr, nodeAllocator)
-      tx.update(pointer, None, None, kreqs, Insert(key, root.encode()) :: Nil)
-      tx.result.map { _ =>
-        new KVObjectRootManager(client, key, pointer)
+    if (initialContent.isEmpty) {
+      Future.successful(Future.successful(new KVObjectRootManager(client, key, pointer)))
+    } else {
+      for {
+        alloc <- nodeAllocator.getAllocatorForTier(0)
+        kvos <- client.read(pointer)
+        rptr <- alloc.allocateKeyValueObject(ObjectRevisionGuard(pointer, kvos.revision), initialContent)
+      } yield {
+        val root = Root(0, ordering, Some(rptr), nodeAllocator)
+        tx.update(pointer, None, None, kreqs, Insert(key, root.encode()) :: Nil)
+        tx.result.map { _ =>
+          new KVObjectRootManager(client, key, pointer)
+        }
       }
     }
   }

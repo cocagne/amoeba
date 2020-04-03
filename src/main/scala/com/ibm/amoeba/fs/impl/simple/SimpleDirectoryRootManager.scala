@@ -29,15 +29,18 @@ class SimpleDirectoryRootManager(client: AmoebaClient,
         val inode = DirectoryInode(client, inodeDos.data)
         val root = inode.contents
         try {
+          root.orootObject match {
+            case None => p.success(RData(root, inodeDos.revision, None))
+            case Some(rootObject) =>
+              client.read(rootObject).onComplete {
+                case Failure(err) => p.failure(err)
+                case Success(rootKvos) =>
 
-          client.read(root.rootObject).onComplete {
-            case Failure(err) => p.failure(err)
-            case Success(rootKvos) =>
+                  val rootLp = KeyValueListPointer(Key.AbsoluteMinimum, rootObject)
+                  val node = KeyValueListNode(client, rootLp, root.ordering, rootKvos)
 
-              val rootLp = KeyValueListPointer(Key.AbsoluteMinimum, root.rootObject)
-              val node = KeyValueListNode(client, rootLp, root.ordering, rootKvos)
-
-              p.success(RData(root, inodeDos.revision, node))
+                  p.success(RData(root, inodeDos.revision, Some(node)))
+              }
           }
         } catch {
           case _: Throwable => p.failure(new InvalidRoot)
@@ -56,8 +59,8 @@ class SimpleDirectoryRootManager(client: AmoebaClient,
     rd.root.nodeAllocator.getAllocatorForTier(tier)
   }
 
-  def getRootNode(): Future[(Int, KeyOrdering, KeyValueListNode)] = getRoot().map { rd =>
-    (rd.root.tier, rd.root.ordering, rd.node)
+  def getRootNode(): Future[(Int, KeyOrdering, Option[KeyValueListNode])] = getRoot().map { rd =>
+    (rd.root.tier, rd.root.ordering, rd.onode)
   }
 
   def getMaxNodeSize(tier: Int): Future[Int] = getRoot().map { rd =>
@@ -67,7 +70,7 @@ class SimpleDirectoryRootManager(client: AmoebaClient,
   override def getRootRevisionGuard(): Future[AllocationRevisionGuard] = {
 
     getRoot().map { rd =>
-      ObjectRevisionGuard(rd.node.pointer, rd.rootRevision)
+      ObjectRevisionGuard(inodePointer, rd.rootRevision)
     }
   }
 
@@ -90,7 +93,7 @@ class SimpleDirectoryRootManager(client: AmoebaClient,
 
         val root = inode.contents
 
-        val nextRoot = root.copy(tier = newTier, rootObject = newRoot)
+        val nextRoot = root.copy(tier = newTier, orootObject = Some(newRoot))
         val newInode = inode.setContentTree(nextRoot)
 
         tx.overwrite(inodePointer, inodeDos.revision, newInode.toArray)
@@ -99,12 +102,29 @@ class SimpleDirectoryRootManager(client: AmoebaClient,
 
     p.future
   }
+
+  override def createInitialNode(contents: Map[Key,Value])(implicit tx: Transaction): Future[Unit] = {
+    for {
+      RData(root, _, _) <- getRoot()
+      alloc <- root.nodeAllocator.getAllocatorForTier(0)
+      dos <- client.read(inodePointer)
+      rptr <- alloc.allocateKeyValueObject(ObjectRevisionGuard(inodePointer, dos.revision), contents)
+    } yield {
+      val dinode = DirectoryInode(client, dos.data)
+      val newRoot = Root(0, root.ordering, Some(rptr), root.nodeAllocator)
+      val newInode = dinode.setContentTree(newRoot)
+      tx.overwrite(inodePointer, dos.revision, newInode.toArray)
+      tx.result.map { _ =>
+        ()
+      }
+    }
+  }
 }
 
 object SimpleDirectoryRootManager extends RegisteredTypeFactory with RootManagerFactory {
   val typeUUID: UUID = UUID.fromString("52887CBE-0D2B-43C8-80FA-999DA177392D")
 
-  private case class RData(root: Root, rootRevision: ObjectRevision, node: KeyValueListNode)
+  private case class RData(root: Root, rootRevision: ObjectRevision, onode: Option[KeyValueListNode])
 
   def apply(client: AmoebaClient, bb: ByteBuffer): SimpleDirectoryRootManager = {
     new SimpleDirectoryRootManager(client, DataObjectPointer(bb))

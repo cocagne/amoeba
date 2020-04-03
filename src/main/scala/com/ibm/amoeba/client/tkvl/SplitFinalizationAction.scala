@@ -81,11 +81,16 @@ class SplitFinalizationAction(val client: AmoebaClient,
       }
 
       rootManager.getRootNode().flatMap { t =>
-        val (rootTier, ordering, rootNode) = t
-        if (tier > rootTier)
-          createNewRoot(rootTier, ordering, rootNode)
-        else
-          insertIntoExistingTier(rootTier, ordering, rootNode)
+        val (rootTier, ordering, orootNode) = t
+
+        orootNode match {
+          case None => Future.successful(()) // shouldn't be possible
+          case Some(rootNode) =>
+            if (tier > rootTier)
+              createNewRoot(rootTier, ordering, rootNode)
+            else
+              insertIntoExistingTier(rootTier, ordering, rootNode)
+        }
       }
     }
 

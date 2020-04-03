@@ -17,10 +17,14 @@ class TieredKeyValueList(val client: AmoebaClient,
 
   def get(key: Key): Future[Option[ValueState]] = {
     rootManager.getRootNode().flatMap { t =>
-      val (tier, ordering, node) = t
-      fetchContainingNode(client, tier, 0, ordering, key, node, Set()).map {
-        case Left(_) => throw new BrokenTree()
-        case Right(node) => node.contents.get(key)
+      val (tier, ordering, onode) = t
+      onode match {
+        case None => Future.successful(None)
+        case Some(node) =>
+          fetchContainingNode(client, tier, 0, ordering, key, node, Set()).map {
+            case Left(_) => throw new BrokenTree()
+            case Right(node) => node.contents.get(key)
+          }
       }
     }
   }
@@ -33,18 +37,30 @@ class TieredKeyValueList(val client: AmoebaClient,
       SplitFinalizationAction.addToTransaction(rootManager, 1, newMinimum, newNode, t)
       Future.successful(())
     }
-    for {
-      (tier, ordering, root) <- rootManager.getRootNode()
-      alloc <- rootManager.getAllocatorForTier(0)
-      maxNodeSize <- rootManager.getMaxNodeSize(0)
-      e <- fetchContainingNode(client, tier, 0, ordering, key, root, Set())
-      node = e match {
-        case Left(_) => throw new BrokenTree()
-        case Right(n) => n
+    def empty(tier: Int, ordering: KeyOrdering): Future[Unit] = {
+      rootManager.createInitialNode(Map(key -> value))
+    }
+    def nonEmpty(tier: Int, ordering: KeyOrdering, root: KeyValueListNode): Future[Unit] = {
+      for {
+        alloc <- rootManager.getAllocatorForTier(0)
+        maxNodeSize <- rootManager.getMaxNodeSize(0)
+        e <- fetchContainingNode(client, tier, 0, ordering, key, root, Set())
+        node = e match {
+          case Left(_) => throw new BrokenTree()
+          case Right(n) => n
+        }
+        _ <- node.insert(key, value, maxNodeSize, alloc, onSplit, requireDoesNotExist, onRelpacement)
+      } yield {
+        ()
       }
-      _ <- node.insert(key, value, maxNodeSize, alloc, onSplit, requireDoesNotExist, onRelpacement)
-    } yield {
-      ()
+    }
+
+   rootManager.getRootNode().flatMap { t =>
+      val (tier, ordering, oroot) = t
+      oroot match {
+        case None => empty(tier, ordering)
+        case Some(root) => nonEmpty(tier, ordering, root)
+      }
     }
   }
 
@@ -53,30 +69,48 @@ class TieredKeyValueList(val client: AmoebaClient,
       JoinFinalizationAction.addToTransaction(rootManager, 1, delMinimum, delNode, t)
       Future.successful(())
     }
-    for {
-      (tier, ordering, root) <- rootManager.getRootNode()
-      e <- fetchContainingNode(client, tier, 0, ordering, key, root, Set())
-      node = e match {
-        case Left(_) => throw new BrokenTree()
-        case Right(n) => n
+    def nonEmpty(tier: Int, ordering: KeyOrdering, root: KeyValueListNode): Future[Unit] = {
+      for {
+        e <- fetchContainingNode(client, tier, 0, ordering, key, root, Set())
+        node = e match {
+          case Left(_) => throw new BrokenTree()
+          case Right(n) => n
+        }
+        _ <- node.delete(key, onJoin)
+      } yield {
+        ()
       }
-      _ <- node.delete(key, onJoin)
-    } yield {
-      ()
+    }
+
+    rootManager.getRootNode().flatMap { t =>
+      val (tier, ordering, oroot) = t
+      oroot match {
+        case None => Future.successful(())
+        case Some(root) => nonEmpty(tier, ordering, root)
+      }
     }
   }
 
   def foldLeft[B](z: B)(fn: (B, Map[Key, ValueState]) => B): Future[B] = {
-    for {
-      (tier, ordering, root) <- rootManager.getRootNode()
-      e <- fetchContainingNode(client, tier, 0, ordering, Key.AbsoluteMinimum, root, Set())
-      node = e match {
-        case Left(_) => throw new BrokenTree()
-        case Right(n) => n
+
+    def nonEmpty(tier: Int, ordering: KeyOrdering, root: KeyValueListNode): Future[B] = {
+      for {
+        e <- fetchContainingNode(client, tier, 0, ordering, Key.AbsoluteMinimum, root, Set())
+        node = e match {
+          case Left(_) => throw new BrokenTree()
+          case Right(n) => n
+        }
+        result <- node.foldLeft(z)(fn)
+      } yield {
+        result
       }
-      result <- node.foldLeft(z)(fn)
-    } yield {
-      result
+    }
+    rootManager.getRootNode().flatMap { t =>
+      val (tier, ordering, oroot) = t
+      oroot match {
+        case None => Future.successful(z)
+        case Some(root) => nonEmpty(tier, ordering, root)
+      }
     }
   }
 }

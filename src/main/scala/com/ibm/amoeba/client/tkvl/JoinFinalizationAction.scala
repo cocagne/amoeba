@@ -72,11 +72,15 @@ class JoinFinalizationAction(val client: AmoebaClient,
       }
 
       rootManager.getRootNode().flatMap { t =>
-        val (rootTier, ordering, rootNode) = t
-        if (tier == rootTier && rootNode.contents.size == 2)
-          setNewRoot(rootTier, ordering, rootNode)
-        else
-          deleteFromExistingTier(rootTier, ordering, rootNode)
+        val (rootTier, ordering, orootNode) = t
+        orootNode match {
+          case None =>  Future.successful(())// Nothing to do
+          case Some(rootNode) =>
+            if (tier == rootTier && rootNode.contents.size == 2)
+              setNewRoot(rootTier, ordering, rootNode)
+            else
+              deleteFromExistingTier(rootTier, ordering, rootNode)
+        }
       }
     }
 

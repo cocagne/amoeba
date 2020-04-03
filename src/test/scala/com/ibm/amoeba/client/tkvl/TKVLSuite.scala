@@ -26,7 +26,6 @@ class TKVLSuite extends IntegrationTestSuite {
       froot <- KVObjectRootManager.createNewTree(client, ptr, treeKey, ByteArrayKeyOrdering, nodeAllocator, Map(key -> value))
 
       _ <- tx1.commit()
-
       _ <- waitForTransactionsToComplete()
 
       root <- froot
@@ -65,6 +64,7 @@ class TKVLSuite extends IntegrationTestSuite {
       froot <- KVObjectRootManager.createNewTree(client, ptr, treeKey, ByteArrayKeyOrdering, nodeAllocator, Map(key -> value))
 
       _ <- tx1.commit()
+      _ <- waitForTransactionsToComplete()
 
       root <- froot
       tree <- root.getTree()
@@ -72,7 +72,6 @@ class TKVLSuite extends IntegrationTestSuite {
       tx = client.newTransaction()
       _ <- tree.set(key2, value2)(tx)
       r <- tx.commit()
-
       _ <- waitForTransactionsToComplete()
 
       v <- tree.get(key2)
@@ -110,6 +109,7 @@ class TKVLSuite extends IntegrationTestSuite {
       froot <- KVObjectRootManager.createNewTree(client, ptr, treeKey, ByteArrayKeyOrdering, nodeAllocator, Map(key -> value))
 
       _ <- tx1.commit()
+      _ <- waitForTransactionsToComplete()
 
       root <- froot
       tree <- root.getTree()
@@ -117,6 +117,7 @@ class TKVLSuite extends IntegrationTestSuite {
       tx = client.newTransaction()
       _ <- tree.set(key2, value2)(tx)
       r <- tx.commit()
+      _ <- waitForTransactionsToComplete()
 
       tx = client.newTransaction()
       _ <- tree.set(key3, value3)(tx)
@@ -161,6 +162,7 @@ class TKVLSuite extends IntegrationTestSuite {
       froot <- KVObjectRootManager.createNewTree(client, ptr, treeKey, ByteArrayKeyOrdering, nodeAllocator, Map(key -> value))
 
       _ <- tx1.commit()
+      _ <- waitForTransactionsToComplete()
 
       root <- froot
       tree <- root.getTree()
@@ -168,6 +170,7 @@ class TKVLSuite extends IntegrationTestSuite {
       tx = client.newTransaction()
       _ <- tree.set(key2, value2)(tx)
       r <- tx.commit()
+      _ <- waitForTransactionsToComplete()
 
       _ <- waitForTransactionsToComplete()
 

@@ -41,8 +41,8 @@ object Bootstrap {
       }
 
       val poolConfig = SimpleStoragePool.encode(Nucleus.poolId, ida.width, ida, None, None)
-      val errorTree = Root(0, ByteArrayKeyOrdering, allocate(), BootstrapPoolNodeAllocator).encode()
-      val allocTree = Root(0, ByteArrayKeyOrdering, allocate(), BootstrapPoolNodeAllocator).encode()
+      val errorTree = Root(0, ByteArrayKeyOrdering, Some(allocate()), BootstrapPoolNodeAllocator).encode()
+      val allocTree = Root(0, ByteArrayKeyOrdering, Some(allocate()), BootstrapPoolNodeAllocator).encode()
 
       val pool = allocate(List(StoragePool.ConfigKey -> poolConfig,
                                StoragePool.ErrorTreeKey -> errorTree,
@@ -50,7 +50,7 @@ object Bootstrap {
 
       val poolTree = Root(0,
         ByteArrayKeyOrdering,
-        allocate(List(Key(Nucleus.poolId.uuid) -> pool.toArray)),
+        Some(allocate(List(Key(Nucleus.poolId.uuid) -> pool.toArray))),
         BootstrapPoolNodeAllocator)
 
       val nucleusContent: List[(Key, Array[Byte])] = List(Nucleus.PoolTreeKey -> poolTree.encode())

@@ -9,10 +9,10 @@ import scala.concurrent.{ExecutionContext, Future}
 
 case class Root(tier: Int,
                 ordering: KeyOrdering,
-                rootObject: KeyValueObjectPointer,
+                orootObject: Option[KeyValueObjectPointer],
                 nodeAllocator: NodeAllocator) {
 
-  def encodedSize: Int = 1 + 1 + rootObject.encodedSize + nodeAllocator.encodedSize
+  def encodedSize: Int = 1 + 1 + nodeAllocator.encodedSize + 1 + orootObject.map(_.encodedSize).getOrElse(0)
 
   def encode(): Array[Byte] = {
     val arr = new Array[Byte](encodedSize)
@@ -20,8 +20,13 @@ case class Root(tier: Int,
     bb.order(ByteOrder.BIG_ENDIAN)
     bb.put(tier.asInstanceOf[Byte])
     bb.put(ordering.code)
-    rootObject.encodeInto(bb)
     nodeAllocator.encodeInto(bb)
+    orootObject match {
+      case None => bb.put(0.asInstanceOf[Byte])
+      case Some(rp) =>
+        bb.put(1.asInstanceOf[Byte])
+        rp.encodeInto(bb)
+    }
     arr
   }
 
@@ -40,11 +45,15 @@ object Root {
 
     implicit val ec: ExecutionContext = client.clientContext
 
-    for {
-      alloc <- nodeAllocator.getAllocatorForTier(0)
-      rp <- alloc.allocateKeyValueObject(guard, initialContent)
-    } yield {
-      new Root(0, ordering, rp, nodeAllocator)
+    if (initialContent.isEmpty) {
+      Future.successful(new Root(0, ordering, None, nodeAllocator))
+    } else {
+      for {
+        alloc <- nodeAllocator.getAllocatorForTier(0)
+        rp <- alloc.allocateKeyValueObject(guard, initialContent)
+      } yield {
+        new Root(0, ordering, Some(rp), nodeAllocator)
+      }
     }
   }
 
@@ -57,9 +66,13 @@ object Root {
     bb.order(ByteOrder.BIG_ENDIAN)
     val tier = bb.get()
     val ordering = KeyOrdering.fromCode(bb.get())
-    val rootObject = KeyValueObjectPointer(bb)
     val nodeAllocator = NodeAllocator(client, bb)
 
-    Root(tier, ordering, rootObject, nodeAllocator)
+    val oroot = bb.get() match {
+      case 1 => Some(KeyValueObjectPointer(bb))
+      case _ => None
+    }
+
+    Root(tier, ordering, oroot, nodeAllocator)
   }
 }
