@@ -272,6 +272,10 @@ object NetworkCodec {
         P.KVReq.addRevision(builder, encodeObjectRevision(builder, r.revision))
         P.KeyRequirement.KeyRevision
 
+      case r: KeyValueUpdate.KeyObjectRevision =>
+        P.KVReq.addRevision(builder, encodeObjectRevision(builder, r.revision))
+        P.KeyRequirement.KeyObjectRevision
+
       case r: KeyValueUpdate.WithinRange =>
         P.KVReq.addComparison(builder, encodeKeyComparison(r.ordering))
         P.KeyRequirement.WithinRange
@@ -314,6 +318,9 @@ object NetworkCodec {
       case P.KeyRequirement.KeyRevision =>
         val rev = decode(n.revision())
         KeyValueUpdate.KeyRevision(key, rev)
+      case P.KeyRequirement.KeyObjectRevision =>
+        val rev = decode(n.revision())
+        KeyValueUpdate.KeyObjectRevision(key, rev)
       case P.KeyRequirement.WithinRange =>
         val ord = decodeKeyComparison(n.comparison())
         KeyValueUpdate.WithinRange(key, ord)

@@ -66,6 +66,8 @@ object RequirementsLocker {
               vs.lockedToTransaction = Some(transactionId)
             }
 
+            case r: KeyValueUpdate.KeyObjectRevision => state.lockedToTransaction = Some(transactionId)
+
             case r: KeyValueUpdate.Exists => kvs.content.get(r.key).foreach { vs =>
               vs.lockedToTransaction = Some(transactionId)
             }
@@ -147,6 +149,8 @@ object RequirementsLocker {
             case r: KeyValueUpdate.KeyRevision => kvs.content.get(r.key).foreach { vs =>
               vs.lockedToTransaction = None
             }
+
+            case r: KeyValueUpdate.KeyObjectRevision => state.lockedToTransaction = None
 
             case r: KeyValueUpdate.Exists => kvs.content.get(r.key).foreach { vs =>
               vs.lockedToTransaction = None

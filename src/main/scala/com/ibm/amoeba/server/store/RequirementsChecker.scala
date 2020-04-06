@@ -161,6 +161,10 @@ object RequirementsChecker {
                   throw ObjectErr(state.objectId, KeyTimestampError())
             }
 
+            case r: KeyValueUpdate.KeyObjectRevision =>
+              if (state.metadata.revision != r.revision)
+                throw ObjectErr(state.objectId, RevisionMismatch())
+
             case r: KeyValueUpdate.WithinRange =>
               kvs.min.foreach { min =>
                 if (r.ordering.compare(r.key, min) < 0)

@@ -61,6 +61,7 @@ object KeyValueUpdate {
   }
 
   case class KeyRevision(key: Key, revision: ObjectRevision) extends KeyRequirement
+  case class KeyObjectRevision(key: Key, revision: ObjectRevision) extends KeyRequirement
   case class WithinRange(key: Key, ordering: KeyOrdering) extends KeyRequirement
   case class Exists(key: Key) extends KeyRequirement
   case class MayExist(key: Key) extends KeyRequirement

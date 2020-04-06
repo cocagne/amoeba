@@ -103,7 +103,7 @@ class SimpleDirectoryRootManager(client: AmoebaClient,
     p.future
   }
 
-  override def createInitialNode(contents: Map[Key,Value])(implicit tx: Transaction): Future[Unit] = {
+  override def createInitialNode(contents: Map[Key,Value])(implicit tx: Transaction): Future[AllocationRevisionGuard] = {
     for {
       RData(root, _, _) <- getRoot()
       alloc <- root.nodeAllocator.getAllocatorForTier(0)
@@ -117,6 +117,7 @@ class SimpleDirectoryRootManager(client: AmoebaClient,
       tx.result.map { _ =>
         ()
       }
+      ObjectRevisionGuard(inodePointer, dos.revision)
     }
   }
 }

@@ -63,7 +63,7 @@ class SplitFinalizationAction(val client: AmoebaClient,
                 Future.successful(())
               }
 
-              node.insert(newMinimum, Value(newNode.toArray), nodeSize, alloc, onSplit)
+              node.insert(newMinimum, Value(newNode.toArray), nodeSize, alloc, onSplit).map(_=>())
 
           }
         }

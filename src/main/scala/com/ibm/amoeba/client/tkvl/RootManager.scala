@@ -10,7 +10,7 @@ trait RootManager {
   /** Returns (numTiers, keyOrdering, rootNode) */
   def getRootNode(): Future[(Int, KeyOrdering, Option[KeyValueListNode])]
 
-  def createInitialNode(contents: Map[Key,Value])(implicit tx: Transaction): Future[Unit]
+  def createInitialNode(contents: Map[Key,Value])(implicit tx: Transaction): Future[AllocationRevisionGuard]
 
   def getAllocatorForTier(tier: Int): Future[ObjectAllocator]
 

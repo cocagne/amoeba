@@ -101,7 +101,7 @@ class KVObjectRootManager(val client: AmoebaClient,
     }
   }
 
-  def createInitialNode(contents: Map[Key,Value])(implicit tx: Transaction): Future[Unit] = {
+  def createInitialNode(contents: Map[Key,Value])(implicit tx: Transaction): Future[AllocationRevisionGuard] = {
     for {
       RData(root, _, _) <- getRoot()
       alloc <- root.nodeAllocator.getAllocatorForTier(0)
@@ -114,6 +114,7 @@ class KVObjectRootManager(val client: AmoebaClient,
       tx.result.map { _ =>
         new KVObjectRootManager(client, treeKey, pointer)
       }
+      ObjectRevisionGuard(pointer, kvos.revision)
     }
   }
 }

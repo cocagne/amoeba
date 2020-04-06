@@ -80,6 +80,7 @@ enum DataUpdateOperation:byte {
 
 enum KeyRequirement:byte {
   KeyRevision,
+  KeyObjectRevision,
   WithinRange,
   Exists,
   MayExist,

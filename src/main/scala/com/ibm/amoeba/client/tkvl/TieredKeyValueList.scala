@@ -1,9 +1,8 @@
 package com.ibm.amoeba.client.tkvl
 
-import com.ibm.amoeba.client.{AmoebaClient, ObjectAllocator, Transaction}
+import com.ibm.amoeba.client.{AmoebaClient, Transaction}
 import com.ibm.amoeba.client.KeyValueObjectState.ValueState
-import com.ibm.amoeba.common.DataBuffer
-import com.ibm.amoeba.common.objects.{AllocationRevisionGuard, DataObjectPointer, Key, KeyOrdering, KeyValueObjectPointer, ObjectId, ObjectPointer, ObjectRevisionGuard, Value}
+import com.ibm.amoeba.common.objects.{AllocationRevisionGuard, Key, KeyOrdering, KeyValueObjectPointer, ObjectId, ObjectRevisionGuard, Value}
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
@@ -32,15 +31,16 @@ class TieredKeyValueList(val client: AmoebaClient,
   def set(key: Key,
           value: Value,
           requireDoesNotExist: Boolean=false,
-          onRelpacement: Option[(Key, ValueState) => Future[Unit]] = None)(implicit t: Transaction): Future[Unit] = {
+          onRelpacement: Option[(Key, ValueState) => Future[Unit]] = None)
+         (implicit t: Transaction): Future[AllocationRevisionGuard] = {
     def onSplit(newMinimum: Key, newNode: KeyValueObjectPointer): Future[Unit] = {
       SplitFinalizationAction.addToTransaction(rootManager, 1, newMinimum, newNode, t)
       Future.successful(())
     }
-    def empty(tier: Int, ordering: KeyOrdering): Future[Unit] = {
+    def empty(tier: Int, ordering: KeyOrdering): Future[AllocationRevisionGuard] = {
       rootManager.createInitialNode(Map(key -> value))
     }
-    def nonEmpty(tier: Int, ordering: KeyOrdering, root: KeyValueListNode): Future[Unit] = {
+    def nonEmpty(tier: Int, ordering: KeyOrdering, root: KeyValueListNode): Future[AllocationRevisionGuard] = {
       for {
         alloc <- rootManager.getAllocatorForTier(0)
         maxNodeSize <- rootManager.getMaxNodeSize(0)
@@ -49,9 +49,9 @@ class TieredKeyValueList(val client: AmoebaClient,
           case Left(_) => throw new BrokenTree()
           case Right(n) => n
         }
-        _ <- node.insert(key, value, maxNodeSize, alloc, onSplit, requireDoesNotExist, onRelpacement)
+        guard <- node.insert(key, value, maxNodeSize, alloc, onSplit, requireDoesNotExist, onRelpacement)
       } yield {
-        ()
+        guard
       }
     }
 

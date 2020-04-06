@@ -4,8 +4,8 @@ import com.ibm.amoeba.client.KeyValueObjectState.ValueState
 import com.ibm.amoeba.client.{KeyValueObjectState, ObjectAllocator, ObjectReader, Transaction}
 import com.ibm.amoeba.common.HLCTimestamp
 import com.ibm.amoeba.common.objects._
-import com.ibm.amoeba.common.transaction.KeyValueUpdate
-import com.ibm.amoeba.common.transaction.KeyValueUpdate.{DoesNotExist, FullContentLock, KeyRevision, WithinRange}
+import com.ibm.amoeba.common.transaction.{KeyValueUpdate, RevisionLock}
+import com.ibm.amoeba.common.transaction.KeyValueUpdate.{DoesNotExist, FullContentLock, KeyObjectRevision, KeyRequirement, KeyRevision, WithinRange}
 import com.ibm.amoeba.server.store.KVObjectState
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
@@ -84,7 +84,7 @@ class KeyValueListNode(val reader: ObjectReader,
              prepareForSplit: (Key, KeyValueObjectPointer) => Future[Unit] = (_,_) => Future.successful(()),
              requireDoesNotExist: Boolean=false,
              onRelpacement: Option[(Key, ValueState) => Future[Unit]] = None
-            )(implicit tx: Transaction): Future[Unit] = fetchContainingNode(key).flatMap { node =>
+            )(implicit tx: Transaction): Future[AllocationRevisionGuard] = fetchContainingNode(key).flatMap { node =>
     KeyValueListNode.insert(node, ordering, key, value, maxNodeSize, allocator, prepareForSplit, requireDoesNotExist,
       onRelpacement)
   }
@@ -143,7 +143,7 @@ object KeyValueListNode {
                      prepareForSplit: (Key, KeyValueObjectPointer) => Future[Unit] = (_,_) => Future.successful(()),
                      requireDoesNotExist: Boolean=false,
                      onRelpacement: Option[(Key, ValueState) => Future[Unit]] = None
-                    )(implicit tx: Transaction, ec: ExecutionContext): Future[Unit] =  {
+                    )(implicit tx: Transaction, ec: ExecutionContext): Future[AllocationRevisionGuard] =  {
 
     val currentSize = node.contents.foldLeft(0) { (sz, t) =>
       sz + KVObjectState.idaEncodedPairSize(node.pointer.ida, t._1, t._2.value)
@@ -161,18 +161,26 @@ object KeyValueListNode {
     if (requireDoesNotExist && node.contents.contains(key))
       tx.invalidateTransaction(new KeyAlreadyExists(key))
 
-    val (reqs, freplace) = onRelpacement match {
+    val (reqs: List[KeyRequirement], freplace: Future[AllocationRevisionGuard]) = onRelpacement match {
       case None =>
+
         if (requireDoesNotExist)
-          (DoesNotExist(key) :: Nil, Future.successful(()))
-        else
-          (Nil, Future.successful(()))
+          (DoesNotExist(key) :: KeyObjectRevision(key, node.revision) :: Nil,
+            Future.successful(ObjectRevisionGuard(node.pointer, node.revision)))
+        else {
+          node.contents.get(key) match {
+            case None => (Nil, Future.successful(ObjectRevisionGuard(node.pointer, node.revision)))
+            case Some(vs) => (Nil, Future.successful(KeyRevisionGuard(node.pointer, key, vs.revision)))
+          }
+        }
       case Some(fn) =>
         node.contents.get(key) match {
           case  None =>
-            (DoesNotExist(key) :: Nil, Future.successful(()))
+            (DoesNotExist(key) :: KeyObjectRevision(key, node.revision):: Nil,
+              Future.successful(ObjectRevisionGuard(node.pointer, node.revision)))
           case Some(vs) =>
-            (KeyRevision(key, vs.revision) :: Nil, fn(key, vs))
+            (KeyRevision(key, vs.revision) :: Nil,
+              fn(key, vs).map(_ => KeyRevisionGuard(node.pointer, key, vs.revision)))
         }
     }
 
@@ -233,9 +241,9 @@ object KeyValueListNode {
 
       for {
         _ <- falloc
-        _ <- freplace
+        guard <- freplace
       } yield {
-        ()
+        guard
       }
     }
   }
