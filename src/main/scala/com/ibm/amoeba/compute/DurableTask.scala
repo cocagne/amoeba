@@ -23,8 +23,4 @@ trait DurableTask {
   val taskPointer: DurableTaskPointer
 
   def completed: Future[Option[AnyRef]]
-
-  def resume(): Unit
-
-  def suspend(): Unit
 }

@@ -37,7 +37,7 @@ class SimpleInodeTable(
   }
 
   /** Future completes when the transaction is ready for commit */
-  override def prepareInodeAllocation(inode: Inode)(implicit tx: Transaction): Future[InodePointer] = ??? /* {
+  override def prepareInodeAllocation(inode: Inode)(implicit tx: Transaction): Future[InodePointer] = {
 
     // Jump to new location if the transaction fails for any reason
     tx.result.failed.foreach( _ => selectNewInodeAllocationPosition() )
@@ -47,6 +47,8 @@ class SimpleInodeTable(
     val key = Key(inodeNumber)
     val requirements = DoesNotExist(key) :: Nil
 
+    Future.failed(new Exception("Not done yet"))
+/*
     for {
       node <- table.fetchMutableNode(inodeNumber)
       ptr <- inodeAllocator.allocateDataObject(node.kvos.pointer, node.kvos.revision, updatedInode.toDataBuffer)
@@ -56,9 +58,22 @@ class SimpleInodeTable(
     } yield {
       iptr
     }
-  } */
-  /** Removes the Inode from the table. This method does NOT decrement the reference count on the Inode object. */
-  override def delete(pointer: InodePointer): Future[Unit] = ???
 
-  override def lookup(inodeNumber: Long): Future[Option[InodePointer]] = ???
+ */
+  }
+  /** Removes the Inode from the table. This method does NOT decrement the reference count on the Inode object. */
+  override def delete(pointer: InodePointer)(implicit tx: Transaction): Future[Unit] = {
+    table.delete(Key(pointer.number))
+  }
+
+  override def lookup(inodeNumber: Long): Future[Option[InodePointer]] = {
+    for {
+      ovs <- table.get(Key(inodeNumber))
+    } yield {
+      ovs match {
+        case None => None
+        case Some(vs) => Some(InodePointer(vs.value.bytes))
+      }
+    }
+  }
 }

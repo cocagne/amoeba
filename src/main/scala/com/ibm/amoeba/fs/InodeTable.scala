@@ -17,7 +17,7 @@ trait InodeTable {
   def prepareInodeAllocation(inode: Inode)(implicit tx: Transaction): Future[InodePointer]
 
   /** Removes the Inode from the table. This method does NOT decrement the reference count on the Inode object. */
-  def delete(pointer: InodePointer): Future[Unit]
+  def delete(pointer: InodePointer)(implicit tx: Transaction): Future[Unit]
 
   def lookup(inodeNumber: Long): Future[Option[InodePointer]]
 
