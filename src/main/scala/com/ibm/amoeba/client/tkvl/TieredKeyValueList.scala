@@ -28,6 +28,20 @@ class TieredKeyValueList(val client: AmoebaClient,
     }
   }
 
+  def getContainingNode(key: Key): Future[Option[TieredKeyValueListNode]] = {
+    rootManager.getRootNode().flatMap { t =>
+      val (tier, ordering, onode) = t
+      onode match {
+        case None => Future.successful(None)
+        case Some(node) =>
+          fetchContainingNode(client, tier, 0, ordering, key, node, Set()).map {
+            case Left(_) => throw new BrokenTree()
+            case Right(node) => Some(new TieredKeyValueListNode(this, node))
+          }
+      }
+    }
+  }
+
   def set(key: Key,
           value: Value,
           requireDoesNotExist: Boolean=false,

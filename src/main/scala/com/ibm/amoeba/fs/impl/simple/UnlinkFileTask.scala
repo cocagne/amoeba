@@ -29,7 +29,7 @@ object UnlinkFileTask extends DurableTaskType {
 
     val fs = FileSystem.getRegisteredFileSystem(fsUUID).get
 
-    new UnlinkFileTask(pointer, fs, ptr, state)
+    new UnlinkFileTask(pointer, fs, ptr)
   }
 
   def prepareTask(fileSystem: FileSystem,
@@ -43,8 +43,7 @@ object UnlinkFileTask extends DurableTaskType {
 
 class UnlinkFileTask(val taskPointer: DurableTaskPointer,
                      val fs: FileSystem,
-                     val iptr: InodePointer,
-                     initialState: Map[Key, KeyValueObjectState.ValueState]) extends DurableTask {
+                     val iptr: InodePointer) extends DurableTask {
 
   import UnlinkFileTask._
 

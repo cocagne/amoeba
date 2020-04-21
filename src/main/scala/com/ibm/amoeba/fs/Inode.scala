@@ -14,15 +14,20 @@ import org.apache.logging.log4j.scala.Logging
 object Inode {
 
   def apply( client: AmoebaClient,
-             pointer: InodePointer,
-             content: DataBuffer): Inode = pointer match {
-    case _: FilePointer            => FileInode(content)
-    case _: DirectoryPointer       => DirectoryInode(client, content)
-    case _: SymlinkPointer         => SymlinkInode(content)
-    case _: UnixSocketPointer      => UnixSocketInode(content)
-    case _: CharacterDevicePointer => CharacterDeviceInode(content)
-    case _: BlockDevicePointer     => BlockDeviceInode(content)
-    case _: FIFOPointer            => FIFOInode(content)
+             content: DataBuffer): Inode = {
+    val bb: ByteBuffer = content
+    bb.position(1 + 8)
+    val mode = bb.getInt()
+    val fileType = FileType.fromMode(mode)
+    fileType match {
+      case FileType.File            => FileInode(content)
+      case FileType.Directory       => DirectoryInode(client, content)
+      case FileType.Symlink         => SymlinkInode(content)
+      case FileType.UnixSocket      => UnixSocketInode(content)
+      case FileType.CharacterDevice => CharacterDeviceInode(content)
+      case FileType.BlockDevice     => BlockDeviceInode(content)
+      case FileType.FIFO            => FIFOInode(content)
+    }
   }
 
   // First byte is the fileTypeVersionEncoding

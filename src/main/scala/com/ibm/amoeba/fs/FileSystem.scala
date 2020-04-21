@@ -13,10 +13,11 @@ trait FileSystem {
   def readInode(iptr: InodePointer): Future[(Inode, ObjectRevision)] = {
     implicit val ec: ExecutionContext = executionContext
     client.read(iptr.pointer).map { dos =>
-      (Inode(client, iptr, dos.data), dos.revision)
+      (Inode(client, dos.data), dos.revision)
     }
   }
 
+  private[fs] def defaultInodeAllocater: ObjectAllocator
   private[fs] def client: AmoebaClient
   private[fs] def executionContext: ExecutionContext
   private[fs] def getObjectAllocator(id: ObjectAllocatorId): Future[ObjectAllocator]
