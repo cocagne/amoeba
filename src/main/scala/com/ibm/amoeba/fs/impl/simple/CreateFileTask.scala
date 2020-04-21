@@ -1,16 +1,15 @@
 package com.ibm.amoeba.fs.impl.simple
 
-import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 import java.util.UUID
 
 import com.ibm.amoeba.client.tkvl.TieredKeyValueList
 import com.ibm.amoeba.client.{AmoebaClient, KeyValueObjectState, Transaction}
-import com.ibm.amoeba.common.objects.{AllocationRevisionGuard, DataObjectPointer, Insert, Key, KeyRevisionGuard, ObjectRefcount, ObjectRevision, Value}
+import com.ibm.amoeba.common.objects.{Insert, Key, KeyRevisionGuard, ObjectRevision, Value}
 import com.ibm.amoeba.common.transaction.KeyValueUpdate.KeyRevision
 import com.ibm.amoeba.compute.{DurableTask, DurableTaskPointer, DurableTaskType, TaskExecutor}
 import com.ibm.amoeba.common.util.{byte2uuid, uuid2byte}
-import com.ibm.amoeba.fs.{DirectoryInode, DirectoryPointer, FileSystem, Inode, InodePointer}
+import com.ibm.amoeba.fs.{DirectoryPointer, FileSystem, Inode, InodePointer}
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
@@ -88,8 +87,9 @@ class CreateFileTask(val taskPointer: DurableTaskPointer,
         }
 
         case _ => synchronized {
+          val newFilePointer = InodePointer(kvos.contents(NewFilePointerKey).value.bytes)
           if (! promise.isCompleted) {
-            promise.success(None)
+            promise.success(Some(newFilePointer))
           }
         }
       }
@@ -135,7 +135,9 @@ class CreateFileTask(val taskPointer: DurableTaskPointer,
           case None =>
             node.set(fkey, Value(newFile.toArray), requirement = Some(Left(true)))
           case Some(vs) =>
-            node.set(fkey, Value(newFile.toArray), requirement = Some(Right(vs.revision)))
+            node.set(fkey, Value(newFile.toArray), requirement = Some(Right(vs.revision))).flatMap { _ =>
+              UnlinkFileTask.prepareTask(fs, InodePointer(vs.value.bytes))
+            }
         }
       }
     } yield {

@@ -4,6 +4,7 @@ import java.util.UUID
 
 import com.ibm.amoeba.client.{AmoebaClient, ObjectAllocator, ObjectAllocatorId}
 import com.ibm.amoeba.common.objects.ObjectRevision
+import com.ibm.amoeba.compute.TaskExecutor
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -17,6 +18,7 @@ trait FileSystem {
     }
   }
 
+  private[fs] def taskExecutor: TaskExecutor
   private[fs] def defaultInodeAllocater: ObjectAllocator
   private[fs] def client: AmoebaClient
   private[fs] def executionContext: ExecutionContext

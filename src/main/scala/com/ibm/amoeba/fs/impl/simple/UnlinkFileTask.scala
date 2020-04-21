@@ -33,11 +33,10 @@ object UnlinkFileTask extends DurableTaskType {
   }
 
   def prepareTask(fileSystem: FileSystem,
-                  taskExecutor: TaskExecutor,
                   inodePointer: InodePointer)(implicit tx: Transaction): Future[Future[Option[AnyRef]]] = {
     val istate = List((FileSystemUUIDKey -> uuid2byte(fileSystem.uuid)),
       (InodePointerKey -> inodePointer.toArray))
-    taskExecutor.prepareTask(this, istate)
+    fileSystem.taskExecutor.prepareTask(this, istate)
   }
 }
 
