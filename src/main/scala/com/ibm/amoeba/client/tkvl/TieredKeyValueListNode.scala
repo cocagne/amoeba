@@ -2,7 +2,7 @@ package com.ibm.amoeba.client.tkvl
 
 import com.ibm.amoeba.client.KeyValueObjectState.ValueState
 import com.ibm.amoeba.client.Transaction
-import com.ibm.amoeba.common.objects.{Key, KeyValueObjectPointer, Value}
+import com.ibm.amoeba.common.objects.{Key, KeyValueObjectPointer, ObjectRevision, Value}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -15,17 +15,18 @@ class TieredKeyValueListNode(val tkvl: TieredKeyValueList,
 
   def set(key: Key,
           value: Value,
-          requireDoesNotExist: Boolean=false)(implicit t: Transaction): Future[Unit] = {
+          requirement: Option[Either[Boolean, ObjectRevision]] = None)(implicit t: Transaction): Future[Unit] = {
 
     def onSplit(newMinimum: Key, newNode: KeyValueObjectPointer): Future[Unit] = {
       SplitFinalizationAction.addToTransaction(tkvl.rootManager, 1, newMinimum, newNode, t)
       Future.successful(())
     }
+
     for {
       alloc <- tkvl.rootManager.getAllocatorForTier(0)
       maxNodeSize <- tkvl.rootManager.getMaxNodeSize(0)
 
-      _ <- node.insert(key, value, maxNodeSize, alloc, onSplit, requireDoesNotExist, None)
+      _ <- node.insert(key, value, maxNodeSize, alloc, onSplit, requirement)
     } yield {
       ()
     }

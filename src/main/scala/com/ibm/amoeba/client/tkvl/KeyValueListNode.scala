@@ -82,11 +82,9 @@ class KeyValueListNode(val reader: ObjectReader,
              maxNodeSize: Int,
              allocator: ObjectAllocator,
              prepareForSplit: (Key, KeyValueObjectPointer) => Future[Unit] = (_,_) => Future.successful(()),
-             requireDoesNotExist: Boolean=false,
-             onRelpacement: Option[(Key, ValueState) => Future[Unit]] = None
-            )(implicit tx: Transaction): Future[AllocationRevisionGuard] = fetchContainingNode(key).flatMap { node =>
-    KeyValueListNode.insert(node, ordering, key, value, maxNodeSize, allocator, prepareForSplit, requireDoesNotExist,
-      onRelpacement)
+             requirement: Option[Either[Boolean, ObjectRevision]] = None
+            )(implicit tx: Transaction): Future[Unit] = fetchContainingNode(key).flatMap { node =>
+    KeyValueListNode.insert(node, ordering, key, value, maxNodeSize, allocator, prepareForSplit, requirement)
   }
 
   def delete(key: Key,
@@ -141,9 +139,8 @@ object KeyValueListNode {
                      maxNodeSize: Int,
                      allocator: ObjectAllocator,
                      prepareForSplit: (Key, KeyValueObjectPointer) => Future[Unit] = (_,_) => Future.successful(()),
-                     requireDoesNotExist: Boolean=false,
-                     onRelpacement: Option[(Key, ValueState) => Future[Unit]] = None
-                    )(implicit tx: Transaction, ec: ExecutionContext): Future[AllocationRevisionGuard] =  {
+                     requirement: Option[Either[Boolean, ObjectRevision]] = None
+                    )(implicit tx: Transaction, ec: ExecutionContext): Future[Unit] =  {
 
     val currentSize = node.contents.foldLeft(0) { (sz, t) =>
       sz + KVObjectState.idaEncodedPairSize(node.pointer.ida, t._1, t._2.value)
@@ -158,30 +155,17 @@ object KeyValueListNode {
     if (newPairSize > maxSize)
       throw new NodeSizeExceeded
 
-    if (requireDoesNotExist && node.contents.contains(key))
-      tx.invalidateTransaction(new KeyAlreadyExists(key))
-
-    val (reqs: List[KeyRequirement], freplace: Future[AllocationRevisionGuard]) = onRelpacement match {
-      case None =>
-
-        if (requireDoesNotExist)
-          (DoesNotExist(key) :: KeyObjectRevision(key, node.revision) :: Nil,
-            Future.successful(ObjectRevisionGuard(node.pointer, node.revision)))
-        else {
-          node.contents.get(key) match {
-            case None => (Nil, Future.successful(ObjectRevisionGuard(node.pointer, node.revision)))
-            case Some(vs) => (Nil, Future.successful(KeyRevisionGuard(node.pointer, key, vs.revision)))
-          }
-        }
-      case Some(fn) =>
-        node.contents.get(key) match {
-          case  None =>
-            (DoesNotExist(key) :: KeyObjectRevision(key, node.revision):: Nil,
-              Future.successful(ObjectRevisionGuard(node.pointer, node.revision)))
-          case Some(vs) =>
-            (KeyRevision(key, vs.revision) :: Nil,
-              fn(key, vs).map(_ => KeyRevisionGuard(node.pointer, key, vs.revision)))
-        }
+    val reqs: List[KeyRequirement] = requirement match {
+      case None => Nil
+      case Some(e) => e match {
+        case Left(req) => if (req) {
+          if (node.contents.contains(key))
+            tx.invalidateTransaction(new KeyAlreadyExists(key))
+          DoesNotExist(key) :: Nil
+        } else
+          Nil
+        case Right(revision) => KeyRevision(key, revision) :: Nil
+      }
     }
 
     if (newPairSize + currentSize < maxSize) {
@@ -189,7 +173,7 @@ object KeyValueListNode {
       tx.update(node.pointer, None, None,
         WithinRange(key, ordering) :: reqs, List(Insert(key, value.bytes)))
 
-      freplace
+      Future.successful(())
     } else {
       val fullContent = node.contents + (key -> ValueState(value, tx.revision, HLCTimestamp.now))
       val keys = fullContent.keysIterator.toArray
@@ -228,7 +212,7 @@ object KeyValueListNode {
 
       val newContent = moveList.map(k => k -> fullContent(k).value).toMap
 
-      val falloc = allocator.allocateKeyValueObject(ObjectRevisionGuard(node.pointer, node.revision), newContent,
+      allocator.allocateKeyValueObject(ObjectRevisionGuard(node.pointer, node.revision), newContent,
         Some(newMinimum), None, None, node.tail.map(p => Value(p.toArray))).flatMap { newObjectPointer =>
 
         val rightPtr = KeyValueListPointer(newMinimum, newObjectPointer)
@@ -237,13 +221,6 @@ object KeyValueListNode {
           SetMax(newMinimum) :: SetRight(rightPtr.toArray) :: oldOps)
 
         prepareForSplit(newMinimum, newObjectPointer)
-      }
-
-      for {
-        _ <- falloc
-        guard <- freplace
-      } yield {
-        guard
       }
     }
   }

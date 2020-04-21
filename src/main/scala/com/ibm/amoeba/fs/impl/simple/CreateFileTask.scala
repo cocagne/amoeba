@@ -125,15 +125,17 @@ class CreateFileTask(val taskPointer: DurableTaskPointer,
     val rootMgr = new SimpleDirectoryRootManager(fs.client, directoryPointer.pointer)
     val tkvl = new TieredKeyValueList(fs.client, rootMgr)
     val fkey = Key(fileName)
+
     for {
       onode <- tkvl.getContainingNode(fkey)
       _ <- onode match {
         case None =>
-          tkvl.set(fkey, Value(newFile.toArray), requireDoesNotExist = true)
+          tkvl.set(fkey, Value(newFile.toArray), requirement = Some(Left(true)))
         case Some(node) => node.get(fkey) match {
           case None =>
-            node.set(fkey, Value(newFile.toArray), true)
-          case Some(vs) => Future.successful(())
+            node.set(fkey, Value(newFile.toArray), requirement = Some(Left(true)))
+          case Some(vs) =>
+            node.set(fkey, Value(newFile.toArray), requirement = Some(Right(vs.revision)))
         }
       }
     } yield {
@@ -141,8 +143,5 @@ class CreateFileTask(val taskPointer: DurableTaskPointer,
 
       tx.commit().map(_=>())
     }
-
-
-
   }
 }
