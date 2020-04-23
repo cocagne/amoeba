@@ -107,9 +107,8 @@ class TKVLSuite extends IntegrationTestSuite {
       nodeAllocator = new SinglePoolNodeAllocator(client, Nucleus.poolId)
 
       froot <- KVObjectRootManager.createNewTree(client, ptr, treeKey, ByteArrayKeyOrdering, nodeAllocator, Map(key -> value))
-
-      _ <- tx1.commit()
-      _ <- waitForTransactionsToComplete()
+      
+      r <- tx1.commit()
 
       root <- froot
       tree <- root.getTree()
@@ -117,12 +116,13 @@ class TKVLSuite extends IntegrationTestSuite {
       tx = client.newTransaction()
       _ <- tree.set(key2, value2)(tx)
       r <- tx.commit()
-      _ <- waitForTransactionsToComplete()
 
       tx = client.newTransaction()
       _ <- tree.set(key3, value3)(tx)
       r <- tx.commit()
 
+      // Wait for background transactions complete since the tree is updated
+      // Asynchronously in the background
       _ <- waitForTransactionsToComplete()
 
       tree <- root.getTree()

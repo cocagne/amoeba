@@ -60,6 +60,8 @@ class IntegrationTestSuite  extends AsyncFunSuite with Matchers { //with BeforeA
 
   def waitForTransactionsToComplete(): Future[Unit] = net.waitForTransactionsToComplete()
 
+  def handleEvents(): Unit = net.handleEvents()
+
   def waitForIt(errMsg: String)(fn: => Boolean): Future[Unit] = Future {
 
     var count = 0

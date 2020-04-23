@@ -28,7 +28,7 @@ import com.ibm.amoeba.server.store.cache.SimpleLRUObjectCache
 import com.ibm.amoeba.server.transaction.{TransactionDriver, TransactionFinalizer}
 
 import scala.concurrent.duration.{Duration, MILLISECONDS}
-import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.concurrent.{Await, ExecutionContext, Future, Promise}
 
 
 object TestNetwork {
@@ -157,6 +157,8 @@ class TestNetwork extends ServerMessenger {
 
   val ida = Replication(3, 2)
 
+  var handleDepth = 0
+
   val nucleus: KeyValueObjectPointer = Bootstrap.initialize(ida, List(store0, store1, store2))
 
   object FinalizerFactory extends TransactionFinalizer.Factory {
@@ -171,26 +173,25 @@ class TestNetwork extends ServerMessenger {
     TestCRL, FinalizerFactory, TransactionDriver.noErrorRecoveryFactory,
     List(store0, store1, store2))
 
-  private def handleEvents(): Unit = synchronized {
+  def handleEvents(): Unit = synchronized {
     smgr.handleEvents()
-    //while (smgr.hasTransactions) {
-      //smgr.handleEvents()
-    //}
   }
 
   private val cliMessenger = new ClientMessenger {
 
     def sendClientRequest(msg: ClientRequest): Unit = {
+      handleEvents()
       smgr.receiveClientRequest(msg)
       handleEvents()
     }
 
     def sendTransactionMessage(msg: TxMessage): Unit = {
+      handleEvents()
       smgr.receiveTransactionMessage(msg)
       handleEvents()
     }
 
-    def sendTransactionMessages(msg: List[TxMessage]): Unit = sendTransactionMessages(msg)
+    def sendTransactionMessages(msg: List[TxMessage]): Unit = msg.foreach(sendTransactionMessage)
   }
 
   val client = new TClient(cliMessenger, nucleus)
@@ -201,23 +202,26 @@ class TestNetwork extends ServerMessenger {
   smgr.handleEvents()
 
   override def sendClientResponse(msg: ClientResponse): Unit = {
+    handleEvents()
     client.receiveClientResponse(msg)
     handleEvents()
   }
 
   override def sendTransactionMessage(msg: TxMessage): Unit = {
+    handleEvents()
     smgr.receiveTransactionMessage(msg)
     handleEvents()
   }
 
   override def sendTransactionMessages(msg: List[TxMessage]): Unit = {
+    handleEvents()
     msg.foreach(smgr.receiveTransactionMessage)
     handleEvents()
   }//msg.foreach(sendTransactionMessage)
 
   def printTransactionStatus(): Unit = {
     val test = client.getSystemAttribute("unittest.name")
-    println(s"*********** Transaction Status. Test: $test ***********")
+    println(s"*********** Transaction Status. Hung Test: $test ***********")
     smgr.logTransactionStatus(s => println(s))
     println("******************************************")
   }
