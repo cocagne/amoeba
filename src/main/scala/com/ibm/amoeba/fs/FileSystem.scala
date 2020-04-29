@@ -18,6 +18,8 @@ trait FileSystem {
     }
   }
 
+  def shutdown(): Unit
+
   private[fs] def taskExecutor: TaskExecutor
   private[fs] def defaultInodeAllocater: ObjectAllocator
   private[fs] def client: AmoebaClient

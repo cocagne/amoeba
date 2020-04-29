@@ -107,7 +107,7 @@ class TKVLSuite extends IntegrationTestSuite {
       nodeAllocator = new SinglePoolNodeAllocator(client, Nucleus.poolId)
 
       froot <- KVObjectRootManager.createNewTree(client, ptr, treeKey, ByteArrayKeyOrdering, nodeAllocator, Map(key -> value))
-      
+
       r <- tx1.commit()
 
       root <- froot
