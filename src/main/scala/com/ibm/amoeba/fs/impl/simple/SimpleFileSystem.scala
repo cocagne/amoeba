@@ -5,7 +5,7 @@ import java.util.concurrent.{Executors, TimeUnit}
 
 import com.ibm.amoeba.client.internal.allocation.SinglePoolObjectAllocator
 import com.ibm.amoeba.client.tkvl.{KVObjectRootManager, NodeAllocator, Root, SinglePoolNodeAllocator}
-import com.ibm.amoeba.client.{AmoebaClient, KeyValueObjectState, ObjectAllocator, ObjectAllocatorId, Transaction}
+import com.ibm.amoeba.client.{AmoebaClient, ExponentialBackoffRetryStrategy, KeyValueObjectState, ObjectAllocator, ObjectAllocatorId, Transaction}
 import com.ibm.amoeba.common.objects.{AllocationRevisionGuard, Key, KeyValueObjectPointer, LexicalKeyOrdering, Value}
 import com.ibm.amoeba.common.util.{byte2uuid, uuid2byte}
 import com.ibm.amoeba.compute.TaskExecutor
@@ -81,6 +81,8 @@ class SimpleFileSystem(aclient: AmoebaClient,
     sched.shutdown()
     sched.awaitTermination(5, TimeUnit.SECONDS)
   }
+
+  override private[fs] def retryStrategy = new ExponentialBackoffRetryStrategy(client)
 
   override private[fs] def taskExecutor = executor
 

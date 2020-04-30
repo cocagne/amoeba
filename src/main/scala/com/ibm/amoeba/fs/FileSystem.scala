@@ -2,24 +2,56 @@ package com.ibm.amoeba.fs
 
 import java.util.UUID
 
-import com.ibm.amoeba.client.{AmoebaClient, ObjectAllocator, ObjectAllocatorId}
+import com.ibm.amoeba.client.{AmoebaClient, CorruptedObject, InvalidObject, ObjectAllocator, ObjectAllocatorId, RetryStrategy}
 import com.ibm.amoeba.common.objects.ObjectRevision
 import com.ibm.amoeba.compute.TaskExecutor
+import com.ibm.amoeba.fs.error.InvalidInode
+import org.apache.logging.log4j.scala.Logging
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.util.{Failure, Success}
 
-trait FileSystem {
+trait FileSystem extends Logging {
   val uuid: UUID
 
+  def readInode(inodeNumber: Long)(implicit ec: ExecutionContext): Future[(Inode, ObjectRevision)] = {
+    inodeTable.lookup(inodeNumber).flatMap {
+      case None => Future.failed(InvalidInode(inodeNumber))
+      case Some(iptr) => readInode(iptr)
+    }
+  }
   def readInode(iptr: InodePointer): Future[(Inode, ObjectRevision)] = {
     implicit val ec: ExecutionContext = executionContext
-    client.read(iptr.pointer).map { dos =>
-      (Inode(client, dos.data), dos.revision)
+    //client.read(iptr.pointer).map { dos =>
+    //  (Inode(client, dos.data), dos.revision)
+    //}
+    val pload = Promise[(Inode, ObjectRevision)]()
+
+    client.read(iptr.pointer) onComplete {
+      case Success(dos) =>
+        pload.success((Inode(client, dos.data), dos.revision))
+
+      case Failure(_: InvalidObject) =>
+        // Probably deleted
+        pload.failure(InvalidInode(iptr.number))
+
+      case Failure(e: CorruptedObject) =>
+        // TODO: If pointer fails to read, we'll need to read the inode table (could be stale pointer). If new pointer
+        //       for that inode exists, we'll need to use a callback function to update the stale pointer
+        pload.failure(e)
+        logger.error(s"Corrupted Inode: $iptr")
+
+      case Failure(cause) =>
+        pload.failure(cause)
+        logger.error(s"Unexpected error encountered during load of inode $iptr, $cause")
     }
+
+    pload.future
   }
 
   def shutdown(): Unit
 
+  private[fs] def retryStrategy: RetryStrategy
   private[fs] def taskExecutor: TaskExecutor
   private[fs] def defaultInodeAllocater: ObjectAllocator
   private[fs] def client: AmoebaClient
