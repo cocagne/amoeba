@@ -143,7 +143,7 @@ abstract class SimpleBaseFile(val pointer: InodePointer,
 
   def flush(): Future[Unit] = enqueueOp(Flush())
 
-  def prepareHardLink()(implicit tx: Transaction, ec: ExecutionContext): Unit = synchronized {
+  def prepareHardLink()(implicit tx: Transaction): Unit = synchronized {
     val updatedInode = cachedInode.update(links=Some(cachedInode.links+1))
     tx.overwrite(pointer.pointer, cachedInodeRevision, updatedInode.toDataBuffer)
     tx.result.foreach { _ =>
@@ -152,7 +152,7 @@ abstract class SimpleBaseFile(val pointer: InodePointer,
     }
   }
 
-  def prepareUnlink()(implicit tx: Transaction, ec: ExecutionContext): Future[Future[Unit]] = synchronized {
+  def prepareUnlink()(implicit tx: Transaction): Future[Future[Unit]] = synchronized {
     val updatedInode = inode.update(links=Some(inode.links-1))
 
     tx.overwrite(pointer.pointer, cachedInodeRevision, updatedInode.toDataBuffer)

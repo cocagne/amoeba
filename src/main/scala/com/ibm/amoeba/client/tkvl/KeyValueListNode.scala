@@ -87,6 +87,15 @@ class KeyValueListNode(val reader: ObjectReader,
     KeyValueListNode.insert(node, ordering, key, value, maxNodeSize, allocator, prepareForSplit, requirement)
   }
 
+  def rename(oldKey: Key,
+             newKey: Key,
+             maxNodeSize: Int,
+             allocator: ObjectAllocator,
+             prepareForSplit: (Key, KeyValueObjectPointer) => Future[Unit] = (_,_) => Future.successful(()),
+            )(implicit tx: Transaction): Future[Unit] = fetchContainingNode(oldKey).flatMap { node =>
+    KeyValueListNode.rename(node, ordering, oldKey, newKey, maxNodeSize, allocator, prepareForSplit)
+  }
+
   def delete(key: Key,
              prepareForJoin: (Key, KeyValueObjectPointer) => Future[Unit] = (_,_) => Future.successful(())
             )(implicit tx: Transaction): Future[Unit] = fetchContainingNode(key).flatMap { node =>
@@ -207,6 +216,96 @@ object KeyValueListNode {
         deletes
       else
         Insert(key, value.bytes) :: deletes
+
+      val newMinimum = moveList.head
+
+      val newContent = moveList.map(k => k -> fullContent(k).value).toMap
+
+      allocator.allocateKeyValueObject(ObjectRevisionGuard(node.pointer, node.revision), newContent,
+        Some(newMinimum), None, None, node.tail.map(p => Value(p.toArray))).flatMap { newObjectPointer =>
+
+        val rightPtr = KeyValueListPointer(newMinimum, newObjectPointer)
+
+        tx.update(node.pointer, Some(node.revision), Some(node.fullContentLock), reqs,
+          SetMax(newMinimum) :: SetRight(rightPtr.toArray) :: oldOps)
+
+        prepareForSplit(newMinimum, newObjectPointer)
+      }
+    }
+  }
+
+  // Implemented as a non-class member to prevent accidental use of member variables instead of "node." attributes
+  private def rename(node: KeyValueListNode,
+                     ordering: KeyOrdering,
+                     oldKey: Key,
+                     newKey: Key,
+                     maxNodeSize: Int,
+                     allocator: ObjectAllocator,
+                     prepareForSplit: (Key, KeyValueObjectPointer) => Future[Unit] = (_,_) => Future.successful(()),
+                    )(implicit tx: Transaction, ec: ExecutionContext): Future[Unit] =  {
+
+    assert(node.contents.contains(oldKey))
+
+    val currentSize = node.contents.foldLeft(0) { (sz, t) =>
+      sz + KVObjectState.idaEncodedPairSize(node.pointer.ida, t._1, t._2.value)
+    }
+
+    val value = node.contents(oldKey).value
+    val klenDelta = newKey.bytes.length - oldKey.bytes.length
+
+    val oldPairSize = KVObjectState.idaEncodedPairSize(node.pointer.ida, oldKey, value)
+    val newPairSize = KVObjectState.idaEncodedPairSize(node.pointer.ida, newKey, value)
+
+    val newSize = newPairSize - oldPairSize
+
+    val maxSize = maxNodeSize - 4 - 4 - node.minimum.bytes.length - node.maximum.map(_.bytes.length).getOrElse(0) - node.tail.map{ p =>
+      p.encodedSize
+    }.getOrElse(0)
+
+    if (newSize > maxSize)
+      throw new NodeSizeExceeded
+
+    val reqs: List[KeyRequirement] = KeyRevision(oldKey, node.contents(oldKey).revision) :: Nil
+
+    if (newPairSize + currentSize < maxSize) {
+
+      tx.update(node.pointer, None, None,
+        WithinRange(newKey, ordering) :: reqs, List(Delete(oldKey), Insert(newKey, value.bytes)))
+
+      Future.successful(())
+    } else {
+      val fullContent = node.contents - oldKey + (newKey -> ValueState(value, tx.revision, HLCTimestamp.now))
+      val keys = fullContent.keysIterator.toArray
+
+      scala.util.Sorting.quickSort(keys)(ordering)
+
+      val sizes = keys.iterator.map { k =>
+        val vs = fullContent(k)
+        (k, KVObjectState.idaEncodedPairSize(node.pointer.ida, k, vs.value))
+      }.toList
+
+      val fullSize = sizes.foldLeft(0)((sz, t) => sz + t._2)
+
+      val halfSize = fullSize / 2
+
+      def rmove(rsizes: List[(Key,Int)], moveList: List[Key], moveSize: Int): List[Key] = {
+        val (k, sz) = rsizes.head
+        if (moveSize + sz >= halfSize)
+          moveList
+        else
+          rmove(rsizes.tail, k :: moveList, moveSize + sz)
+      }
+
+      val rsizes = sizes.reverse
+      val moveList = rmove(rsizes.tail, rsizes.head._1 :: Nil, rsizes.head._2) // Ensure at least 1 move
+      val moves = moveList.toSet
+
+      val deletes: List[Delete] = moveList.map(Delete(_))
+
+      val oldOps = if (moves.contains(newKey))
+        Delete(oldKey) :: deletes
+      else
+        Delete(oldKey) :: Insert(newKey, value.bytes) :: deletes
 
       val newMinimum = moveList.head
 

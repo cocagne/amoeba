@@ -39,7 +39,6 @@ object CreateFileTask extends DurableTaskType {
   }
 
   def prepareTask(fileSystem: FileSystem,
-                  taskExecutor: TaskExecutor,
                   directoryPointer: DirectoryPointer,
                   fileName: String,
                   inode: Inode)(implicit tx: Transaction): Future[Future[Option[AnyRef]]] = {
@@ -48,7 +47,7 @@ object CreateFileTask extends DurableTaskType {
       DirectoryInodeKey -> directoryPointer.toArray,
       InodeKey -> inode.toArray,
       FileNameKey -> fileName.getBytes(StandardCharsets.UTF_8))
-    taskExecutor.prepareTask(this, istate)
+    fileSystem.taskExecutor.prepareTask(this, istate)
   }
 }
 

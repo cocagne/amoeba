@@ -1,5 +1,7 @@
 package com.ibm.amoeba.client.tkvl
 
+import java.util.UUID
+
 import com.ibm.amoeba.client.KeyValueObjectState.ValueState
 import com.ibm.amoeba.client.Transaction
 import com.ibm.amoeba.common.objects.{Key, KeyValueObjectPointer, ObjectRevision, Value}
@@ -11,7 +13,11 @@ class TieredKeyValueListNode(val tkvl: TieredKeyValueList,
 
   implicit val ec: ExecutionContext = tkvl.client.clientContext
 
+  def nodeUUID: UUID = node.pointer.id.uuid
+
   def get(key: Key): Option[ValueState] = node.contents.get(key)
+
+  def contains(key: Key): Boolean = node.contents.contains(key)
 
   def set(key: Key,
           value: Value,
@@ -39,5 +45,24 @@ class TieredKeyValueListNode(val tkvl: TieredKeyValueList,
     }
 
     node.delete(key, onJoin)
+  }
+
+  /** May only be used on nodes that contain both the old and new key */
+  def rename(oldKey: Key, newKey: Key)(implicit t: Transaction): Future[Unit] = {
+    assert(node.keyInRange(oldKey) && node.keyInRange(newKey))
+
+    def onSplit(newMinimum: Key, newNode: KeyValueObjectPointer): Future[Unit] = {
+      SplitFinalizationAction.addToTransaction(tkvl.rootManager, 1, newMinimum, newNode, t)
+      Future.successful(())
+    }
+
+    for {
+      alloc <- tkvl.rootManager.getAllocatorForTier(0)
+      maxNodeSize <- tkvl.rootManager.getMaxNodeSize(0)
+
+      _ <- node.rename(newKey, newKey, maxNodeSize, alloc, onSplit)
+    } yield {
+      ()
+    }
   }
 }
