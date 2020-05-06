@@ -28,6 +28,9 @@ object NodeAllocator {
         val lsb = bb.getLong()
         val poolId = PoolId(new UUID(msb, lsb))
         new SinglePoolNodeAllocator(client, poolId)
+      case _ =>
+        println("HERE!!!")
+        throw new Exception("Invalid Node Allocator")
     }
   }
 }

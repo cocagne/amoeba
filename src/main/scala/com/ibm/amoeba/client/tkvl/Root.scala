@@ -59,6 +59,7 @@ object Root {
 
   def apply(client: AmoebaClient, arr: Array[Byte]): Root = {
     val bb = ByteBuffer.wrap(arr)
+    bb.order(ByteOrder.BIG_ENDIAN)
     Root(client, bb)
   }
 

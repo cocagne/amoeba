@@ -159,7 +159,6 @@ class DirectoryInode(inodeNumber: Long,
 
   override def encodedSize: Int = {
     super.encodedSize + 1 + oparent.map(_.encodedSize).getOrElse(0) + contents.encodedSize
-    super.encodedSize + 1 + oparent.map(_.encodedSize).getOrElse(0) + 0
   }
 
   override def encodeInto(bb: ByteBuffer): Unit = {

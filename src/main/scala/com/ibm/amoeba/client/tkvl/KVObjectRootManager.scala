@@ -47,7 +47,9 @@ class KVObjectRootManager(val client: AmoebaClient,
                 }
             }
           } catch {
-            case _: Throwable => p.failure(new InvalidRoot)
+            case err: Throwable =>
+            println(s"Invalid Root: $err")
+              p.failure(new InvalidRoot)
           }
         }
     }

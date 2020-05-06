@@ -31,6 +31,8 @@ class IntegrationTestSuite  extends AsyncFunSuite with Matchers { //with BeforeA
     nucleus = null
     testName = "NO_TEST"
   }*/
+  def subFixtureSetup(): Unit = {}
+  def subFixtureTeardown(): Unit = ()
 
   override def withFixture(test: NoArgAsyncTest): FutureOutcome = {
     net = new TestNetwork
@@ -38,6 +40,8 @@ class IntegrationTestSuite  extends AsyncFunSuite with Matchers { //with BeforeA
     testName = test.name
     nucleus = net.nucleus
     client.setSystemAttribute("unittest.name", test.name)
+
+    subFixtureSetup()
 
     complete {
       super.withFixture(test)
@@ -50,6 +54,8 @@ class IntegrationTestSuite  extends AsyncFunSuite with Matchers { //with BeforeA
           net.printTransactionStatus()
           throw e
       }
+
+      subFixtureTeardown()
 
       net = null
       client = null

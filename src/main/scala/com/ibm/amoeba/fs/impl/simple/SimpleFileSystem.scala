@@ -6,11 +6,11 @@ import java.util.concurrent.{Executors, TimeUnit}
 import com.ibm.amoeba.client.internal.allocation.SinglePoolObjectAllocator
 import com.ibm.amoeba.client.tkvl.{KVObjectRootManager, NodeAllocator, Root, SinglePoolNodeAllocator}
 import com.ibm.amoeba.client.{AmoebaClient, ExponentialBackoffRetryStrategy, KeyValueObjectState, ObjectAllocator, ObjectAllocatorId, Transaction}
-import com.ibm.amoeba.common.objects.{AllocationRevisionGuard, Key, KeyValueObjectPointer, LexicalKeyOrdering, Value}
+import com.ibm.amoeba.common.objects.{AllocationRevisionGuard, IntegerKeyOrdering, Key, KeyValueObjectPointer, LexicalKeyOrdering, Value}
 import com.ibm.amoeba.common.util.{byte2uuid, uuid2byte}
 import com.ibm.amoeba.compute.TaskExecutor
 import com.ibm.amoeba.compute.impl.SimpleTaskExecutor
-import com.ibm.amoeba.fs.{DirectoryInode, FileMode, FileSystem}
+import com.ibm.amoeba.fs.{DirectoryInode, DirectoryPointer, FileMode, FileSystem}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -36,11 +36,14 @@ object SimpleFileSystem {
       rootRoot = new Root(0, LexicalKeyOrdering, None, new SinglePoolNodeAllocator(client, taskRoot.poolId))
       rootDirInode = DirectoryInode.init(rootDirMode, 0, 0, None, Some(1), rootRoot)
       rootDirectory <- allocator.allocateDataObject(guard, rootDirInode.toArray)
-      inodeTableRoot <- allocator.allocateKeyValueObject(guard, Map(Key(1) -> Value(rootDirectory.toArray)))
+      rootDirectoryPointer = new DirectoryPointer(1, rootDirectory)
+      inodeTableContentRoot <- allocator.allocateKeyValueObject(guard, Map(Key(1) -> Value(rootDirectoryPointer.toArray)))
+      inodeTableRoot = new Root(0, IntegerKeyOrdering, Some(inodeTableContentRoot), new SinglePoolNodeAllocator(client, taskRoot.poolId) )
       content = Map( FileSystemUUIDKey -> Value(uuid2byte(uuid)),
         TaskExecutorRootKey -> Value(taskRoot.toArray),
-        InodeTableRootKey -> Value(inodeTableRoot.toArray))
+        InodeTableRootKey -> Value(inodeTableRoot.encode))
       fsRootPointer <- allocator.allocateKeyValueObject(guard, content)
+      _=tx.overwrite(rootDirectory, tx.revision, rootDirInode.toArray) // ensure Tx has an object to modify
       _ <- tx.commit()
       fs <- load(client, fsRootPointer, numContextThreads = 4)
     } yield {
