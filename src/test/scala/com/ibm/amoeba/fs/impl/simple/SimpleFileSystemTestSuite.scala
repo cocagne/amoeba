@@ -83,4 +83,31 @@ class SimpleFileSystemTestSuite extends FilesSystemTestSuite {
       file.fileType should be (FileType.File)
     }
   }
+
+  test("Rename File") {
+    val initInode = FileInode.init(0, 0, 1)
+    for {
+      fs <- bootFS()
+      (rootInode, rootPointer, rootRevision) <- fs.readInode(1)
+      dir = new SimpleDirectory(rootPointer.asInstanceOf[DirectoryPointer],
+        rootRevision, rootInode.asInstanceOf[DirectoryInode], fs)
+
+      tx = client.newTransaction()
+      f <- CreateFileTask.prepareTask(fs, dir.pointer, "foo", initInode)(tx)
+      _ <- tx.commit()
+      _ <- f
+
+      tx = client.newTransaction()
+      _ <- dir.prepareRename("foo", "bar")(tx)
+      _ <- tx.commit()
+
+      ofile1 <- dir.getEntry("foo")
+      ofile2 <- dir.getEntry("bar")
+      (file, _, _) <- fs.readInode(ofile2.get)
+    } yield {
+      rootInode.fileType should be (FileType.Directory)
+      file.fileType should be (FileType.File)
+      ofile1.isEmpty should be (true)
+    }
+  }
 }

@@ -60,7 +60,7 @@ class TieredKeyValueListNode(val tkvl: TieredKeyValueList,
       alloc <- tkvl.rootManager.getAllocatorForTier(0)
       maxNodeSize <- tkvl.rootManager.getMaxNodeSize(0)
 
-      _ <- node.rename(newKey, newKey, maxNodeSize, alloc, onSplit)
+      _ <- node.rename(oldKey, newKey, maxNodeSize, alloc, onSplit)
     } yield {
       ()
     }
