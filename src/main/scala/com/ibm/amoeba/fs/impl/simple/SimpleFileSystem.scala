@@ -85,11 +85,18 @@ class SimpleFileSystem(aclient: AmoebaClient,
     sched.awaitTermination(5, TimeUnit.SECONDS)
   }
 
+  def defaultSegmentSize: Int = 4 * 1024 * 1024
+  def defaultFileIndexNodeSize(iter: Int): Int = 1024*1024
+
   override private[fs] def retryStrategy = new ExponentialBackoffRetryStrategy(client)
 
   override private[fs] def taskExecutor = executor
 
-  override private[fs] def defaultInodeAllocater = defaultAllocator
+  override private[fs] def defaultInodeAllocator = defaultAllocator
+
+  override private[fs] def defaultSegmentAllocator(): Future[ObjectAllocator] = Future.successful(defaultAllocator)
+
+  override private[fs] def defaultIndexNodeAllocator(tier: Int): Future[ObjectAllocator] = Future.successful(defaultAllocator)
 
   override private[fs] def client = aclient
 

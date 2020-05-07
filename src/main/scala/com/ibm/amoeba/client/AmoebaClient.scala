@@ -57,11 +57,11 @@ trait AmoebaClient extends ObjectReader {
     }
   }
 
-  private[client] def retryStrategy: RetryStrategy
+  def retryStrategy: RetryStrategy
 
-  private[client] def backgroundTasks: BackgroundTask
+  def backgroundTasks: BackgroundTask
 
-  private[amoeba] def clientContext: ExecutionContext
+  def clientContext: ExecutionContext
 
   private[client] def opportunisticRebuildManager: OpportunisticRebuildManager
 

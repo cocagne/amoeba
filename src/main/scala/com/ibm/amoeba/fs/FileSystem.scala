@@ -49,11 +49,19 @@ trait FileSystem extends Logging {
     pload.future
   }
 
+  def openFileHandle(file: File): FileHandle = ???
+  def closeFileHandle(fh: File): Unit = ???
+
+  def defaultSegmentSize: Int
+  def defaultFileIndexNodeSize(iter: Int): Int
+
   def shutdown(): Unit
 
   private[fs] def retryStrategy: RetryStrategy
   private[fs] def taskExecutor: TaskExecutor
-  private[fs] def defaultInodeAllocater: ObjectAllocator
+  private[fs] def defaultInodeAllocator: ObjectAllocator
+  private[fs] def defaultSegmentAllocator(): Future[ObjectAllocator]
+  private[fs] def defaultIndexNodeAllocator(tier: Int): Future[ObjectAllocator]
   private[fs] def client: AmoebaClient
   private[fs] def executionContext: ExecutionContext
   private[fs] def getObjectAllocator(id: ObjectAllocatorId): Future[ObjectAllocator]

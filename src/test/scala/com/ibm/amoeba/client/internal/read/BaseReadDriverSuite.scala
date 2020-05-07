@@ -63,9 +63,9 @@ object BaseReadDriverSuite {
 
     val retryStrategy: RetryStrategy = null
 
-    private[client] def backgroundTasks: BackgroundTask = BackgroundTask.NoBackgroundTasks
+    def backgroundTasks: BackgroundTask = BackgroundTask.NoBackgroundTasks
 
-    private[amoeba] def clientContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
+    def clientContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
 
     private[client] def opportunisticRebuildManager: OpportunisticRebuildManager = OpportunisticRebuildManager.None
 

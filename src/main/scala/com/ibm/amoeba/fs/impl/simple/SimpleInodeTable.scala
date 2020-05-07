@@ -48,7 +48,7 @@ class SimpleInodeTable(
     val key = Key(inodeNumber)
 
     for {
-      ptr <- fs.defaultInodeAllocater.allocateDataObject(guard, updatedInode.toArray)
+      ptr <- fs.defaultInodeAllocator.allocateDataObject(guard, updatedInode.toArray)
       iptr = InodePointer(inode.fileType, inodeNumber, ptr)
       _ <- table.set(key, Value(iptr.toArray), requirement = Some(Left(true)))
     } yield {
