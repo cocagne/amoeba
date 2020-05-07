@@ -122,7 +122,7 @@ abstract class SimpleBaseFile(val pointer: InodePointer,
   }
 
   def refresh(): Future[Unit] = synchronized {
-    fs.readInode(pointer).map(t => setCachedInode(t._1, t._2))
+    fs.readInode(pointer).map(t => setCachedInode(t._1, t._3))
   }
 
   def mode: Int = inode.mode

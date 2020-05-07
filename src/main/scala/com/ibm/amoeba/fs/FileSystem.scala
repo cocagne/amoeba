@@ -14,22 +14,22 @@ import scala.util.{Failure, Success}
 trait FileSystem extends Logging {
   val uuid: UUID
 
-  def readInode(inodeNumber: Long)(implicit ec: ExecutionContext): Future[(Inode, ObjectRevision)] = {
+  def readInode(inodeNumber: Long)(implicit ec: ExecutionContext): Future[(Inode, InodePointer, ObjectRevision)] = {
     inodeTable.lookup(inodeNumber).flatMap {
       case None => Future.failed(InvalidInode(inodeNumber))
       case Some(iptr) => readInode(iptr)
     }
   }
-  def readInode(iptr: InodePointer): Future[(Inode, ObjectRevision)] = {
+  def readInode(iptr: InodePointer): Future[(Inode, InodePointer, ObjectRevision)] = {
     implicit val ec: ExecutionContext = executionContext
     //client.read(iptr.pointer).map { dos =>
     //  (Inode(client, dos.data), dos.revision)
     //}
-    val pload = Promise[(Inode, ObjectRevision)]()
+    val pload = Promise[(Inode, InodePointer, ObjectRevision)]()
 
     client.read(iptr.pointer) onComplete {
       case Success(dos) =>
-        pload.success((Inode(client, dos.data), dos.revision))
+        pload.success((Inode(client, dos.data), iptr, dos.revision))
 
       case Failure(_: InvalidObject) =>
         // Probably deleted

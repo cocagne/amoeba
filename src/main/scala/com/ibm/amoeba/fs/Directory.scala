@@ -18,7 +18,7 @@ trait Directory extends BaseFile with Logging {
   //def inode: DirectoryInode
 
   def getInode(): Future[(DirectoryInode, ObjectRevision)] = {
-    fs.readInode(pointer).map(t => (t._1.asInstanceOf[DirectoryInode], t._2))
+    fs.readInode(pointer).map(t => (t._1.asInstanceOf[DirectoryInode], t._3))
   }
 
   def lookup(name: String): Future[Option[InodePointer]] = name match {

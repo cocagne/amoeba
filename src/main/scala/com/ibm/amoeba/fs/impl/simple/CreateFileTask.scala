@@ -43,6 +43,7 @@ object CreateFileTask extends DurableTaskType {
                   fileName: String,
                   inode: Inode)(implicit tx: Transaction): Future[Future[Option[AnyRef]]] = {
     val istate = List(
+      StepKey -> Array[Byte](0),
       FileSystemUUIDKey -> uuid2byte(fileSystem.uuid),
       DirectoryInodeKey -> directoryPointer.toArray,
       InodeKey -> inode.toArray,

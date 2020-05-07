@@ -57,7 +57,7 @@ class UnlinkFileTask(val taskPointer: DurableTaskPointer,
   def doNextStep(): Unit = {
     for {
       kvos <- fs.client.read(taskPointer.kvPointer)
-      (inode, revision) <- fs.readInode(iptr)
+      (inode, _, revision) <- fs.readInode(iptr)
       step = kvos.contents(StepKey)
     } yield {
       step.value.bytes(0) match {

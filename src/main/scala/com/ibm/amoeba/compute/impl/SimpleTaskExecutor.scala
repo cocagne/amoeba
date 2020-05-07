@@ -135,7 +135,6 @@ class SimpleTaskExecutor(val client: AmoebaClient,
 
     for {
       taskPointer <- fptr
-      kvos <- client.read(taskPointer.kvPointer)
     } yield {
       tx.update(taskPointer.kvPointer, None, None, Nil, ins)
 
@@ -145,14 +144,18 @@ class SimpleTaskExecutor(val client: AmoebaClient,
         }
       }
 
-      tx.result.flatMap { _ => synchronized {
-        val task = taskType.createTask(client, taskPointer, kvos.revision, kvos.contents)
-        active += taskPointer
-        task.completed.foreach { _ =>
-          deallocateTask(taskPointer)
+      tx.result.flatMap { _ =>
+        client.read(taskPointer.kvPointer).flatMap { kvos =>
+          synchronized {
+            val task = taskType.createTask(client, taskPointer, kvos.revision, kvos.contents)
+            active += taskPointer
+            task.completed.foreach { _ =>
+              deallocateTask(taskPointer)
+            }
+            task.completed
+          }
         }
-        task.completed
-      }}
+      }
     }
   }
 }

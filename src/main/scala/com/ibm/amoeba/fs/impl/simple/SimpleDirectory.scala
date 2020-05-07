@@ -44,7 +44,7 @@ class SimpleDirectory(override val pointer: DirectoryPointer,
                              incref: Boolean)(implicit tx: Transaction): Future[Unit] = {
     val fincref = if (incref) {
       fs.readInode(pointer) map { t =>
-        val (finode, frevision) = t
+        val (finode, _, frevision) = t
         val updatedInode = finode.update(links=Some(inode.links+1))
         tx.overwrite(pointer.pointer, frevision, updatedInode.toArray)
       }
