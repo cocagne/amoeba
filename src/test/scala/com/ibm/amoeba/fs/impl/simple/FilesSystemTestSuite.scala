@@ -12,7 +12,7 @@ class FilesSystemTestSuite  extends IntegrationTestSuite {
   var fs: FileSystem = _
 
   //override def subFixtureSetup(): Unit = {
-  def bootFS(): Future[FileSystem] = {
+  def bootstrap(): Future[FileSystem] = {
     for {
       kvos <- client.read(nucleus)
       rootPool <- client.getStoragePool(kvos.pointer.poolId)

@@ -10,7 +10,7 @@ import com.ibm.amoeba.common.objects.{AllocationRevisionGuard, IntegerKeyOrderin
 import com.ibm.amoeba.common.util.{byte2uuid, uuid2byte}
 import com.ibm.amoeba.compute.TaskExecutor
 import com.ibm.amoeba.compute.impl.SimpleTaskExecutor
-import com.ibm.amoeba.fs.{DirectoryInode, DirectoryPointer, FileMode, FileSystem}
+import com.ibm.amoeba.fs.{DirectoryInode, DirectoryPointer, FileFactory, FileMode, FileSystem}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -72,7 +72,8 @@ class SimpleFileSystem(aclient: AmoebaClient,
                        fsRoot: KeyValueObjectState,
                        defaultAllocator: ObjectAllocator,
                        executor: TaskExecutor,
-                       val numContextThreads: Int = 4) extends FileSystem {
+                       val numContextThreads: Int = 4,
+                       writeBufferSize: Int = 4 * 1024 * 1024) extends FileSystem {
 
   import SimpleFileSystem._
 
@@ -87,6 +88,8 @@ class SimpleFileSystem(aclient: AmoebaClient,
 
   def defaultSegmentSize: Int = 4 * 1024 * 1024
   def defaultFileIndexNodeSize(iter: Int): Int = 1024*1024
+
+  override protected val fileFactory: FileFactory = new SimpleFileFactory(writeBufferSize)
 
   override private[fs] def retryStrategy = new ExponentialBackoffRetryStrategy(client)
 

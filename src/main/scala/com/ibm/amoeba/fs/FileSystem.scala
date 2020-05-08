@@ -49,6 +49,71 @@ trait FileSystem extends Logging {
     pload.future
   }
 
+  def loadRoot()(implicit ec: ExecutionContext): Future[Directory] = {
+    inodeTable.lookupRoot() flatMap { pointer => loadDirectory(pointer) }
+  }
+
+  private def doLoad[
+    PointerType <: InodePointer,
+    InodeType <: Inode,
+    FileType <: BaseFile](pointer: PointerType,
+                          createFn: (FileSystem, PointerType, InodeType, ObjectRevision) => Future[FileType])(implicit ec: ExecutionContext): Future[FileType] = {
+    getCachedFile(pointer.number) match {
+      case Some(f) => Future.successful(f.asInstanceOf[FileType])
+      case None => synchronized {
+        loading.get(pointer.number) match {
+          case Some(f) => f.map(base => base.asInstanceOf[FileType])
+          case None =>
+            val f = readInode(pointer).flatMap { t =>
+              val (inode, _, revision) = t
+              createFn(this, pointer, inode.asInstanceOf[InodeType], revision)
+            }
+            loading += (pointer.number -> f)
+            f.foreach { _ =>
+              synchronized {
+                loading -= pointer.number
+              }
+            }
+            f
+        }
+      }
+    }
+  }
+
+  def loadDirectory(pointer: DirectoryPointer)(implicit ec: ExecutionContext): Future[Directory] = {
+    doLoad[DirectoryPointer, DirectoryInode, Directory](pointer, fileFactory.createDirectory)
+  }
+
+  def loadFile(pointer: FilePointer)(implicit ec: ExecutionContext): Future[File] = {
+    doLoad[FilePointer, FileInode, File](pointer, fileFactory.createFile)
+  }
+
+  def loadSymlink(pointer: SymlinkPointer)(implicit ec: ExecutionContext): Future[Symlink] = {
+    doLoad[SymlinkPointer, SymlinkInode, Symlink](pointer, fileFactory.createSymlink)
+  }
+
+  def loadUnixSocket(pointer: UnixSocketPointer)(implicit ec: ExecutionContext): Future[UnixSocket] = {
+    doLoad[UnixSocketPointer, UnixSocketInode, UnixSocket](pointer, fileFactory.createUnixSocket)
+  }
+
+  def loadFIFO(pointer: FIFOPointer)(implicit ec: ExecutionContext): Future[FIFO] = {
+    doLoad[FIFOPointer, FIFOInode, FIFO](pointer, fileFactory.createFIFO)
+  }
+
+  def loadCharacterDevice(pointer: CharacterDevicePointer)(implicit ec: ExecutionContext): Future[CharacterDevice] = {
+    doLoad[CharacterDevicePointer, CharacterDeviceInode, CharacterDevice](pointer, fileFactory.createCharacterDevice)
+  }
+
+  def loadBlockDevice(pointer: BlockDevicePointer)(implicit ec: ExecutionContext): Future[BlockDevice] = {
+    doLoad[BlockDevicePointer, BlockDeviceInode, BlockDevice](pointer, fileFactory.createBlockDevice)
+  }
+
+  protected def getCachedFile(inodeNumber: Long): Option[BaseFile] = None
+  protected def cacheFile(file: BaseFile): Unit = ()
+  private[this] var loading: Map[Long, Future[BaseFile]] = Map()
+
+  protected val fileFactory: FileFactory
+
   def openFileHandle(file: File): FileHandle = ???
   def closeFileHandle(fh: File): Unit = ???
 

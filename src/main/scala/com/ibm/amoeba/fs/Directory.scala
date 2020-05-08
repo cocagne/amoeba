@@ -230,43 +230,91 @@ trait Directory extends BaseFile with Logging {
   def prepareCreateDirectory(name: String, mode: Int, uid: Int, gid: Int)(implicit tx: Transaction): Future[Future[DirectoryPointer]] = {
     val root = Root(0, LexicalKeyOrdering, None, new SinglePoolNodeAllocator(fs.client, pointer.pointer.poolId))
     val newInode = DirectoryInode.init(mode, uid, gid, Some(pointer), None, root)
-
-    CreateFileTask.prepareTask(fs, pointer, name, newInode).map(_.asInstanceOf[Future[DirectoryPointer]])
+    val raw =  CreateFileTask.prepareTask(fs, pointer, name, newInode)
+    val fdp = for {
+      fof <- raw
+      of <- fof
+    } yield {
+      of.get.asInstanceOf[DirectoryPointer]
+    }
+    raw.map(_ => fdp)
   }
 
   def prepareCreateFile(name: String, mode: Int, uid: Int, gid: Int)(implicit tx: Transaction): Future[Future[FilePointer]] = {
     val newInode = FileInode.init(mode, uid, gid)
 
-    CreateFileTask.prepareTask(fs, pointer, name, newInode).map(_.asInstanceOf[Future[FilePointer]])
+    val raw = CreateFileTask.prepareTask(fs, pointer, name, newInode)
+    val fdp = for {
+      fof <- raw
+      of <- fof
+    } yield {
+      of.get.asInstanceOf[FilePointer]
+    }
+    raw.map(_ => fdp)
   }
 
   def prepareCreateSymlink(name: String, mode: Int, uid: Int, gid: Int, link: String)(implicit tx: Transaction): Future[Future[SymlinkPointer]] = {
     val newInode = SymlinkInode.init(mode, uid, gid, link)
 
-    CreateFileTask.prepareTask(fs, pointer, name, newInode).map(_.asInstanceOf[Future[SymlinkPointer]])
+    val raw = CreateFileTask.prepareTask(fs, pointer, name, newInode)
+    val fdp = for {
+      fof <- raw
+      of <- fof
+    } yield {
+      of.get.asInstanceOf[SymlinkPointer]
+    }
+    raw.map(_ => fdp)
   }
 
   def prepareCreateUnixSocket(name: String, mode: Int, uid: Int, gid: Int)(implicit tx: Transaction): Future[Future[UnixSocketPointer]] = {
     val newInode = UnixSocketInode.init(mode, uid, gid)
 
-    CreateFileTask.prepareTask(fs, pointer, name, newInode).map(_.asInstanceOf[Future[UnixSocketPointer]])
+    val raw = CreateFileTask.prepareTask(fs, pointer, name, newInode)
+    val fdp = for {
+      fof <- raw
+      of <- fof
+    } yield {
+      of.get.asInstanceOf[UnixSocketPointer]
+    }
+    raw.map(_ => fdp)
   }
 
   def prepareCreateFIFO(name: String, mode: Int, uid: Int, gid: Int)(implicit tx: Transaction): Future[Future[FIFOPointer]] = {
     val newInode = FIFOInode.init(mode, uid, gid)
 
-    CreateFileTask.prepareTask(fs, pointer, name, newInode).map(_.asInstanceOf[Future[FIFOPointer]])
+    val raw = CreateFileTask.prepareTask(fs, pointer, name, newInode)
+    val fdp = for {
+      fof <- raw
+      of <- fof
+    } yield {
+      of.get.asInstanceOf[FIFOPointer]
+    }
+    raw.map(_ => fdp)
   }
 
   def prepareCreateCharacterDevice(name: String, mode: Int, uid: Int, gid: Int, rdev: Int)(implicit tx: Transaction): Future[Future[CharacterDevicePointer]] = {
     val newInode = CharacterDeviceInode.init(mode, uid, gid, rdev)
 
-    CreateFileTask.prepareTask(fs, pointer, name, newInode).map(_.asInstanceOf[Future[CharacterDevicePointer]])
+    val raw = CreateFileTask.prepareTask(fs, pointer, name, newInode)
+    val fdp = for {
+      fof <- raw
+      of <- fof
+    } yield {
+      of.get.asInstanceOf[CharacterDevicePointer]
+    }
+    raw.map(_ => fdp)
   }
 
   def prepareCreateBlockDevice(name: String, mode: Int, uid: Int, gid: Int, rdev: Int)(implicit tx: Transaction): Future[Future[BlockDevicePointer]] = {
     val newInode = BlockDeviceInode.init(mode, uid, gid, rdev)
 
-    CreateFileTask.prepareTask(fs, pointer, name, newInode).map(_.asInstanceOf[Future[BlockDevicePointer]])
+    val raw = CreateFileTask.prepareTask(fs, pointer, name, newInode)
+    val fdp = for {
+      fof <- raw
+      of <- fof
+    } yield {
+      of.get.asInstanceOf[BlockDevicePointer]
+    }
+    raw.map(_ => fdp)
   }
 }

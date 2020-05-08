@@ -6,6 +6,7 @@ import com.ibm.amoeba.fs.{BaseFile, FileMode, FileSystem, Inode, InodePointer, T
 import org.apache.logging.log4j.scala.Logging
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.util.{Failure, Success}
 
 object SimpleBaseFile {
 

@@ -8,7 +8,7 @@ class SimpleFileSystemTestSuite extends FilesSystemTestSuite {
 
   test("Load root directory pointer") {
     for {
-      fs <- bootFS()
+      fs <- bootstrap()
       (rootInode, _, _) <- fs.readInode(1)
     } yield {
       rootInode.fileType should be (FileType.Directory)
@@ -17,7 +17,7 @@ class SimpleFileSystemTestSuite extends FilesSystemTestSuite {
 
   test("Change file uid") {
     for {
-      fs <- bootFS()
+      fs <- bootstrap()
       (rootInode, rootPointer, rootRevision) <- fs.readInode(1)
       dir = new SimpleDirectory(rootPointer.asInstanceOf[DirectoryPointer],
         rootRevision, rootInode.asInstanceOf[DirectoryInode], fs)
@@ -33,7 +33,7 @@ class SimpleFileSystemTestSuite extends FilesSystemTestSuite {
 
   test("Change file gid") {
     for {
-      fs <- bootFS()
+      fs <- bootstrap()
       (rootInode, rootPointer, rootRevision) <- fs.readInode(1)
       dir = new SimpleDirectory(rootPointer.asInstanceOf[DirectoryPointer],
         rootRevision, rootInode.asInstanceOf[DirectoryInode], fs)
@@ -49,7 +49,7 @@ class SimpleFileSystemTestSuite extends FilesSystemTestSuite {
 
   test("Prepare hardlink") {
     for {
-      fs <- bootFS()
+      fs <- bootstrap()
       (rootInode, rootPointer, rootRevision) <- fs.readInode(1)
       dir = new SimpleDirectory(rootPointer.asInstanceOf[DirectoryPointer],
         rootRevision, rootInode.asInstanceOf[DirectoryInode], fs)
@@ -68,7 +68,7 @@ class SimpleFileSystemTestSuite extends FilesSystemTestSuite {
   test("Create File") {
     val initInode = FileInode.init(0, 0, 1)
     for {
-      fs <- bootFS()
+      fs <- bootstrap()
       (rootInode, rootPointer, rootRevision) <- fs.readInode(1)
       dir = new SimpleDirectory(rootPointer.asInstanceOf[DirectoryPointer],
         rootRevision, rootInode.asInstanceOf[DirectoryInode], fs)
@@ -87,7 +87,7 @@ class SimpleFileSystemTestSuite extends FilesSystemTestSuite {
   test("Rename File") {
     val initInode = FileInode.init(0, 0, 1)
     for {
-      fs <- bootFS()
+      fs <- bootstrap()
       (rootInode, rootPointer, rootRevision) <- fs.readInode(1)
       dir = new SimpleDirectory(rootPointer.asInstanceOf[DirectoryPointer],
         rootRevision, rootInode.asInstanceOf[DirectoryInode], fs)

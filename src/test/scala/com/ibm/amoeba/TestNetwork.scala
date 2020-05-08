@@ -112,9 +112,11 @@ object TestNetwork {
       }
     }
 
+    override def shutdown(): Unit = backgroundTasks.shutdown(Duration(50, MILLISECONDS))
+
     val retryStrategy: RetryStrategy = new ExponentialBackoffRetryStrategy(this)
 
-    def backgroundTasks: BackgroundTask = BackgroundTask.NoBackgroundTasks
+    def backgroundTasks: BackgroundTask = new BackgroundTaskPool
 
     def clientContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
 

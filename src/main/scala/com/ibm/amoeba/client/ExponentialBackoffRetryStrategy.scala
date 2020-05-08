@@ -77,10 +77,11 @@ class ExponentialBackoffRetryStrategy(client: AmoebaClient, backoffLimit: Int = 
           attempt onComplete {
             case Success(result) => p.success(result)
 
-            case Failure(cause) => cause match {
-              case StopRetrying(reason) => p.failure(reason)
-              case cause: Throwable => scheduleNextAttempt(cause)
-            }
+            case Failure(cause) =>
+              cause match {
+                case StopRetrying(reason) => p.failure(reason)
+                case cause: Throwable => scheduleNextAttempt(cause)
+              }
           }
         } catch {
           case StopRetrying(reason) => p.failure(reason)

@@ -56,6 +56,7 @@ class IntegrationTestSuite  extends AsyncFunSuite with Matchers { //with BeforeA
       }
 
       subFixtureTeardown()
+      client.shutdown()
 
       net = null
       client = null
