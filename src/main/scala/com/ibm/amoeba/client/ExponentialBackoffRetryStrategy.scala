@@ -6,7 +6,7 @@ import scala.concurrent.duration.Duration
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
 
-class ExponentialBackoffRetryStrategy(client: AmoebaClient, backoffLimit: Int = 60 * 1000, initialRetryDelay: Int = 15) extends RetryStrategy {
+class ExponentialBackoffRetryStrategy(client: AmoebaClient, backoffLimit: Int = 60 * 1000, initialRetryDelay: Int = 16) extends RetryStrategy {
 
   private [this] var exit = false
 
@@ -17,35 +17,51 @@ class ExponentialBackoffRetryStrategy(client: AmoebaClient, backoffLimit: Int = 
 
     implicit val ec: ExecutionContext = client.clientContext
 
-    def retry(limit: Int): Unit = {
-      val shouldAttempt = synchronized { !exit }
+    def scheduleNextAttempt(retryCount: Int): Unit = {
+      var countdown = retryCount
+      var window = 2
 
-      if (shouldAttempt) {
+      while (countdown > 0 && countdown < backoffLimit) {
+        window = window * 2
+        countdown -= 1
+      }
 
-        def scheduleNextAttempt(): Unit = {
-          val rand = new java.util.Random
-          val delay = rand.nextInt(limit)
-          val nextLimit = if (limit * limit < backoffLimit) limit * limit else backoffLimit
-          client.backgroundTasks.schedule(Duration(delay, TimeUnit.MILLISECONDS))(retry(nextLimit))
-        }
+      if (countdown > backoffLimit)
+        window = backoffLimit
 
-        try {
-          attempt onComplete {
-            case Success(result) => p.success(result)
+      val rand = new java.util.Random
+      val delay = rand.nextInt(window)
 
-            case Failure(cause) => cause match {
-              case StopRetrying(reason) => p.failure(reason)
-              case _: Throwable => scheduleNextAttempt()
-            }
-          }
-        } catch {
-          case StopRetrying(reason) => p.failure(reason)
-          case _: Throwable => scheduleNextAttempt()
-        }
+      client.backgroundTasks.schedule(Duration(delay, TimeUnit.MILLISECONDS)) {
+        retry(retryCount + 1)
       }
     }
 
-    retry(initialRetryDelay)
+    def retry(retryCount: Int) {
+      val shouldExit = synchronized { exit }
+
+      if (shouldExit)
+        return
+
+      def onFail(cause: Throwable): Unit = {
+        cause match {
+          case StopRetrying(reason) => p.failure(reason)
+          case _ => scheduleNextAttempt(retryCount)
+        }
+      }
+
+      try {
+        attempt onComplete {
+          case Success(result) => p.success(result)
+
+          case Failure(cause) => onFail(cause)
+        }
+      } catch {
+        case cause: Throwable => onFail(cause)
+      }
+    }
+
+    retry(1)
 
     p.future
   }
@@ -55,42 +71,61 @@ class ExponentialBackoffRetryStrategy(client: AmoebaClient, backoffLimit: Int = 
 
     implicit val ec: ExecutionContext = client.clientContext
 
-    def retry(limit: Int): Unit = {
-      val shouldAttempt = synchronized { !exit }
+    def scheduleNextAttempt(retryCount: Int): Unit = {
+      var countdown = retryCount
+      var window = 2
 
-      if (shouldAttempt) {
+      while (countdown > 0 && countdown < backoffLimit) {
+        window = window * 2
+        countdown -= 1
+      }
 
-        def scheduleNextAttempt(cause: Throwable): Unit = {
-          val rand = new java.util.Random
-          val delay = rand.nextInt(limit)
-          val nextLimit = if (limit * limit < backoffLimit) limit * limit else backoffLimit
+      if (countdown > backoffLimit)
+        window = backoffLimit
 
-          client.backgroundTasks.schedule(Duration(delay, TimeUnit.MILLISECONDS)) {
-            retryUntilSuccessful(onAttemptFailure(cause)).onComplete {
-              case Failure(reason) => p.failure(reason)
-              case Success(_) => retry(nextLimit)
-            }
-          }
-        }
+      val rand = new java.util.Random
+      val delay = rand.nextInt(window)
 
-        try {
-          attempt onComplete {
-            case Success(result) => p.success(result)
-
-            case Failure(cause) =>
-              cause match {
-                case StopRetrying(reason) => p.failure(reason)
-                case cause: Throwable => scheduleNextAttempt(cause)
-              }
-          }
-        } catch {
-          case StopRetrying(reason) => p.failure(reason)
-          case cause: Throwable => scheduleNextAttempt(cause)
-        }
+      client.backgroundTasks.schedule(Duration(delay, TimeUnit.MILLISECONDS)) {
+        retry(retryCount + 1)
       }
     }
 
-    retry(initialRetryDelay)
+    def retry(retryCount: Int) {
+      val shouldExit = synchronized { exit }
+
+      if (shouldExit)
+        return
+
+      def onFail(cause: Throwable): Unit = {
+        cause match {
+          case StopRetrying(reason) => p.failure(reason)
+          case _ =>
+            try {
+              onAttemptFailure(cause) onComplete {
+                case Success(_) => scheduleNextAttempt(retryCount)
+                case Failure(StopRetrying(reason)) => p.failure(reason)
+                case Failure(_) => scheduleNextAttempt(retryCount)
+              }
+            } catch {
+              case StopRetrying(reason) => p.failure(reason)
+              case cause: Throwable => scheduleNextAttempt(retryCount)
+            }
+        }
+      }
+
+      try {
+        attempt onComplete {
+          case Success(result) => p.success(result)
+
+          case Failure(cause) => onFail(cause)
+        }
+      } catch {
+        case cause: Throwable => onFail(cause)
+      }
+    }
+
+    retry(1)
 
     p.future
   }

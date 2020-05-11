@@ -1,7 +1,7 @@
 package com.ibm.amoeba.fs.impl.simple
 
 import com.ibm.amoeba.client.KeyValueObjectState.ValueState
-import com.ibm.amoeba.client.Transaction
+import com.ibm.amoeba.client.{StopRetrying, Transaction}
 import com.ibm.amoeba.client.tkvl.TieredKeyValueList
 import com.ibm.amoeba.common.objects.{Key, ObjectRevision, Value}
 import com.ibm.amoeba.fs.error.{DirectoryEntryDoesNotExist, DirectoryNotEmpty}
@@ -18,6 +18,10 @@ class SimpleDirectory(override val pointer: DirectoryPointer,
   def tree: TieredKeyValueList = {
     val rootManager = new SimpleDirectoryRootManager(fs.client, pointer.pointer)
     new TieredKeyValueList(fs.client, rootManager)
+  }
+
+  override def isEmpty(): Future[Boolean] = {
+    tree.foldLeft(true)( (s, t) => s && t.isEmpty)
   }
 
   override def getContents(): Future[List[DirectoryEntry]] = {
@@ -59,28 +63,48 @@ class SimpleDirectory(override val pointer: DirectoryPointer,
     } yield ()
   }
 
-  override def prepareDelete(name: String, decref: Boolean)(implicit tx: Transaction): Future[Future[Unit]] = {
+  override def prepareDelete(name: String, decref: Boolean)(implicit tx: Transaction): Future[Unit] = {
     val key = Key(name)
 
     def onptr(ovs: Option[ValueState]): Future[Unit] = ovs match {
       case None => Future.failed(DirectoryEntryDoesNotExist(pointer, name))
       case Some(vs) =>
         val fptr = InodePointer(vs.value.bytes)
-        val fdel = tree.delete(key)
-        val fdecref = if (decref) {
-          UnlinkFileTask.prepareTask(fs, fptr)
-        } else {
-          Future.successful(())
+        val fcheck = fptr match {
+          case dptr: DirectoryPointer =>
+            for {
+              d <- fs.loadDirectory(dptr)
+              (_, revision) <- d.getInode()
+              isEmpty <- d.isEmpty()
+            } yield {
+              if (!isEmpty) {
+                throw  DirectoryNotEmpty(dptr)
+              } else {
+                // Use this to ensure that no entries are added to the directory
+                // while we're in the process of deleting it
+                tx.bumpVersion(d.pointer.pointer, revision)
+              }
+            }
+          case _ => Future.successful(())
         }
+
         for {
-          _ <- fdel
-          _ <- fdecref
+          _ <- fcheck
+          _ <- tree.delete(key)
+          _ <- if (decref) {
+            UnlinkFileTask.prepareTask(fs, fptr)
+          } else {
+            Future.successful(())
+          }
         } yield {
           tx.result.map(_=>())
         }
     }
 
-    tree.get(key).map(onptr)
+    for {
+      ovs <- tree.get(key)
+      _ <- onptr(ovs)
+    } yield ()
   }
 
   override def prepareRename(oldName: String, newName: String)(implicit tx: Transaction): Future[Unit] = {

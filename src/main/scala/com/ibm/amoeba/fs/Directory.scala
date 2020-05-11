@@ -27,13 +27,15 @@ trait Directory extends BaseFile with Logging {
     case _ => getEntry(name)
   }
 
+  def isEmpty(): Future[Boolean]
+
   def getContents(): Future[List[DirectoryEntry]]
 
   def getEntry(name: String): Future[Option[InodePointer]]
 
   def prepareInsert(name: String, pointer: InodePointer, incref: Boolean=true)(implicit tx: Transaction): Future[Unit]
 
-  def prepareDelete(name: String, decref: Boolean=true)(implicit tx: Transaction): Future[Future[Unit]]
+  def prepareDelete(name: String, decref: Boolean=true)(implicit tx: Transaction): Future[Unit]
 
   def prepareRename(oldName: String, newName: String)(implicit tx: Transaction): Future[Unit]
 
@@ -46,6 +48,7 @@ trait Directory extends BaseFile with Logging {
   private def retryUntilSuccessfulOr[T](prepare: Transaction => Future[T])
                                        (checkForErrors: => Future[Unit]): Future[T] = {
     def onFail(err: Throwable): Future[Unit] = {
+
       err match {
         case e: InvalidInode => throw StopRetrying(e)
         case e: FatalReadError => throw StopRetrying(e)
@@ -106,7 +109,7 @@ trait Directory extends BaseFile with Logging {
 
   def delete(name: String, decref: Boolean=true): Future[Unit] = {
     retryUntilSuccessfulOr { implicit tx =>
-      prepareDelete(name, decref).map(_ => ())
+      prepareDelete(name, decref)
     }{
       getEntry(name).map {
         case None =>  throw StopRetrying(DirectoryEntryDoesNotExist(pointer, name))
