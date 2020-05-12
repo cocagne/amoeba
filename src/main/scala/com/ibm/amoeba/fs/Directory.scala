@@ -233,9 +233,10 @@ trait Directory extends BaseFile with Logging {
   def prepareCreateDirectory(name: String, mode: Int, uid: Int, gid: Int)(implicit tx: Transaction): Future[Future[DirectoryPointer]] = {
     val root = Root(0, LexicalKeyOrdering, None, new SinglePoolNodeAllocator(fs.client, pointer.pointer.poolId))
     val newInode = DirectoryInode.init(mode, uid, gid, Some(pointer), None, root)
-    val raw =  CreateFileTask.prepareTask(fs, pointer, name, newInode)
+    val fcheck = getEntry(name).map { optr => optr.map( _ => throw DirectoryEntryExists(this.pointer, name))}
+    val raw = fcheck.flatMap(_ => CreateFileTask.prepareTask(fs, pointer, name, newInode))
     val fdp = for {
-      fof <- raw
+      fof <-  raw
       of <- fof
     } yield {
       of.get.asInstanceOf[DirectoryPointer]
@@ -245,8 +246,8 @@ trait Directory extends BaseFile with Logging {
 
   def prepareCreateFile(name: String, mode: Int, uid: Int, gid: Int)(implicit tx: Transaction): Future[Future[FilePointer]] = {
     val newInode = FileInode.init(mode, uid, gid)
-
-    val raw = CreateFileTask.prepareTask(fs, pointer, name, newInode)
+    val fcheck = getEntry(name).map { optr => optr.map( _ => throw DirectoryEntryExists(this.pointer, name))}
+    val raw = fcheck.flatMap(_ => CreateFileTask.prepareTask(fs, pointer, name, newInode))
     val fdp = for {
       fof <- raw
       of <- fof
@@ -259,7 +260,8 @@ trait Directory extends BaseFile with Logging {
   def prepareCreateSymlink(name: String, mode: Int, uid: Int, gid: Int, link: String)(implicit tx: Transaction): Future[Future[SymlinkPointer]] = {
     val newInode = SymlinkInode.init(mode, uid, gid, link)
 
-    val raw = CreateFileTask.prepareTask(fs, pointer, name, newInode)
+    val fcheck = getEntry(name).map { optr => optr.map( _ => throw DirectoryEntryExists(this.pointer, name))}
+    val raw = fcheck.flatMap(_ => CreateFileTask.prepareTask(fs, pointer, name, newInode))
     val fdp = for {
       fof <- raw
       of <- fof
@@ -272,7 +274,8 @@ trait Directory extends BaseFile with Logging {
   def prepareCreateUnixSocket(name: String, mode: Int, uid: Int, gid: Int)(implicit tx: Transaction): Future[Future[UnixSocketPointer]] = {
     val newInode = UnixSocketInode.init(mode, uid, gid)
 
-    val raw = CreateFileTask.prepareTask(fs, pointer, name, newInode)
+    val fcheck = getEntry(name).map { optr => optr.map( _ => throw DirectoryEntryExists(this.pointer, name))}
+    val raw = fcheck.flatMap(_ => CreateFileTask.prepareTask(fs, pointer, name, newInode))
     val fdp = for {
       fof <- raw
       of <- fof
@@ -285,7 +288,8 @@ trait Directory extends BaseFile with Logging {
   def prepareCreateFIFO(name: String, mode: Int, uid: Int, gid: Int)(implicit tx: Transaction): Future[Future[FIFOPointer]] = {
     val newInode = FIFOInode.init(mode, uid, gid)
 
-    val raw = CreateFileTask.prepareTask(fs, pointer, name, newInode)
+    val fcheck = getEntry(name).map { optr => optr.map( _ => throw DirectoryEntryExists(this.pointer, name))}
+    val raw = fcheck.flatMap(_ => CreateFileTask.prepareTask(fs, pointer, name, newInode))
     val fdp = for {
       fof <- raw
       of <- fof
@@ -298,7 +302,8 @@ trait Directory extends BaseFile with Logging {
   def prepareCreateCharacterDevice(name: String, mode: Int, uid: Int, gid: Int, rdev: Int)(implicit tx: Transaction): Future[Future[CharacterDevicePointer]] = {
     val newInode = CharacterDeviceInode.init(mode, uid, gid, rdev)
 
-    val raw = CreateFileTask.prepareTask(fs, pointer, name, newInode)
+    val fcheck = getEntry(name).map { optr => optr.map( _ => throw DirectoryEntryExists(this.pointer, name))}
+    val raw = fcheck.flatMap(_ => CreateFileTask.prepareTask(fs, pointer, name, newInode))
     val fdp = for {
       fof <- raw
       of <- fof
@@ -311,7 +316,8 @@ trait Directory extends BaseFile with Logging {
   def prepareCreateBlockDevice(name: String, mode: Int, uid: Int, gid: Int, rdev: Int)(implicit tx: Transaction): Future[Future[BlockDevicePointer]] = {
     val newInode = BlockDeviceInode.init(mode, uid, gid, rdev)
 
-    val raw = CreateFileTask.prepareTask(fs, pointer, name, newInode)
+    val fcheck = getEntry(name).map { optr => optr.map( _ => throw DirectoryEntryExists(this.pointer, name))}
+    val raw = fcheck.flatMap(_ => CreateFileTask.prepareTask(fs, pointer, name, newInode))
     val fdp = for {
       fof <- raw
       of <- fof

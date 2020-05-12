@@ -4,7 +4,7 @@ import com.ibm.amoeba.client.KeyValueObjectState.ValueState
 import com.ibm.amoeba.client.{StopRetrying, Transaction}
 import com.ibm.amoeba.client.tkvl.TieredKeyValueList
 import com.ibm.amoeba.common.objects.{Key, ObjectRevision, Value}
-import com.ibm.amoeba.fs.error.{DirectoryEntryDoesNotExist, DirectoryNotEmpty}
+import com.ibm.amoeba.fs.error.{DirectoryEntryDoesNotExist, DirectoryEntryExists, DirectoryNotEmpty}
 import com.ibm.amoeba.fs.{BaseFile, Directory, DirectoryEntry, DirectoryInode, DirectoryPointer, FileSystem, InodePointer}
 import org.apache.logging.log4j.scala.Logging
 
@@ -46,6 +46,13 @@ class SimpleDirectory(override val pointer: DirectoryPointer,
   override def prepareInsert(name: String,
                              pointer: InodePointer,
                              incref: Boolean)(implicit tx: Transaction): Future[Unit] = {
+    val fcheck = tree.getContainingNode(name).map { onode =>
+      onode.map { node =>
+        if (node.contains(name))
+          prepareDelete(name, true)
+      }
+    }
+
     val fincref = if (incref) {
       fs.readInode(pointer) map { t =>
         val (finode, _, frevision) = t
@@ -55,11 +62,11 @@ class SimpleDirectory(override val pointer: DirectoryPointer,
     } else {
       Future.successful(())
     }
-    val finsert = tree.set(Key(name), Value(pointer.toArray), Some(Left(true)))
 
     for {
+      _ <- fcheck
       _ <- fincref
-      _ <- finsert
+      _ <- tree.set(Key(name), Value(pointer.toArray), Some(Left(true)))
     } yield ()
   }
 
@@ -116,6 +123,8 @@ class SimpleDirectory(override val pointer: DirectoryPointer,
       ob <- tr.getContainingNode(newKey)
       _ <- (oa, ob) match {
         case (Some(a), Some(b)) =>
+          if (b.contains(newKey))
+            throw DirectoryEntryExists(this.pointer, newName)
           if (!a.contains(oldKey)) {
             Future.failed(DirectoryEntryDoesNotExist(pointer, oldKey.stringValue))
           } else {

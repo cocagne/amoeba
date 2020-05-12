@@ -19,6 +19,8 @@ class TieredKeyValueListNode(val tkvl: TieredKeyValueList,
 
   def contains(key: Key): Boolean = node.contents.contains(key)
 
+  def keys: Set[Key] = node.contents.keySet
+
   def set(key: Key,
           value: Value,
           requirement: Option[Either[Boolean, ObjectRevision]] = None)(implicit t: Transaction): Future[Unit] = {

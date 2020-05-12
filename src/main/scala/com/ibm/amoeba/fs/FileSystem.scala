@@ -14,6 +14,8 @@ import scala.util.{Failure, Success}
 trait FileSystem extends Logging {
   val uuid: UUID
 
+  private[this] var openFiles: Map[Long, File] = Map()
+
   def readInode(inodeNumber: Long)(implicit ec: ExecutionContext): Future[(Inode, InodePointer, ObjectRevision)] = {
     inodeTable.lookup(inodeNumber).flatMap {
       case None => Future.failed(InvalidInode(inodeNumber))
@@ -51,6 +53,26 @@ trait FileSystem extends Logging {
 
   def loadRoot()(implicit ec: ExecutionContext): Future[Directory] = {
     inodeTable.lookupRoot() flatMap { pointer => loadDirectory(pointer) }
+  }
+
+  def lookup(iptr: InodePointer)(implicit ec: ExecutionContext): Future[BaseFile] =  {
+    getCachedFile(iptr.number) match {
+      case Some(f) => Future.successful(f)
+      case None =>
+        iptr match {
+          case ptr: DirectoryPointer => loadDirectory(ptr)
+          case ptr: FilePointer =>
+            synchronized { openFiles.get(iptr.number) } match {
+              case Some(file) => Future.successful(file)
+              case None => loadFile(ptr)
+            }
+          case ptr: SymlinkPointer => loadSymlink(ptr)
+          case ptr: UnixSocketPointer => loadUnixSocket(ptr)
+          case ptr: FIFOPointer => loadFIFO(ptr)
+          case ptr: CharacterDevicePointer => loadCharacterDevice(ptr)
+          case ptr: BlockDevicePointer => loadBlockDevice(ptr)
+        }
+    }
   }
 
   private def doLoad[

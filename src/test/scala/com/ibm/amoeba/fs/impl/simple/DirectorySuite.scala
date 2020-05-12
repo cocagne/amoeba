@@ -1,8 +1,10 @@
 package com.ibm.amoeba.fs.impl.simple
 
+import java.nio.charset.StandardCharsets
+
 import com.ibm.amoeba.client.Transaction
 import com.ibm.amoeba.common.objects.{ObjectPointer, ObjectRevision}
-import com.ibm.amoeba.fs.error.DirectoryNotEmpty
+import com.ibm.amoeba.fs.error.{DirectoryEntryDoesNotExist, DirectoryEntryExists, DirectoryNotEmpty}
 import com.ibm.amoeba.fs.{Directory, DirectoryPointer, FileMode, Timespec}
 
 import scala.concurrent.Future
@@ -133,6 +135,231 @@ class DirectorySuite extends FilesSystemTestSuite {
       _ <- recoverToSucceededIf[DirectoryNotEmpty](rootDir.delete("foo"))
     } yield {
       initialContent.length should be (0)
+    }
+  }
+
+  test("Create file fails if file already exists") {
+    for {
+      fs <- bootstrap()
+      rootDir <- fs.loadRoot()
+      initialContent <- rootDir.getContents()
+      _ <- cdir(rootDir, "foo", mode=0, uid=1, gid=2)
+      _ <- recoverToSucceededIf[DirectoryEntryExists](rootDir.createFile("foo", mode=0, uid=1, gid=2))
+    } yield {
+      initialContent.length should be (0)
+    }
+  }
+
+  test("Insert file fails if file already exists") {
+    for {
+      fs <- bootstrap()
+      rootDir <- fs.loadRoot()
+      initialContent <- rootDir.getContents()
+      _ <- cdir(rootDir, "foo", mode=0, uid=1, gid=2)
+      _ <- recoverToSucceededIf[DirectoryEntryExists](rootDir.insert("foo",rootDir.pointer))
+    } yield {
+      initialContent.length should be (0)
+    }
+  }
+
+  test("Delete file fails if file does not exist") {
+    for {
+      fs <- bootstrap()
+      rootDir <- fs.loadRoot()
+      initialContent <- rootDir.getContents()
+      _ <- cdir(rootDir, "foo", mode=0, uid=1, gid=2)
+      _ <- recoverToSucceededIf[DirectoryEntryDoesNotExist](rootDir.delete("INVALID"))
+    } yield {
+      initialContent.length should be (0)
+    }
+  }
+
+  test("Rename file fails if source file does not exist") {
+    for {
+      fs <- bootstrap()
+      rootDir <- fs.loadRoot()
+      initialContent <- rootDir.getContents()
+      _ <- cdir(rootDir, "foo", mode=0, uid=1, gid=2)
+      _ <- recoverToSucceededIf[DirectoryEntryDoesNotExist](rootDir.rename("INVALID", "bar"))
+    } yield {
+      initialContent.length should be (0)
+    }
+  }
+
+  test("Rename file fails if destination file exists") {
+    for {
+      fs <- bootstrap()
+      rootDir <- fs.loadRoot()
+      initialContent <- rootDir.getContents()
+      _ <- cdir(rootDir, "foo", mode=0, uid=1, gid=2)
+      _ <- cdir(rootDir, "bar", mode=0, uid=1, gid=2)
+      _ <- recoverToSucceededIf[DirectoryEntryExists](rootDir.rename("foo", "bar"))
+    } yield {
+      initialContent.length should be (0)
+    }
+  }
+
+  test("HardLink file fails if destination file exists") {
+    for {
+      fs <- bootstrap()
+      rootDir <- fs.loadRoot()
+      initialContent <- rootDir.getContents()
+      fooptr <- cdir(rootDir, "foo", mode=0, uid=1, gid=2)
+      _ <- cdir(rootDir, "bar", mode=0, uid=1, gid=2)
+      foo <- fs.lookup(fooptr)
+      _ <- recoverToSucceededIf[DirectoryEntryExists](rootDir.hardLink("bar", foo))
+    } yield {
+      initialContent.length should be (0)
+    }
+  }
+
+  test("Delete empty Directory") {
+    for {
+      fs <- bootstrap()
+      rootDir <- fs.loadRoot()
+      _ <- cdir(rootDir, "foo", mode=0, uid=1, gid=2)
+      _ <- rootDir.delete("foo")
+      oentry <- rootDir.getEntry("foo")
+    } yield {
+      oentry should be (None)
+    }
+  }
+
+  test("Delete Directory with data tiered list") {
+    for {
+      fs <- bootstrap()
+      rootDir <- fs.loadRoot()
+      newDirPointer <- cdir(rootDir, "foo", mode=0, uid=1, gid=2)
+      newDir <- fs.loadDirectory(newDirPointer)
+      _ <- cdir(newDir, "bar", mode=0, uid=1, gid=2)
+      dc <- newDir.getContents()
+      if dc.length == 1
+      _ <- newDir.delete("bar")
+      obar <- newDir.getEntry("bar")
+      _ <- rootDir.delete("foo")
+      ofoo <- rootDir.getEntry("foo")
+    } yield {
+      obar should be (None)
+      ofoo should be (None)
+    }
+  }
+
+  test("Test Symlink") {
+    for {
+      fs <- bootstrap()
+      rootDir <- fs.loadRoot()
+      _ <- rootDir.getContents()
+      sptr <- {
+        implicit val tx: Transaction = rootDir.fs.client.newTransaction()
+        val fprep = rootDir.prepareCreateSymlink("foo", mode=0, uid=1, gid=2, link="bar")
+        fprep.foreach(_ => tx.commit())
+        fprep.flatMap(fresult => fresult)
+      }
+      sl1 <- fs.loadSymlink(sptr)
+      origSize = sl1.size
+      origLink = sl1.symLinkAsString
+      _<-sl1.setSymLink("quux".getBytes(StandardCharsets.UTF_8))
+      sl2 <- fs.loadSymlink(sptr)
+    } yield {
+      origSize should be (3)
+      origLink should be ("bar")
+      sl1.size should be (4)
+      sl1.symLinkAsString should be ("quux")
+      sl2.size should be (4)
+      sl2.symLinkAsString should be ("quux")
+    }
+  }
+
+  test("Test UnixSocket") {
+    for {
+      fs <- bootstrap()
+      rootDir <- fs.loadRoot()
+      _ <- rootDir.getContents()
+      sptr <- {
+        implicit val tx: Transaction = rootDir.fs.client.newTransaction()
+        val fprep = rootDir.prepareCreateUnixSocket("foo", mode=0, uid=1, gid=2)
+        fprep.foreach(_ => tx.commit())
+        fprep.flatMap(fresult => fresult)
+      }
+      us <- fs.loadUnixSocket(sptr)
+    } yield {
+      us.uid should be (1)
+    }
+  }
+
+  test("Test FIFO") {
+    for {
+      fs <- bootstrap()
+      rootDir <- fs.loadRoot()
+      _ <- rootDir.getContents()
+      sptr <- {
+        implicit val tx: Transaction = rootDir.fs.client.newTransaction()
+        val fprep = rootDir.prepareCreateFIFO("foo", mode=0, uid=1, gid=2)
+        fprep.foreach(_ => tx.commit())
+        fprep.flatMap(fresult => fresult)
+      }
+      us <- fs.loadFIFO(sptr)
+    } yield {
+      us.uid should be (1)
+    }
+  }
+
+  test("Test CharacterDevice") {
+    for {
+      fs <- bootstrap()
+      rootDir <- fs.loadRoot()
+      _ <- rootDir.getContents()
+      sptr <- {
+        implicit val tx: Transaction = rootDir.fs.client.newTransaction()
+        val fprep = rootDir.prepareCreateCharacterDevice("foo", mode=0, uid=1, gid=2, rdev=10)
+        fprep.foreach(_ => tx.commit())
+        fprep.flatMap(fresult => fresult)
+      }
+      us <- fs.loadCharacterDevice(sptr)
+    } yield {
+      us.uid should be (1)
+      us.rdev should be (10)
+    }
+  }
+
+  test("Test BlockDevice") {
+    for {
+      fs <- bootstrap()
+      rootDir <- fs.loadRoot()
+      _ <- rootDir.getContents()
+      sptr <- {
+        implicit val tx: Transaction = rootDir.fs.client.newTransaction()
+        val fprep = rootDir.prepareCreateBlockDevice("foo", mode=0, uid=1, gid=2, rdev=10)
+        fprep.foreach(_ => tx.commit())
+        fprep.flatMap(fresult => fresult)
+      }
+      us <- fs.loadBlockDevice(sptr)
+    } yield {
+      us.uid should be (1)
+      us.rdev should be (10)
+    }
+  }
+
+  test("Test Hardlink") {
+    for {
+      fs <- bootstrap()
+      rootDir <- fs.loadRoot()
+      _ <- rootDir.getContents()
+      sptr <- {
+        implicit val tx: Transaction = rootDir.fs.client.newTransaction()
+        val fprep = rootDir.prepareCreateBlockDevice("foo", mode=0, uid=1, gid=2, rdev=10)
+        fprep.foreach(_ => tx.commit())
+        fprep.flatMap(fresult => fresult)
+      }
+      us <- fs.loadBlockDevice(sptr)
+      _ <- fs.client.transact { implicit tx =>
+        rootDir.prepareHardLink("bar", us)
+      }
+      us2 <- fs.loadBlockDevice(sptr)
+      postLinkContent <- rootDir.getContents()
+    } yield {
+      us2.links should be (2)
+      postLinkContent.size should be (2)
     }
   }
 }
