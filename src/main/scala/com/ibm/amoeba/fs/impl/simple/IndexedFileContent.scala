@@ -401,6 +401,7 @@ class IndexedFileContent(file: SimpleFile, osegmentSize: Option[Int]=None, otier
       }
 
       fprep.map { prep =>
+
         val newTail = Tail(prep.offset, prep.pointer, ObjectRevision(tx.id), prep.newTailContent, prep.newTailPath)
 
         val fcomplete = tx.result.map { _ =>
