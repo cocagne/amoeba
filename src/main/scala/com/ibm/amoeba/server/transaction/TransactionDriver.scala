@@ -167,9 +167,9 @@ abstract class TransactionDriver(
       sendAcceptMessages()
 
     tprep.foreach(sendPrepareMessage)
-    cliResolved.foreach(messenger.sendClientResponse)
-    cliFinalized.foreach(messenger.sendClientResponse)
     txMsgs.foreach(messenger.sendTransactionMessages)
+    cliFinalized.foreach(messenger.sendClientResponse)
+    cliResolved.foreach(messenger.sendClientResponse)
   }
 
   def receiveTxPrepare(msg: TxPrepare): Unit = synchronized {

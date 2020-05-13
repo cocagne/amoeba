@@ -130,6 +130,7 @@ abstract class BaseObjectReader[PointerType <: ObjectPointer, StoreStateType <: 
 
   protected def attemptRestore(debug: Boolean): Unit = {
 
+    /*
     val revisions = responses.valuesIterator.foldLeft(Map[ObjectRevision, Int]()) { (m, r) => r match {
       case Left(_) => m
       case Right(ss) =>
@@ -140,11 +141,18 @@ abstract class BaseObjectReader[PointerType <: ObjectPointer, StoreStateType <: 
     val (restorableRevision, restorableCount) = revisions.foldLeft(revisions.head) { (h, r) =>
       if (h._2 > r._2) h else r
     }
+     */
+    val mostRecent = responses.valuesIterator.foldLeft((ObjectRevision.Null, HLCTimestamp.Zero)) { (t,r) => r match {
+      case Left(_) => t
+      case Right(ss) => if (ss.timestamp > t._2) (ss.revision, ss.timestamp) else t
+    }}
+
+    //val storeStates = responses.values.collect{ case Right(ss) if ss.revision == mostRecent._1 => ss }.toList
 
     val allStoreStates = responses.valuesIterator.collect { case Right(ss) => ss }.toList
 
     val matchingStoreStates = allStoreStates.filter { ss =>
-      if (restorableRevision == ss.revision) true else {
+      if (mostRecent._1 == ss.revision) true else {
         knownBehind += ss.storeId -> ss.readTimestamp
         false
       }

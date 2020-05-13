@@ -220,7 +220,7 @@ class KeyValueObjectReaderSuite extends FunSuite with Matchers {
     r.result should be (None)
     r.ok(2, v1, Set(), a0, b0, c0)
     r.result should not be (None)
-    r.rereadCandidates.keySet should be (Set(s0,s1))
+    r.rereadCandidates.keySet should be (Set(s1))
     r.result.get match {
       case Left(_) => fail()
       case Right(os) =>
