@@ -1,18 +1,5 @@
 
-FileSystem
-    - Create file
-        fetchContainingNode from inode table
-        Object REvision guard on containing node then set(requireDoesNotExist=true) on inode table
-        fetchContainingNode from Directory
-        if not exist: set(requireDoesNotExist=true)
-        if exists: CreateUnlinkTask, set(keyRevision=Revision)
 
-Unlink is a task.
-    - Gurantees exactly once semantics
-    - Accurate count on Inode
-    - Ensures delete on zero reference
-
-MissedUpdateErrorHandling
 AllocationErrorHandling
     - Fix sweeper bug
 

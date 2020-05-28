@@ -26,6 +26,7 @@ lazy val root = (project in file(".")).
     resolvers += "mvnrepository" at "http://mvnrepository.com/artifact/",
     
     resolvers += "dCache Repository" at "https://download.dcache.org/nexus/content/repositories/releases",
+    resolvers += "Oracle Repository" at "http://download.oracle.com/maven",
 
     libraryDependencies ++= Seq(
       "org.scalatest"                    %% "scalatest"               % "3.0.8" % "test",
@@ -38,6 +39,8 @@ lazy val root = (project in file(".")).
       "org.apache.logging.log4j"         %% "log4j-api-scala"         % "11.0",
       "org.slf4j"                        %  "slf4j-log4j12"           % "1.8.0-beta2",
       "com.lmax"                         %  "disruptor"               % "3.3.7",
+      "org.dcache"                       %  "nfs4j-core"              % "0.19.0",
+      "org.yaml"                         %  "snakeyaml"               % "1.25",
     )
   )
   

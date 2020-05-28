@@ -1,5 +1,6 @@
 package com.ibm.amoeba.client.internal.transaction
 
+import java.nio.{ByteBuffer, ByteOrder}
 import java.util.UUID
 
 import com.ibm.amoeba.client.{AmoebaClient, FinalizationAction, FinalizationActionFactory, RegisteredTypeFactory, StopRetrying, Transaction, UnknownStoragePool}
@@ -66,12 +67,21 @@ class MissedUpdateFinalizationAction(val client: AmoebaClient) extends Finalizat
       case _ => Future.unit
     }}
 
+    val keyBytes = new Array[Byte](17)
+    val bb = ByteBuffer.wrap(keyBytes)
+    bb.order(ByteOrder.BIG_ENDIAN)
+    bb.put(storeId.poolIndex)
+    bb.putLong(objectId.uuid.getMostSignificantBits)
+    bb.putLong(objectId.uuid.getLeastSignificantBits)
+
+    val key = Key(keyBytes)
+
     client.retryStrategy.retryUntilSuccessful(onFail _) {
       for {
         pool <- client.getStoragePool(storeId.poolId)
         tx = client.newTransaction()
         _ = tx.disableMissedUpdateTracking()
-        _ <- pool.errorTree.set(Key(objectId.uuid), Value(Array()))(tx)
+        _ <- pool.errorTree.set(key, Value(Array()))(tx)
         _ <- tx.commit()
       } yield {
         ()
