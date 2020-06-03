@@ -16,7 +16,8 @@ trait FileSystem extends Logging {
 
   private[this] var openFiles: Map[Long, File] = Map()
 
-  def readInode(inodeNumber: Long)(implicit ec: ExecutionContext): Future[(Inode, InodePointer, ObjectRevision)] = {
+  def readInode(inodeNumber: Long): Future[(Inode, InodePointer, ObjectRevision)] = {
+    implicit val ec: ExecutionContext = executionContext
     inodeTable.lookup(inodeNumber).flatMap {
       case None => Future.failed(InvalidInode(inodeNumber))
       case Some(iptr) => readInode(iptr)
@@ -53,6 +54,24 @@ trait FileSystem extends Logging {
 
   def loadRoot()(implicit ec: ExecutionContext): Future[Directory] = {
     inodeTable.lookupRoot() flatMap { pointer => loadDirectory(pointer) }
+  }
+
+  def lookup(inodeNumber: Long): Future[Option[BaseFile]] = {
+    implicit val ec: ExecutionContext = executionContext
+    val p = Promise[Option[BaseFile]]
+    inodeTable.lookup(inodeNumber) onComplete {
+      case Success(oiptr) =>
+        oiptr match {
+          case Some(iptr) =>
+            lookup(iptr) onComplete {
+              case Success(bfile) => p.success(Some(bfile))
+              case Failure(_) => p.success(None)
+            }
+          case None => p.success(None)
+        }
+      case Failure(_) => p.success(None)
+    }
+    p.future
   }
 
   def lookup(iptr: InodePointer)(implicit ec: ExecutionContext): Future[BaseFile] =  {
