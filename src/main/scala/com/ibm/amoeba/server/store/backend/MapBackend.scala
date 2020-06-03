@@ -1,6 +1,6 @@
 package com.ibm.amoeba.server.store.backend
 import com.ibm.amoeba.common.DataBuffer
-import com.ibm.amoeba.common.objects.{Metadata, ObjectId, ObjectType}
+import com.ibm.amoeba.common.objects.{Metadata, ObjectId, ObjectType, ReadError}
 import com.ibm.amoeba.common.store.{ReadState, StoreId, StorePointer}
 import com.ibm.amoeba.common.transaction.TransactionId
 import com.ibm.amoeba.server.store.{Locater, ObjectState}
@@ -10,6 +10,8 @@ class MapBackend(val storeId: StoreId) extends Backend {
   private var chandler: Option[CompletionHandler] = None
 
   var m: Map[ObjectId, ObjectState] = Map()
+
+  override def close(): Unit = ()
 
   override def setCompletionHandler(handler: CompletionHandler): Unit = {
     chandler = Some(handler)
@@ -50,10 +52,13 @@ class MapBackend(val storeId: StoreId) extends Backend {
   }
 
   override def read(locater: Locater): Unit = {
-    m.get(locater.objectId).foreach { os =>
-      chandler.foreach { handler =>
-        val rs = ReadState(os.objectId, os.metadata, os.objectType, os.data, os.lockedWriteTransactions)
-        handler.complete(Read(storeId, locater.objectId, os.storePointer, Left(rs)))
+    chandler.foreach { handler =>
+      m.get(locater.objectId) match {
+        case None =>
+          handler.complete(Read(storeId, locater.objectId, locater.storePointer, Right(ReadError.ObjectNotFound)))
+        case Some(os) =>
+          val rs = ReadState(os.objectId, os.metadata, os.objectType, os.data, Set())
+          handler.complete(Read(storeId, locater.objectId, os.storePointer, Left(rs)))
       }
     }
   }

@@ -9,6 +9,8 @@ import com.ibm.amoeba.server.store.Locater
 trait Backend {
   val storeId: StoreId
 
+  def close(): Unit
+
   def setCompletionHandler(handler: CompletionHandler)
 
   /** Bootstrap-only allocation method. It cannot fail and must return a StorePointer to data committed to disk */
@@ -26,9 +28,9 @@ trait Backend {
                data: DataBuffer,
                maxSize: Option[Int]): Either[StorePointer, AllocationError.Value]
 
-  def abortAllocation(objectId: ObjectId)
+  def abortAllocation(objectId: ObjectId): Unit
 
-  def read(locater: Locater)
+  def read(locater: Locater): Unit
 
-  def commit(state: CommitState, transactionId: TransactionId)
+  def commit(state: CommitState, transactionId: TransactionId): Unit
 }

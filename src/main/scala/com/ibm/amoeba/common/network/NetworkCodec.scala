@@ -13,7 +13,7 @@ import com.ibm.amoeba.common.paxos.ProposalId
 import com.ibm.amoeba.common.pool.PoolId
 import com.ibm.amoeba.common.store.{StoreId, StorePointer}
 import com.ibm.amoeba.common.transaction.KeyValueUpdate.{FullContentLock, KeyRevision}
-import com.ibm.amoeba.common.transaction.{DataUpdate, DataUpdateOperation, FinalizationActionId, KeyValueUpdate, LocalTimeRequirement, RefcountUpdate, RevisionLock, SerializedFinalizationAction, TransactionDescription, TransactionDisposition, TransactionId, TransactionRequirement, TransactionStatus, VersionBump}
+import com.ibm.amoeba.common.transaction.{DataUpdate, DataUpdateOperation, FinalizationActionId, KeyValueUpdate, LocalTimeRequirement, ObjectUpdate, PreTransactionOpportunisticRebuild, RefcountUpdate, RevisionLock, SerializedFinalizationAction, TransactionDescription, TransactionDisposition, TransactionId, TransactionRequirement, TransactionStatus, VersionBump}
 
 
 object NetworkCodec {
@@ -586,13 +586,15 @@ object NetworkCodec {
     P.TxPrepare.addProposalId(builder, encode(builder, o.proposalId))
     P.TxPrepare.endTxPrepare(builder)
   }
-  def decode(n: P.TxPrepare): TxPrepare = {
+  def decode(n: P.TxPrepare,
+             objectUpdates: List[ObjectUpdate],
+             preTxRebuilds: List[PreTransactionOpportunisticRebuild]): TxPrepare = {
     val to = decode(n.to())
     val from = decode(n.from())
     val txd = decode(n.txd())
     val proposalId = decode(n.proposalId())
     
-    TxPrepare(to, from, txd, proposalId, Nil, Nil)
+    TxPrepare(to, from, txd, proposalId, objectUpdates, preTxRebuilds)
   }
   
   

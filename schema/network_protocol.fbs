@@ -422,6 +422,8 @@ table Message {
   opportunisticRebuild: OpportunisticRebuild;
   transactionCompletionQuery: TransactionCompletionQuery;
   transactionCompletionResponse: TransactionCompletionResponse;
+  tx_resolved: TransactionResolved;
+  tx_finalized: TransactionFinalized;
 }
 
 root_type Message;

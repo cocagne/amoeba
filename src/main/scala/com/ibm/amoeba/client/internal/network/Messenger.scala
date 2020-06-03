@@ -1,6 +1,6 @@
 package com.ibm.amoeba.client.internal.network
 
-import com.ibm.amoeba.common.network.{ClientId, ClientRequest, TxMessage}
+import com.ibm.amoeba.common.network.{ClientRequest, TxMessage}
 
 trait Messenger {
 
