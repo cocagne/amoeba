@@ -50,7 +50,6 @@ object RocksDBBackend {
 
 class RocksDBBackend(dbPath:String,
                      override val storeId: StoreId,
-                     val poolIndex: Byte,
                      implicit val executionContext: ExecutionContext) extends Backend {
 
   import RocksDBBackend._
@@ -74,7 +73,7 @@ class RocksDBBackend(dbPath:String,
     val key = tokey(objectId)
     val value = encodeDBValue(objectType, metadata, data)
     db.bootstrapPut(key, value)
-    StorePointer(poolIndex, Array())
+    StorePointer(storeId.poolIndex, Array())
   }
 
   override def bootstrapOverwrite(objectId: ObjectId, pointer: StorePointer, data:DataBuffer): Unit = {
@@ -82,7 +81,7 @@ class RocksDBBackend(dbPath:String,
     val (objectType, metadata, _) = decodeDBValue(db.bootstrapGet(key))
     val value = encodeDBValue(objectType, metadata, data)
     db.bootstrapPut(key, value)
-    StorePointer(poolIndex, Array())
+    StorePointer(storeId.poolIndex, Array())
   }
 
   override def allocate(objectId: ObjectId,
@@ -93,7 +92,7 @@ class RocksDBBackend(dbPath:String,
     synchronized {
       allocating += (objectId -> (objectType, metadata, data))
     }
-    Left(StorePointer(poolIndex, Array()))
+    Left(StorePointer(storeId.poolIndex, Array()))
   }
 
   override def abortAllocation(objectId: ObjectId): Unit = synchronized {

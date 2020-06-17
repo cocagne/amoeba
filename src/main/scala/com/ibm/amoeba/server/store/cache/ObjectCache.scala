@@ -26,3 +26,16 @@ trait ObjectCache {
     */
   def remove(objectId: ObjectId)
 }
+
+object ObjectCache {
+  object NoCache extends ObjectCache {
+
+    override def clear(): Unit = ()
+
+    override def get(objectId: ObjectId): Option[ObjectState] = None
+
+    override def insert(state: ObjectState): Option[ObjectState] = None
+
+    override def remove(objectId: ObjectId): Unit = ()
+  }
+}

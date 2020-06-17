@@ -17,16 +17,19 @@ import com.ibm.amoeba.common.transaction.{ObjectUpdate, PreTransactionOpportunis
 import com.ibm.amoeba.server.StoreManager
 
 class StoreNetwork(val nodeName: String,
-                   val nnet: NettyNetwork,
-                   val storeManager: StoreManager) extends ServerMessenger with Logging {
+                   val nnet: NettyNetwork) extends ServerMessenger with Logging {
 
   import MessageEncoder._
+
+  private[this] var ostoreManager: Option[StoreManager] = None
 
   private[this] var oclient: Option[AmoebaClient] = None
 
   def client: Option[AmoebaClient] = synchronized(oclient)
 
   def setClient(s: AmoebaClient): Unit = synchronized { oclient = Some(s) }
+
+  def setStoreManager(smgr: StoreManager): Unit = synchronized { ostoreManager = Some(smgr) }
 
   val nodeConfig: ConfigFile.StorageNode = nnet.config.nodes(nodeName)
 
@@ -59,7 +62,7 @@ class StoreNetwork(val nodeName: String,
 
     if (p.read() != null) {
       val message = NetworkCodec.decode(p.read())
-      storeManager.receiveClientRequest(message)
+      ostoreManager.foreach(_.receiveClientRequest(message))
     }
     else if (p.prepare() != null) {
       //println("got prepare")
@@ -110,54 +113,54 @@ class StoreNetwork(val nodeName: String,
         (localUpdates, preTxRebuilds)
       }
       val message = NetworkCodec.decode(p.prepare(), updateContent._1, updateContent._2)
-      storeManager.receiveTransactionMessage(message)
+      ostoreManager.foreach( _.receiveTransactionMessage(message))
     }
     else if (p.prepareResponse() != null) {
       //println("got prepareResponse")
       val message = NetworkCodec.decode(p.prepareResponse())
-      storeManager.receiveTransactionMessage(message)
+      ostoreManager.foreach( _.receiveTransactionMessage(message))
     }
     else if (p.accept() != null) {
       //println("got accept")
       val message = NetworkCodec.decode(p.accept())
-      storeManager.receiveTransactionMessage(message)
+      ostoreManager.foreach( _.receiveTransactionMessage(message))
     }
     else if (p.acceptResponse() != null) {
       //println("got acceptResponse")
       val message = NetworkCodec.decode(p.acceptResponse())
-      storeManager.receiveTransactionMessage(message)
+      ostoreManager.foreach( _.receiveTransactionMessage(message))
     }
     else if (p.resolved() != null) {
       val message = NetworkCodec.decode(p.resolved())
       //println(s"got resolved for txid ${message.transactionUUID} committed = ${message.committed}")
-      storeManager.receiveTransactionMessage(message)
+      ostoreManager.foreach( _.receiveTransactionMessage(message))
     }
     else if (p.committed() != null) {
       val message = NetworkCodec.decode(p.committed())
       //println(s"got committed for txid ${message.transactionUUID}")
-      storeManager.receiveTransactionMessage(message)
+      ostoreManager.foreach( _.receiveTransactionMessage(message))
     }
     else if (p.finalized() != null) {
       //println("got finalized")
       val message = NetworkCodec.decode(p.finalized())
-      storeManager.receiveTransactionMessage(message)
+      ostoreManager.foreach( _.receiveTransactionMessage(message))
     }
     else if (p.heartbeat() != null) {
       val message = NetworkCodec.decode(p.heartbeat())
-      storeManager.receiveTransactionMessage(message)
+      ostoreManager.foreach( _.receiveTransactionMessage(message))
     }
     else if (p.allocate() != null) {
       //println(s"got allocate request. Receiver: $a")
       val message = NetworkCodec.decode(p.allocate())
-      storeManager.receiveClientRequest(message)
+      ostoreManager.foreach( _.receiveClientRequest(message))
     }
     else if (p.opportunisticRebuild() != null) {
       val message = NetworkCodec.decode(p.opportunisticRebuild())
-      storeManager.receiveClientRequest(message)
+      ostoreManager.foreach( _.receiveClientRequest(message))
     }
     else if (p.transactionCompletionQuery() != null) {
       val message = NetworkCodec.decode(p.transactionCompletionQuery())
-      storeManager.receiveClientRequest(message)
+      ostoreManager.foreach( _.receiveClientRequest(message))
     }
     else {
       logger.error("Unknown Message!")

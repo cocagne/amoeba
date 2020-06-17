@@ -20,12 +20,23 @@ class Store(val backend: Backend,
             val crl: CrashRecoveryLog,
             val txStatusCache: TransactionStatusCache,
             val finalizerFactory: TransactionFinalizer.Factory,
-            val txDriverFactory: TransactionDriver.Factory) {
+            val txDriverFactory: TransactionDriver.Factory,
+            val txHeartbeatTimeout: Duration) {
 
   val storeId: StoreId = backend.storeId
   val frontend = new Frontend(backend.storeId, backend, objectCache, net, crl, txStatusCache)
 
   private var transactionDrivers: Map[TransactionId, TransactionDriver] = Map()
+
+  def heartbeat() {
+    transactionDrivers.values.foreach { td =>
+      td.heartbeat()
+    }
+    frontend.transactions.values.foreach { tx =>
+      if (tx.durationSinceLastEvent > txHeartbeatTimeout && !transactionDrivers.contains(tx.transactionId))
+        driveTransaction(tx.txd)
+    }
+  }
 
   private[this] val prepareResponseCache = Scaffeine().expireAfterWrite(10.seconds)
     .maximumSize(1000)

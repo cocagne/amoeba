@@ -5,7 +5,7 @@ import scala.concurrent.duration.{Duration, MILLISECONDS, NANOSECONDS}
 
 trait SimpleDriverRecoveryMixin extends StoreManager {
 
-  val checkPeriod = Duration(500, MILLISECONDS)
+  val checkPeriod: Duration = Duration(500, MILLISECONDS)
 
   private[this] var periodicTask = backgroundTasks.schedulePeriodic(checkPeriod) { addRecoveryEvent() }
 

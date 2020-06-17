@@ -11,6 +11,8 @@ import com.ibm.amoeba.server.store.backend.{Backend, CommitError, CommitState}
 import com.ibm.amoeba.server.store.{Locater, ObjectState, RequirementsApplyer, RequirementsChecker, RequirementsLocker}
 import org.apache.logging.log4j.scala.Logging
 
+import scala.concurrent.duration._
+
 object Tx {
   class DelayedPrepareResponse {
     var response: Option[TxPrepareResponse] = None
@@ -67,6 +69,8 @@ class Tx( trs: TransactionRecoveryState,
   private def updateLastEvent(): Unit = lastEvent = System.nanoTime()
 
   def lastEventTime: Long = lastEvent
+
+  def durationSinceLastEvent: Duration = Duration(System.nanoTime() - lastEvent, NANOSECONDS)
 
   private def nextCrlSaveId(): TxSaveId = {
     val id = nextCrlSave

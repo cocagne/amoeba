@@ -96,13 +96,23 @@ object ConfigFile {
 
   sealed abstract class CRLBackend
 
-  case class Sweeper(path: String) extends CRLBackend
+  case class Sweeper(path: String,
+                     numStreams: Int,
+                     fileSizeMb: Int,
+                     windowSize: Int) extends CRLBackend
 
   object Sweeper extends YObject[Sweeper] {
-    val path: Required[String] = Required("path", YString)
-    val attrs: List[Attr] = path :: Nil
+    val path: Required[String]      = Required("path", YString)
+    val numStreams: Optional[Int]   = Optional("num-streams", YInt)
+    val fileSize: Optional[Int]     = Optional("max-file-size-mb", YInt)
+    val windowSize: Optional[Int]   = Optional("window-size", YInt)
+    val attrs: List[Attr] = path :: numStreams :: fileSize :: windowSize :: Nil
 
-    def create(o: Object): Sweeper = Sweeper(path.get(o))
+    def create(o: Object): Sweeper = Sweeper(
+      path.get(o),
+      numStreams.get(o).getOrElse(3),
+      fileSize.get(o).getOrElse(100),
+      windowSize.get(o).getOrElse(50))
   }
 
   case class DataStore(pool: String, store: Int, backend: StorageBackend)
@@ -173,7 +183,7 @@ object ConfigFile {
 
   def zeroeduuid(uuid: UUID): Boolean = uuid.getMostSignificantBits == 0 && uuid.getLeastSignificantBits == 0
 
-  case class Config(pools: Map[String, Pool], allocaters: Map[String, ObjectAllocater], nodes: Map[String, StorageNode], oradicle: Option[KeyValueObjectPointer]) {
+  case class Config(pools: Map[String, Pool], allocaters: Map[String, ObjectAllocater], nodes: Map[String, StorageNode], onucleus: Option[KeyValueObjectPointer]) {
     // Validate config
     {
       allocaters.values.foreach { a =>

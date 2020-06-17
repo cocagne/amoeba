@@ -27,7 +27,7 @@ object SimpleFileSystem {
     implicit val ec: ExecutionContext = client.clientContext
     implicit val tx: Transaction = client.newTransaction()
 
-    val uuid: UUID = UUID.randomUUID()
+    val fileSystemUUID: UUID = UUID.randomUUID()
 
     val rootDirMode = FileMode.S_IFDIR | FileMode.S_IRWXU
 
@@ -39,7 +39,7 @@ object SimpleFileSystem {
       rootDirectoryPointer = new DirectoryPointer(1, rootDirectory)
       inodeTableContentRoot <- allocator.allocateKeyValueObject(guard, Map(Key(1) -> Value(rootDirectoryPointer.toArray)))
       inodeTableRoot = new Root(0, IntegerKeyOrdering, Some(inodeTableContentRoot), new SinglePoolNodeAllocator(client, taskRoot.poolId) )
-      content = Map( FileSystemUUIDKey -> Value(uuid2byte(uuid)),
+      content = Map( FileSystemUUIDKey -> Value(uuid2byte(fileSystemUUID)),
         TaskExecutorRootKey -> Value(taskRoot.toArray),
         InodeTableRootKey -> Value(inodeTableRoot.encode))
       fsRootPointer <- allocator.allocateKeyValueObject(guard, content)

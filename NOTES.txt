@@ -1,4 +1,16 @@
+KeyRevisionGuard
+    - Add Zeroed DoesNotExist variable
+    - Test for zeroed UUID in Tx, use this for does not exist requirement
 
+Transaction Finalizers
+    - Improve error handling
+    - Move to dedicated registry rather than the generic one
+        - Should be argument to AmoebaClient for user-defined FAs
+    - Consider moving this registry to Server side only. That's where they're used
+
+AllocationDriver
+    - Detect stalled allocations and force commit failure
+    - Recover from successful completions
 
 AllocationErrorHandling
     - Fix sweeper bug

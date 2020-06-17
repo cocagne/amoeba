@@ -13,6 +13,7 @@ import com.ibm.amoeba.server.store.cache.ObjectCache
 import com.ibm.amoeba.server.store.{Frontend, Store}
 import com.ibm.amoeba.server.transaction.{TransactionDriver, TransactionFinalizer, TransactionStatusCache}
 
+import scala.concurrent.duration.Duration
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
 object StoreManager {
@@ -25,6 +26,7 @@ object StoreManager {
   case class LoadStore(backend: Backend) extends Event
   case class Exit() extends Event
   case class RecoveryEvent() extends Event
+  case class HeartbeatEvent() extends Event
 
   class IOHandler(mgr: StoreManager) extends CompletionHandler {
     override def complete(op: Completion): Unit = {
@@ -45,6 +47,7 @@ class StoreManager(val objectCacheFactory: () => ObjectCache,
                    crlFactory: CrashRecoveryLogFactory,
                    val finalizerFactory: TransactionFinalizer.Factory,
                    val txDriverFactory: TransactionDriver.Factory,
+                   val heartbeatPeriod: Duration,
                    initialBackends: List[Backend]) {
   import StoreManager._
 
@@ -60,9 +63,13 @@ class StoreManager(val objectCacheFactory: () => ObjectCache,
   protected var shutdownCalled = false
   private val shutdownPromise: Promise[Unit] = Promise()
 
+  backgroundTasks.schedulePeriodic(heartbeatPeriod) {
+    events.put(HeartbeatEvent())
+  }
+
   protected var stores: Map[StoreId, Store] = initialBackends.map { backend =>
     val store = new Store(backend, objectCacheFactory(), net, backgroundTasks, crl,
-      txStatusCache, finalizerFactory, txDriverFactory)
+      txStatusCache, finalizerFactory, txDriverFactory, heartbeatPeriod*4)
 
     backend.setCompletionHandler(op => {
       events.add(IOCompletion(op))
@@ -164,9 +171,11 @@ class StoreManager(val objectCacheFactory: () => ObjectCache,
 
       case LoadStore(backend) =>
         val store = new Store(backend, objectCacheFactory(), net, backgroundTasks, crl,
-          txStatusCache,finalizerFactory, txDriverFactory)
+          txStatusCache,finalizerFactory, txDriverFactory, heartbeatPeriod*4)
         backend.setCompletionHandler(ioHandler)
         stores += (backend.storeId -> store)
+
+      case HeartbeatEvent() => stores.valuesIterator.foreach(_.heartbeat())
 
       case null => // nothing to do
 
