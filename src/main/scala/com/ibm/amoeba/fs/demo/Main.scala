@@ -1,7 +1,7 @@
 package com.ibm.amoeba.fs.demo
 
 import java.io.{File, StringReader}
-import java.nio.file.Paths
+import java.nio.file.{Files, Path, Paths}
 import java.util.concurrent.Executors
 
 import com.ibm.amoeba.AmoebaError
@@ -60,7 +60,7 @@ object Main {
     val parser = new scopt.OptionParser[Args]("demo") {
       head("demo", "0.1")
 
-      cmd("bootstrap").text("Bootstrap a new Aspen system").
+      cmd("bootstrap").text("Bootstrap a new Amoeba system").
         action( (_,c) => c.copy(mode="bootstrap")).
         children(
           arg[File]("<config-file>").text("Configuration File").
@@ -68,7 +68,7 @@ object Main {
             validate( x => if (x.exists()) success else failure(s"Config file does not exist: $x"))
         )
 
-      cmd("node").text("Starts an Aspen Storage Node").
+      cmd("node").text("Starts an Amoeba Storage Node").
         action( (_,c) => c.copy(mode="node")).
         children(
           arg[File]("<config-file>").text("Configuration File").
@@ -78,10 +78,10 @@ object Main {
           arg[String]("<node-name>").text("Storage Node Name").action((x,c) => c.copy(nodeName=x))
         )
 
-      cmd("amoeba").text("Launches a Amoeba NFS server").
+      cmd("nfs").text("Launches a Amoeba NFS server").
         action( (_,c) => c.copy(mode="amoeba")).
         children(
-          arg[File]("<config-file>").text("Aspen Configuration File").
+          arg[File]("<config-file>").text("Amoeba Configuration File").
             action( (x, c) => c.copy(configFile=x)).
             validate( x => if (x.exists()) success else failure(s"Config file does not exist: $x")),
 
@@ -138,9 +138,7 @@ object Main {
   }
 
   def createAmoebaClient(cfg: ConfigFile.Config, onnet: Option[NettyNetwork]=None): (AmoebaClient, KeyValueObjectPointer) = {
-    val nucleus = cfg.onucleus.getOrElse(throw new ConfigError("Radicle Pointer is missing from the config file!"))
-
-    val bootstrapPoolIDA = cfg.allocaters("bootstrap-allocater").ida
+    val nucleus = cfg.onucleus.getOrElse(throw new ConfigError("Nucleus Pointer is missing from the config file!"))
 
     val nnet = onnet.getOrElse(new NettyNetwork(cfg, None))
     val cliNet = nnet.createClientNetwork()
@@ -288,10 +286,14 @@ object Main {
 
   }
 
+  def mkdirectory(p: Path): Unit = {
+    Files.createDirectories(p)
+  }
+
   def bootstrap(cfg: ConfigFile.Config): Unit = {
 
-    if (cfg.onucleus.isDefined)
-      throw new ConfigError("Nucleus Pointer is defined. Bootstrap process is already complete!")
+    //if (cfg.onucleus.isDefined)
+    //  throw new ConfigError("Nucleus Pointer is defined. Bootstrap process is already complete!")
 
     val sched = Executors.newScheduledThreadPool(1)
     implicit val ec: ExecutionContext = ExecutionContext.fromExecutorService(sched)
@@ -304,9 +306,17 @@ object Main {
       s.backend match {
         case b: ConfigFile.RocksDB =>
           println(s"Creating data store $dataStoreId. Path ${b.path}")
+          // Ensure parent directory exists
+          mkdirectory(Paths.get(b.path).getParent)
           new RocksDBBackend(b.path, dataStoreId, ec)
       }
     }.toList
+
+    cfg.nodes.values.foreach { n =>
+      n.crl match {
+        case s: ConfigFile.Sweeper => mkdirectory(Paths.get(s.path))
+      }
+    }
 
     val bootstrapPoolIDA = cfg.allocaters("bootstrap-allocater").ida
 
