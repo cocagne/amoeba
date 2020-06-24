@@ -8,6 +8,7 @@ import com.ibm.amoeba.common.objects.{AllocationRevisionGuard, DataObjectPointer
 import com.ibm.amoeba.common.pool.PoolId
 import com.ibm.amoeba.common.store.{StoreId, StorePointer}
 import com.ibm.amoeba.common.transaction.TransactionId
+import org.apache.logging.log4j.scala.Logging
 
 import scala.concurrent.{Future, Promise}
 
@@ -23,7 +24,7 @@ class BaseAllocationDriver (
                              val initialRefcount: ObjectRefcount,
                              val allocationTransactionId: TransactionId,
                              val revisionGuard: AllocationRevisionGuard
-                           ) extends AllocationDriver {
+                           ) extends AllocationDriver with Logging {
 
   private[this] val promise = Promise[ObjectPointer]
 
@@ -54,6 +55,8 @@ class BaseAllocationDriver (
     if (promise.isCompleted)
       return // Already done, nothing left to do
 
+    logger.trace(s"Got Allocation Result from store $fromStoreId: $result. Num Responses: ${responses.size}")
+
     if ( !responses.contains(fromStoreId.poolIndex) )
       responses += (fromStoreId.poolIndex -> result)
 
@@ -65,7 +68,7 @@ class BaseAllocationDriver (
         case Some(ptr) => pointers = ptr :: pointers
         case None => errors += t._1
       })
-
+      logger.trace(s"   Errors: $errors")
       if (errors.isEmpty) {
         val sortedPointersArray = pointers.sortBy(sp => sp.poolIndex).toArray
         val op = objectType match {

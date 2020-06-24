@@ -147,17 +147,21 @@ object Main {
     val initialReadDelay = Duration(15, MILLISECONDS)
     val maxReadDelay = Duration(1, SECONDS)
     val txRetransmitDelay = Duration(1, SECONDS)
-    val allocationRetransmitDelay = Duration(1, SECONDS)
+    val allocationRetransmitDelay = Duration(5, SECONDS)
 
     val sched = Executors.newScheduledThreadPool(3)
     val ec: ExecutionContext = ExecutionContext.fromExecutorService(sched)
 
-    (new SimpleAmoebaClient(cliNet, nnet.clientId, ec, nucleus,
+    val ret = (new SimpleAmoebaClient(cliNet, nnet.clientId, ec, nucleus,
       txStatusCacheDuration,
       initialReadDelay,
       maxReadDelay,
       txRetransmitDelay,
       allocationRetransmitDelay), nucleus)
+
+    nnet.setClient(ret._1)
+
+    ret
   }
 
   def initializeAmoeba(client: AmoebaClient,
@@ -261,6 +265,8 @@ object Main {
 
     val (client, _) = createAmoebaClient(cfg, Some(nnet))
 
+    nnet.setClient(client)
+
     val txFinalizerFactory = new RegisteredTransactionFinalizerFactory(client)
     val txHeartbeatPeriod = Duration(1, SECONDS)
     val txRetryDelay = Duration(100, MILLISECONDS) //
@@ -283,7 +289,7 @@ object Main {
     ) with SimpleDriverRecoveryMixin
 
     nodeNet.setStoreManager(storeManager)
-
+    storeManager.start()
   }
 
   def mkdirectory(p: Path): Unit = {

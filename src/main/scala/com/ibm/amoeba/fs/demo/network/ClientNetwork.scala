@@ -56,6 +56,7 @@ class ClientNetwork(val nnet: NettyNetwork,
     }
     else if (p.allocateResponse() != null) {
       val message = NetworkCodec.decode(p.allocateResponse())
+      logger.trace(s"*** Allocate response from ${message.fromStore} obj ${message.newObjectId}")
       client.foreach(_.receiveClientResponse(message))
     }
   }
@@ -65,8 +66,11 @@ class ClientNetwork(val nnet: NettyNetwork,
       case r: Read => encodeMessage(r)
       case r: TransactionCompletionQuery => encodeMessage(r)
       case r: OpportunisticRebuild => encodeMessage(r)
-      case r: Allocate => encodeMessage(r)
+      case r: Allocate =>
+      logger.trace(s"*** Sending Allocate request to ${r.toStore} obj ${r.newObjectId}")
+        encodeMessage(r)
     }
+
     stores.get(msg.toStore).foreach(_.send(bytes))
   }
 

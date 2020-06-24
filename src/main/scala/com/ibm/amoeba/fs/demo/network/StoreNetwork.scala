@@ -47,7 +47,6 @@ class StoreNetwork(val nodeName: String,
   }
 
   def receiveMessage(msg: Array[Byte]): Unit = synchronized {
-
     val bb = ByteBuffer.wrap(msg)
     val origLimit = bb.limit()
     val msgLen = bb.getInt()
@@ -62,11 +61,12 @@ class StoreNetwork(val nodeName: String,
 
     if (p.read() != null) {
       val message = NetworkCodec.decode(p.read())
+      logger.trace(s"Read request for object ${message.objectPointer.id} from ${message.fromClient}")
       ostoreManager.foreach(_.receiveClientRequest(message))
     }
     else if (p.prepare() != null) {
       //println("got prepare")
-
+      logger.trace(s"Got Prepare message")
       val contentSize = bb.getInt()
       val preTxSize = bb.getInt()
 
@@ -113,53 +113,64 @@ class StoreNetwork(val nodeName: String,
         (localUpdates, preTxRebuilds)
       }
       val message = NetworkCodec.decode(p.prepare(), updateContent._1, updateContent._2)
+      logger.trace(s"Tx ${message.txd.transactionId} Prepare message")
       ostoreManager.foreach( _.receiveTransactionMessage(message))
     }
     else if (p.prepareResponse() != null) {
       //println("got prepareResponse")
       val message = NetworkCodec.decode(p.prepareResponse())
+      logger.trace(s"Tx ${message.transactionId} PrepareResponse")
       ostoreManager.foreach( _.receiveTransactionMessage(message))
     }
     else if (p.accept() != null) {
       //println("got accept")
       val message = NetworkCodec.decode(p.accept())
+      logger.trace(s"Tx ${message.transactionId} Accept")
       ostoreManager.foreach( _.receiveTransactionMessage(message))
     }
     else if (p.acceptResponse() != null) {
       //println("got acceptResponse")
       val message = NetworkCodec.decode(p.acceptResponse())
+      logger.trace(s"Tx ${message.transactionId} AcceptResponse")
       ostoreManager.foreach( _.receiveTransactionMessage(message))
     }
     else if (p.resolved() != null) {
       val message = NetworkCodec.decode(p.resolved())
+      logger.trace(s"Tx ${message.transactionId} Resolved")
       //println(s"got resolved for txid ${message.transactionUUID} committed = ${message.committed}")
       ostoreManager.foreach( _.receiveTransactionMessage(message))
     }
     else if (p.committed() != null) {
       val message = NetworkCodec.decode(p.committed())
+      logger.trace(s"Tx ${message.transactionId} Committed")
       //println(s"got committed for txid ${message.transactionUUID}")
       ostoreManager.foreach( _.receiveTransactionMessage(message))
     }
     else if (p.finalized() != null) {
       //println("got finalized")
       val message = NetworkCodec.decode(p.finalized())
+      logger.trace(s"Tx ${message.transactionId} Finalized")
       ostoreManager.foreach( _.receiveTransactionMessage(message))
     }
     else if (p.heartbeat() != null) {
       val message = NetworkCodec.decode(p.heartbeat())
+      logger.trace(s"Tx ${message.transactionId} Heartbeat")
       ostoreManager.foreach( _.receiveTransactionMessage(message))
     }
     else if (p.allocate() != null) {
       //println(s"got allocate request. Receiver: $a")
       val message = NetworkCodec.decode(p.allocate())
+      logger.trace(s"Tx ${message.allocationTransactionId} Allocate ${message.newObjectId}")
       ostoreManager.foreach( _.receiveClientRequest(message))
     }
     else if (p.opportunisticRebuild() != null) {
       val message = NetworkCodec.decode(p.opportunisticRebuild())
+      logger.trace(s"Tx ${message.pointer.id} OpportunisticRebuild")
       ostoreManager.foreach( _.receiveClientRequest(message))
     }
     else if (p.transactionCompletionQuery() != null) {
       val message = NetworkCodec.decode(p.transactionCompletionQuery())
+      logger.trace(s"Tx ${message.transactionId} CompletionQuery")
       ostoreManager.foreach( _.receiveClientRequest(message))
     }
     else {
@@ -168,6 +179,7 @@ class StoreNetwork(val nodeName: String,
   }
 
   def sendClientResponse(msg: ClientResponse): Unit = {
+    println("SENDING CLIENT RESPONSE")
     connectionMgr.sendMessageToClient(msg.toClient, encodeMessage(msg))
   }
 

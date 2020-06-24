@@ -12,6 +12,7 @@ import com.ibm.amoeba.server.network.Messenger
 import com.ibm.amoeba.server.store.backend.{Backend, Commit, CommitState, Completion, Read}
 import com.ibm.amoeba.server.store.cache.ObjectCache
 import com.ibm.amoeba.server.transaction.{TransactionStatusCache, Tx}
+import org.apache.logging.log4j.scala.Logging
 
 
 object Frontend {
@@ -30,7 +31,7 @@ class Frontend(val storeId: StoreId,
                val objectCache: ObjectCache,
                val net: Messenger,
                val crl: CrashRecoveryLog,
-               val statusCache: TransactionStatusCache) {
+               val statusCache: TransactionStatusCache) extends Logging {
 
   import Frontend._
 
@@ -249,11 +250,22 @@ class Frontend(val storeId: StoreId,
 
     case a: AllocSaveComplete =>
       pendingAllocations.get(a.transactionId).foreach { lst =>
-        lst.foreach(msg => net.sendClientResponse(msg))
+        lst.foreach(msg => {
+          logger.trace(s"CRL Save Completed for Allocation of object ${msg.newObjectId}")
+          net.sendClientResponse(msg)
+        })
       }
   }
 
   def allocateObject(msg: Allocate): Unit = {
+    // Check to see if we've already received an allocation request for this object
+    pendingAllocations.get(msg.allocationTransactionId) match {
+      case Some(lst) =>
+        if (lst.exists(p => p.newObjectId == msg.newObjectId))
+          return
+      case None =>
+    }
+
     val metadata = Metadata(ObjectRevision(msg.allocationTransactionId),
       msg.initialRefcount, msg.timestamp)
 
@@ -265,6 +277,7 @@ class Frontend(val storeId: StoreId,
         net.sendClientResponse(r)
 
       case Left(storePointer) =>
+        logger.trace(s"Backend allocated new object ${msg.newObjectId}. Saving in CRL")
         val r = AllocateResponse(msg.fromClient, msg.toStore, msg.allocationTransactionId, msg.newObjectId,
           Some(storePointer))
 

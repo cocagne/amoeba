@@ -96,8 +96,11 @@ class Sweeper(directory: Path,
 
   for (i <- streams.indices) {
     val stream = streams(i)
-    threadPool.submit(new Runnable { override def run(): Unit = ioThread(stream) })
+    threadPool.submit(new Runnable {
+      override def run(): Unit = ioThread(stream)
+    })
   }
+
 
   def shutdown(): Unit = {
     for (_ <- streams.indices)
@@ -304,6 +307,12 @@ class Sweeper(directory: Path,
       val a = allocations.valuesIterator.filter(a => a.state.storeId == f.storeId).map(a => a.state).toList
       f.response.put((t,a))
 
+    case c: CreateCRL =>
+      val id = CrashRecoveryLogClient(nextClient)
+      nextClient += 1
+      clients += ( id -> c.completionHandler)
+      c.response.put(new SweeperCRL(this, id))
+
     case _: ExitIOThread => throw ExitThread
 
   }
@@ -316,11 +325,12 @@ class Sweeper(directory: Path,
     responder.take()
   }
 
-  def createCRL(completionHandler: SaveCompletionHandler): CrashRecoveryLog = synchronized {
-    val id = CrashRecoveryLogClient(nextClient)
-    nextClient += 1
-    clients += ( id -> completionHandler)
-    new SweeperCRL(this, id)
+  def createCRL(completionHandler: SaveCompletionHandler): CrashRecoveryLog = {
+    val responder = new LinkedBlockingQueue[CrashRecoveryLog]()
+
+    enqueue(CreateCRL(completionHandler, responder))
+
+    responder.take()
   }
 
   def getData(loc: FileLocation): DataBuffer = {

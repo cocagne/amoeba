@@ -63,6 +63,7 @@ class ReadManager(val client: AmoebaClient, val driverFactory: ReadDriver.Factor
   }
 
   def receive(m: ReadResponse): Unit = {
+    println(s"Received ReadResponse! Have driver ${outstandingReads.contains(m.readUUID)}")
     synchronized { outstandingReads.get(m.readUUID) } match {
       case None => logger.warn(s"Received ReadResponse for UNKNOWN read ${m.readUUID}")
 

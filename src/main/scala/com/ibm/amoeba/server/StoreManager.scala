@@ -1,6 +1,6 @@
 package com.ibm.amoeba.server
 
-import java.util.concurrent.{LinkedBlockingQueue, TimeUnit}
+import java.util.concurrent.{Executors, LinkedBlockingQueue, TimeUnit}
 
 import com.ibm.amoeba.common.network._
 import com.ibm.amoeba.common.store.StoreId
@@ -60,8 +60,24 @@ class StoreManager(val objectCacheFactory: () => ObjectCache,
 
   private val crl = crlFactory.createCRL(crlHandler)
 
+  private val threadPool = Executors.newFixedThreadPool(1)
+
   protected var shutdownCalled = false
   private val shutdownPromise: Promise[Unit] = Promise()
+
+  def start(): Unit = {
+    threadPool.submit(new Runnable {
+      override def run(): Unit = {
+        while (!shutdownCalled) {
+          var event = events.poll(3, TimeUnit.SECONDS)
+          while (event != null) {
+            handleEvent(event)
+            event = events.poll(0, TimeUnit.SECONDS)
+          }
+        }
+      }
+    })
+  }
 
   backgroundTasks.schedulePeriodic(heartbeatPeriod) {
     events.put(HeartbeatEvent())

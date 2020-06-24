@@ -4,7 +4,7 @@ import java.util.concurrent.LinkedBlockingQueue
 
 import com.ibm.amoeba.common.store.StoreId
 import com.ibm.amoeba.common.transaction.TransactionId
-import com.ibm.amoeba.server.crl.{AllocationRecoveryState, CrashRecoveryLogClient, TransactionRecoveryState, TxSaveId}
+import com.ibm.amoeba.server.crl.{AllocationRecoveryState, CrashRecoveryLog, CrashRecoveryLogClient, SaveCompletionHandler, TransactionRecoveryState, TxSaveId}
 
 
 sealed abstract class Request
@@ -26,5 +26,9 @@ case class DeleteAlloc(txid: TxId) extends Request
 case class GetFullStoreState(
    storeId: StoreId,
    response: LinkedBlockingQueue[(List[TransactionRecoveryState], List[AllocationRecoveryState]) ]) extends Request
+
+case class CreateCRL(
+                      completionHandler: SaveCompletionHandler,
+                      response: LinkedBlockingQueue[CrashRecoveryLog]) extends Request
 
 case class ExitIOThread() extends Request
