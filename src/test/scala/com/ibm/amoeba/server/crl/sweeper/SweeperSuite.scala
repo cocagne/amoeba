@@ -180,6 +180,94 @@ class SweeperSuite extends FileBasedTests {
     }
   }
 
+  test("Simple Tx and Alloc Save with Multiple Streams") {
+
+    val h = new CompletionHandler
+
+    val txid = TransactionId(new UUID(0, 1))
+    val poolId = PoolId(new UUID(0, 2))
+
+    val storeId = StoreId(poolId, 1)
+    val saveId = TxSaveId(1)
+    val txd = DataBuffer(Array[Byte](1, 2))
+    val oud1 = DataBuffer(Array[Byte](3,4))
+    val oud2 = DataBuffer(Array[Byte](4))
+    val ou1 = ObjectUpdate(ObjectId(new UUID(0,3)), oud1)
+    val ou2 = ObjectUpdate(ObjectId(new UUID(0,4)), oud2)
+    val disp = TransactionDisposition.VoteCommit
+    val status = TransactionStatus.Unresolved
+    val promise = ProposalId(1, 1)
+    val accept = ProposalId(2, 2)
+    val pax = PersistentState(Some(promise), Some((accept, true)))
+    val trs = TransactionRecoveryState(storeId, txd, List(ou1, ou2), disp, status, pax)
+
+    val sp = StorePointer(1, Array[Byte](1,2))
+    val oid = ObjectId(new UUID(1,1))
+    val otype = ObjectType.Data
+    val ref = ObjectRefcount(1,1)
+    val ts = HLCTimestamp(5)
+    val ars = AllocationRecoveryState(storeId, sp, oid, otype, None, txd, ref, ts, txid, oud1)
+
+    val s = new Sweeper(tdir.toPath, 3, 4096*3, 5)
+    try {
+      val crl = s.createCRL(h)
+
+      crl.save(txid, trs, saveId)
+
+      h.completions.take()
+
+      crl.save(ars)
+
+      h.completions.take()
+
+    } finally {
+      e: Throwable =>
+        s.shutdown()
+        throw e
+    }
+
+    val s2 = new Sweeper(tdir.toPath, 1, 4096*3, 5)
+    try {
+      val crl = s2.createCRL(h)
+
+      val (txs, alloc) = crl.getFullRecoveryState(storeId)
+
+      assert(txs.length == 1)
+
+      val t = txs.head
+
+      assert(t.storeId == storeId)
+      assert(t.serializedTxd.asReadOnlyBuffer() == txd.asReadOnlyBuffer())
+      assert(t.objectUpdates.length == 2)
+      assert(t.objectUpdates.head.objectId == ou2.objectId)
+      assert(t.objectUpdates.head.data.asReadOnlyBuffer() == ou2.data.asReadOnlyBuffer())
+      assert(t.objectUpdates.tail.head.objectId == ou1.objectId)
+      assert(t.objectUpdates.tail.head.data.asReadOnlyBuffer() == ou1.data.asReadOnlyBuffer())
+      assert(t.disposition == disp)
+      assert(t.status == status)
+      assert(t.paxosAcceptorState == pax)
+
+      assert(alloc.length == 1)
+
+      val a = alloc.head
+
+      assert(a.storeId == storeId)
+      assert(a.storePointer.poolIndex == sp.poolIndex)
+      assert(ByteBuffer.wrap(a.storePointer.data) == ByteBuffer.wrap(sp.data))
+      assert(a.newObjectId == oid)
+      assert(a.objectType == otype)
+      assert(a.initialRefcount == ref)
+      assert(a.timestamp == ts)
+      assert(a.allocationTransactionId == txid)
+      assert(a.serializedRevisionGuard == oud1)
+
+    } finally {
+      e: Throwable =>
+        s2.shutdown()
+        throw e
+    }
+  }
+
 
   test("Overwrite State") {
 

@@ -14,6 +14,7 @@ import com.ibm.amoeba.common.transaction.{ObjectUpdate, TransactionDisposition, 
 import com.ibm.amoeba.server.crl.{AllocationRecoveryState, CrashRecoveryLog, CrashRecoveryLogClient, CrashRecoveryLogFactory, SaveCompletion, SaveCompletionHandler, TransactionRecoveryState}
 import org.apache.logging.log4j.scala.Logging
 
+import scala.annotation.tailrec
 import scala.collection.immutable.{HashMap, HashSet}
 
 object Sweeper {
@@ -50,6 +51,41 @@ object Sweeper {
   }
 
   object ExitThread extends Throwable
+
+  // This exists in order ot have a separate lock on the contained variables
+  class Notifier(nextEntrySerialNumber: LogEntrySerialNumber) {
+
+    private var pendingNotifications = new HashMap[LogEntrySerialNumber, List[SaveCompletion]]
+
+    private var clients = new HashMap[CrashRecoveryLogClient, SaveCompletionHandler]()
+
+    private var lastNotified: LogEntrySerialNumber = LogEntrySerialNumber(nextEntrySerialNumber.number-1)
+
+    def addClient(key: CrashRecoveryLogClient, handler: SaveCompletionHandler): Unit = synchronized {
+      clients += key -> handler
+    }
+
+    def notify(serial: LogEntrySerialNumber, completions: List[SaveCompletion]): Unit = synchronized {
+
+      pendingNotifications += (serial -> completions)
+
+      def notify(c: SaveCompletion): Unit = clients.get(c.clientId).foreach(h => h.saveComplete(c))
+
+      @tailrec
+      def notifyInOrder(ser: LogEntrySerialNumber): Unit = {
+        pendingNotifications.get(ser) match {
+          case None =>
+          case Some(l) =>
+            l.foreach(notify)
+            pendingNotifications -= ser
+            lastNotified = ser
+            notifyInOrder(LogEntrySerialNumber(lastNotified.number + 1))
+        }
+      }
+
+      notifyInOrder(LogEntrySerialNumber(lastNotified.number + 1))
+    }
+  }
 }
 
 class Sweeper(directory: Path,
@@ -86,11 +122,9 @@ class Sweeper(directory: Path,
 
   private val queue = new LinkedBlockingQueue[Request]()
   private var nextRequest: Option[Request] = None
-  private var clients = new HashMap[CrashRecoveryLogClient, SaveCompletionHandler]()
   private var nextClient: Int = 0
 
-  private var pendingNotifications = new HashMap[LogEntrySerialNumber, List[SaveCompletion]]
-  private var lastNotified: LogEntrySerialNumber = LogEntrySerialNumber(nextEntrySerialNumber.number-1)
+  private val notifier = new Notifier(nextEntrySerialNumber)
 
   private val threadPool = Executors.newFixedThreadPool(numStreams)
 
@@ -234,26 +268,7 @@ class Sweeper(directory: Path,
           pruneId = Some(stream.rotateFiles())
         }
 
-        // Move pendingNotifications, clients, and lastNotified into a separate object w/ synchronous API
-        synchronized {
-
-          pendingNotifications += (serial -> completions)
-
-          def notify(c: SaveCompletion): Unit = clients.get(c.clientId).foreach(h => h.saveComplete(c))
-
-          def notifyInOrder(ser: LogEntrySerialNumber): Unit = {
-            pendingNotifications.get(ser) match {
-              case None =>
-              case Some(l) =>
-                l.foreach(notify)
-                pendingNotifications -= ser
-                lastNotified = ser
-                notifyInOrder(LogEntrySerialNumber(lastNotified.number + 1))
-            }
-          }
-
-          notifyInOrder(LogEntrySerialNumber(lastNotified.number + 1))
-        }
+        notifier.notify(serial, completions)
       }
     } catch {
       case ExitThread => // Exit requested
@@ -311,7 +326,8 @@ class Sweeper(directory: Path,
     case c: CreateCRL =>
       val id = CrashRecoveryLogClient(nextClient)
       nextClient += 1
-      clients += ( id -> c.completionHandler)
+      notifier.addClient(id, c.completionHandler)
+
       c.response.put(new SweeperCRL(this, id))
 
     case _: ExitIOThread => throw ExitThread
