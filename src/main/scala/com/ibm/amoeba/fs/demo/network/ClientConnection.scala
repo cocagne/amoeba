@@ -42,8 +42,8 @@ class ClientConnection(
     override def channelActive(ctx: ChannelHandlerContext): Unit = {
       logger.info(s"Connected to $host:$port")
       onlineTracker.setNodeOnline(hostUUID)
-      ctx.writeAndFlush(com.ibm.amoeba.common.util.uuid2byte(clientUUID))
       setContext(Some(ctx))
+      ctx.writeAndFlush(com.ibm.amoeba.common.util.uuid2byte(clientUUID))
     }
 
     override def channelInactive(ctx: ChannelHandlerContext): Unit = {

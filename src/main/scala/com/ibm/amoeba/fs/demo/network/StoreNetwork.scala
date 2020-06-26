@@ -179,7 +179,6 @@ class StoreNetwork(val nodeName: String,
   }
 
   def sendClientResponse(msg: ClientResponse): Unit = {
-    println("SENDING CLIENT RESPONSE")
     connectionMgr.sendMessageToClient(msg.toClient, encodeMessage(msg))
   }
 

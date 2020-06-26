@@ -234,6 +234,7 @@ class Sweeper(directory: Path,
           pruneId = Some(stream.rotateFiles())
         }
 
+        // Move pendingNotifications, clients, and lastNotified into a separate object w/ synchronous API
         synchronized {
 
           pendingNotifications += (serial -> completions)
