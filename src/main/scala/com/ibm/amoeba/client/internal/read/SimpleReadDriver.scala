@@ -41,12 +41,13 @@ class SimpleReadDriver(
 
   private[this] var task: Option[BackgroundTask.ScheduledTask] = None
 
-  readResult.onComplete { _ => synchronized {
+  override def onComplete(): Unit = synchronized {
+    logger.trace(s"READ UUID $readUUID: COMPLETE. Cancelling future retransmits")
     task.foreach(_.cancel())
-  }}
+  }
 
   override def begin(): Unit = synchronized {
-    task = Some(client.backgroundTasks.retryWithExponentialBackoff(tryNow=true, initialDelay=initialDelay, maxDelay=maxDelay) {
+    task = Some(client.backgroundTasks.retryWithExponentialBackoff(tryNow=false, initialDelay=initialDelay, maxDelay=maxDelay) {
       super.begin()
       false
     })

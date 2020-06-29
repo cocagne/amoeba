@@ -14,6 +14,8 @@ object RegisteredTransactionFinalizerFactory {
   class Finalizer(val client: AmoebaClient, val actions: List[FinalizationAction]) extends TransactionFinalizer {
     implicit val ec: ExecutionContext = client.clientContext
 
+    actions.foreach(_.execute())
+
     def complete: Future[Unit] = Future.sequence(actions.map(_.complete)).map(_=>())
 
     def updateCommitErrors(commitErrors: Map[StoreId, List[ObjectId]]): Unit = {

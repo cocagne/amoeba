@@ -50,6 +50,8 @@ abstract class BaseReadDriver(
 
   def shutdown(): Unit = {}
 
+  protected def onComplete(): Unit = ()
+
   /** Sends a Read request to the specified store. */
   protected def sendReadRequestNoLogMessage(dataStoreId: StoreId): Unit = {
     client.messenger.sendClientRequest(Read(dataStoreId, client.clientId, readUUID, objectPointer, readType))
@@ -122,6 +124,7 @@ abstract class BaseReadDriver(
             case Left(err) =>
               logger.info(s"Read UUID $readUUID: Failed to read object ${objectPointer.id}. Reason: $err")
               promise.failure(err)
+              onComplete()
 
             case Right(obj) =>
               obj match {
@@ -130,6 +133,7 @@ abstract class BaseReadDriver(
                 case mos: MetadataObjectState => logger.info(s"Read UUID $readUUID: Successfully read MetadataObject ${objectPointer.id} Rev ${mos.revision} Ref ${mos.refcount}")
               }
               promise.success(obj)
+              onComplete()
           }
         }
 
