@@ -1,4 +1,4 @@
-package com.ibm.amoeba.fs.demo.network
+package com.ibm.amoeba.fs.demo.netty_network
 
 import java.nio.ByteBuffer
 

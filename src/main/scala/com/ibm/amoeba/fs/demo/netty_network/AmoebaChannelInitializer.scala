@@ -1,4 +1,4 @@
-package com.ibm.amoeba.fs.demo.network
+package com.ibm.amoeba.fs.demo.netty_network
 
 import io.netty.channel.{ChannelHandler, ChannelInitializer}
 import io.netty.channel.socket.SocketChannel
