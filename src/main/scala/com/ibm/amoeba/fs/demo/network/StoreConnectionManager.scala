@@ -1,4 +1,4 @@
-package com.ibm.amoeba.fs.demo.netty_network
+package com.ibm.amoeba.fs.demo.network
 
 import com.ibm.amoeba.common.network.ClientId
 import io.netty.bootstrap.ServerBootstrap
