@@ -10,6 +10,8 @@ import com.ibm.amoeba.common.transaction.{ObjectUpdate, PreTransactionOpportunis
 
 sealed abstract class Message
 
+case class NodeHeartbeat(nodeName:String) extends Message
+
 sealed abstract class ClientRequest extends Message {
   val toStore: StoreId
   val fromClient: ClientId

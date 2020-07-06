@@ -112,7 +112,7 @@ object NetworkCodec {
   def objectPointerToByteArray(o: ObjectPointer): Array[Byte] = {
     
     val builder = new FlatBufferBuilder(2048)
-    
+
     val d = NetworkCodec.encode(builder, o)
 
     builder.finish(d)
@@ -1294,5 +1294,15 @@ object NetworkCodec {
     val committed = n.committed()
 
     TransactionResolved(ClientId(toClient), fromStore, TransactionId(transactionUUID), committed)
+  }
+
+  def encode(builder:FlatBufferBuilder, o: NodeHeartbeat): Int = {
+    val nodeName = builder.createString(o.nodeName)
+    P.NodeHeartbeat.startNodeHeartbeat(builder)
+    P.NodeHeartbeat.addFrom(builder, nodeName)
+    P.NodeHeartbeat.endNodeHeartbeat(builder)
+  }
+  def decode(n: P.NodeHeartbeat): NodeHeartbeat = {
+    NodeHeartbeat(n.from())
   }
 }

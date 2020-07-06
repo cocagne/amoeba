@@ -404,6 +404,15 @@ table AllocateResponse {
 
 
 //---------------------------------------------------------------------------
+//- Node Support Message
+//---------------------------------------------------------------------------
+
+table NodeHeartbeat {
+   from: string;
+}
+
+
+//---------------------------------------------------------------------------
 //- Root Message
 //---------------------------------------------------------------------------
 table Message {
@@ -424,6 +433,7 @@ table Message {
   transactionCompletionResponse: TransactionCompletionResponse;
   tx_resolved: TransactionResolved;
   tx_finalized: TransactionFinalized;
+  node_heartbeat: NodeHeartbeat;
 }
 
 root_type Message;

@@ -2,6 +2,7 @@ package com.ibm.amoeba.fs.demo
 
 import java.io.{File, StringReader}
 import java.nio.file.{Files, Path, Paths}
+import java.util.UUID
 import java.util.concurrent.Executors
 
 import com.ibm.amoeba.AmoebaError
@@ -9,13 +10,13 @@ import com.ibm.amoeba.client.{AmoebaClient, KeyValueObjectState}
 import com.ibm.amoeba.client.internal.SimpleAmoebaClient
 import com.ibm.amoeba.client.internal.allocation.SinglePoolObjectAllocator
 import com.ibm.amoeba.common.ida.{ReedSolomon, Replication}
-import com.ibm.amoeba.common.network.ClientId
+import com.ibm.amoeba.common.network.{ClientId, ClientRequest, ClientResponse, TxMessage}
 import com.ibm.amoeba.common.objects.{Key, KeyValueObjectPointer, ObjectRevisionGuard}
 import com.ibm.amoeba.common.pool.PoolId
 import com.ibm.amoeba.common.store.StoreId
 import com.ibm.amoeba.common.util.{BackgroundTaskPool, YamlFormat}
 import com.ibm.amoeba.fs.FileSystem
-import com.ibm.amoeba.fs.demo.network.NettyNetwork
+import com.ibm.amoeba.fs.demo.network.{NettyNetwork, ZMQNetwork}
 import com.ibm.amoeba.fs.impl.simple.SimpleFileSystem
 import com.ibm.amoeba.fs.nfs.AmoebaNFS
 import com.ibm.amoeba.server.{RegisteredTransactionFinalizerFactory, SimpleDriverRecoveryMixin, StoreManager}
@@ -47,6 +48,21 @@ object Main {
                   port:Int=0)
 
   class ConfigError(msg: String) extends AmoebaError(msg)
+
+  class NetworkBridge {
+    var oclient: Option[AmoebaClient] = None
+    var onode: Option[StoreManager] = None
+
+    def onClientResponseReceived(msg: ClientResponse): Unit ={
+      oclient.foreach(_.receiveClientResponse(msg))
+    }
+    def onClientRequestReceived(msg: ClientRequest): Unit = {
+      onode.foreach(_.receiveClientRequest(msg))
+    }
+    def onTransactionMessageReceived(msg: TxMessage): Unit = {
+      onode.foreach(_.receiveTransactionMessage(msg))
+    }
+  }
 
   def setLog4jConfigFile(f: File): Unit = {
     //System.setProperty("log4j2.debug", "true")
@@ -137,29 +153,48 @@ object Main {
     }
   }
 
-  def createAmoebaClient(cfg: ConfigFile.Config, onnet: Option[NettyNetwork]=None): (AmoebaClient, KeyValueObjectPointer) = {
+  def createNetwork(cfg:ConfigFile.Config,
+                    storageNode: Option[(String, String, Int)],
+                    oclientId: Option[ClientId]): (NetworkBridge, ZMQNetwork) = {
+    val b = new NetworkBridge
+    val nodes = cfg.nodes.map(ds => ds._2.name -> (ds._2.endpoint.host, ds._2.endpoint.port))
+    val stores = cfg.nodes.flatMap { t =>
+      val (nodeName, node) = t
+      node.stores.map { ds =>
+        val poolUUID = cfg.pools(ds.pool).uuid
+        StoreId(PoolId(poolUUID), ds.store.asInstanceOf[Byte]) -> nodeName
+      }
+    }
+    val heartbeatPeriod = Duration(5, SECONDS)
+    (b, new ZMQNetwork(oclientId, nodes, stores, storageNode, heartbeatPeriod,
+      b.onClientResponseReceived,
+      b.onClientRequestReceived,
+      b.onTransactionMessageReceived))
+  }
+
+  def createAmoebaClient(cfg: ConfigFile.Config,
+                         onnet: Option[(NetworkBridge, ZMQNetwork)]=None): (AmoebaClient, ZMQNetwork, KeyValueObjectPointer) = {
     val nucleus = cfg.onucleus.getOrElse(throw new ConfigError("Nucleus Pointer is missing from the config file!"))
 
-    val nnet = onnet.getOrElse(new NettyNetwork(cfg, None))
-    val cliNet = nnet.createClientNetwork()
+    val (networkBridge, nnet) = onnet.getOrElse(createNetwork(cfg, None, None))
 
     val txStatusCacheDuration = Duration(10, SECONDS)
-    val initialReadDelay = Duration(15, MILLISECONDS)
-    val maxReadDelay = Duration(1, SECONDS)
+    val initialReadDelay = Duration(1, SECONDS)
+    val maxReadDelay = Duration(3, SECONDS)
     val txRetransmitDelay = Duration(1, SECONDS)
     val allocationRetransmitDelay = Duration(5, SECONDS)
 
     val sched = Executors.newScheduledThreadPool(3)
     val ec: ExecutionContext = ExecutionContext.fromExecutorService(sched)
 
-    val ret = (new SimpleAmoebaClient(cliNet, nnet.clientId, ec, nucleus,
+    val ret = (new SimpleAmoebaClient(nnet.clientMessenger, nnet.clientId, ec, nucleus,
       txStatusCacheDuration,
       initialReadDelay,
       maxReadDelay,
       txRetransmitDelay,
-      allocationRetransmitDelay), nucleus)
+      allocationRetransmitDelay), nnet, nucleus)
 
-    nnet.setClient(ret._1)
+    networkBridge.oclient = Some(ret._1)
 
     ret
   }
@@ -191,7 +226,14 @@ object Main {
   def amoeba_server(log4jConfigFile: File, cfg: ConfigFile.Config): Unit = {
     setLog4jConfigFile(log4jConfigFile)
 
-    val (client, nucleus) = createAmoebaClient(cfg)
+    val (client, network, nucleus) = createAmoebaClient(cfg)
+
+    val networkThread = new Thread {
+      override def run(): Unit = {
+        network.enterEventLoop()
+      }
+    }
+    networkThread.start()
 
     val f = initializeAmoeba(client, nucleus)
 
@@ -230,6 +272,7 @@ object Main {
     nfsSvc.start()
 
     println("Amoeba NFS server started...")
+
     Thread.currentThread.join()
   }
 
@@ -261,11 +304,13 @@ object Main {
 
     val objectCacheFactory = () => new SimpleLRUObjectCache(100)
 
-    val nnet = new NettyNetwork(cfg, Some(ClientId(node.uuid)))
+    val nodeEndpoint = Some(node.name, node.endpoint.host, node.endpoint.port)
 
-    val (client, _) = createAmoebaClient(cfg, Some(nnet))
+    val (networkBridge, nnet) = createNetwork(cfg, nodeEndpoint, None)
 
-    nnet.setClient(client)
+    val (client, network, _) = createAmoebaClient(cfg, Some((networkBridge, nnet)))
+
+    networkBridge.oclient = Some(client)
 
     val txFinalizerFactory = new RegisteredTransactionFinalizerFactory(client)
     val txHeartbeatPeriod = Duration(1, SECONDS)
@@ -275,7 +320,7 @@ object Main {
     //val allocTimeout           = Duration(4, SECONDS)
     //val allocStatusQueryPeriod = Duration(1, SECONDS)
 
-    val nodeNet = nnet.createStoreNetwork(nodeName)
+    val nodeNet = nnet.serverMessenger
 
     val storeManager = new StoreManager(
       objectCacheFactory,
@@ -288,7 +333,15 @@ object Main {
       stores
     ) with SimpleDriverRecoveryMixin
 
-    nodeNet.setStoreManager(storeManager)
+    networkBridge.onode = Some(storeManager)
+
+    val networkThread = new Thread {
+      override def run(): Unit = {
+        network.enterEventLoop()
+      }
+    }
+    networkThread.start()
+
     storeManager.start()
   }
 

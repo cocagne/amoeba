@@ -44,6 +44,7 @@ lazy val root = (project in file(".")).
       "com.lmax"                         %  "disruptor"               % "3.3.7",
       "org.dcache"                       %  "nfs4j-core"              % "0.19.0",
       "org.yaml"                         %  "snakeyaml"               % "1.25",
+      "org.zeromq"                       %  "jeromq"                  % "0.5.2",
     )
   )
   

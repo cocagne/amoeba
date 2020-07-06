@@ -10,7 +10,25 @@ import com.ibm.amoeba.common.objects.Metadata
 
 object MessageEncoder {
 
+  def encodeMessage(msg: NodeHeartbeat): Array[Byte] = {
+    val builder = new FlatBufferBuilder(4096)
+    val o = NetworkCodec.encode(builder, msg)
+
+    PMessage.startMessage(builder)
+    PMessage.addNodeHeartbeat(builder, o)
+
+    PMessage.finishMessageBuffer(builder, PMessage.endMessage(builder))
+
+    val arr = builder.sizedByteArray()
+    val msgarr = new Array[Byte](4 + arr.length)
+    val bb = ByteBuffer.wrap(msgarr)
+    bb.putInt(arr.length)
+    bb.put(arr)
+    msgarr
+  }
+
   def encodeMessage(message: TxMessage): Array[Byte] = {
+
     val builder = new FlatBufferBuilder(4096)
 
     var updateContent: Option[TransactionData] = None
