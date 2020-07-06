@@ -16,7 +16,7 @@ import com.ibm.amoeba.common.pool.PoolId
 import com.ibm.amoeba.common.store.StoreId
 import com.ibm.amoeba.common.util.{BackgroundTaskPool, YamlFormat}
 import com.ibm.amoeba.fs.FileSystem
-import com.ibm.amoeba.fs.demo.network.{NettyNetwork, ZMQNetwork}
+import com.ibm.amoeba.fs.demo.network.ZMQNetwork
 import com.ibm.amoeba.fs.impl.simple.SimpleFileSystem
 import com.ibm.amoeba.fs.nfs.AmoebaNFS
 import com.ibm.amoeba.server.{RegisteredTransactionFinalizerFactory, SimpleDriverRecoveryMixin, StoreManager}
