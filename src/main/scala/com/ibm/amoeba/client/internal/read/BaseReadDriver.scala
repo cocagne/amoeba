@@ -65,13 +65,14 @@ abstract class BaseReadDriver(
 
   /** Sends a Read request to all stores that have not already responded. May be called outside a synchronized block */
   protected def sendReadRequests(): Unit = {
-    logger.trace(s"Read UUID $readUUID: sending read requests to all stores for object ${objectPointer.id}")
+    //logger.trace(s"Read UUID $readUUID: sending read requests to all stores for object ${objectPointer.id}. ${objectPointer.storePointers.map(sp => StoreId(objectPointer.poolId, sp.poolIndex)).toList}")
     synchronized {
       retryCount += 1
       if (retryCount > 3)
         logger.debug(s"RESENDING READ REQUESTS for Read UUID $readUUID")
     }
-    objectPointer.storePointers.foreach(sp => sendReadRequestNoLogMessage(StoreId(objectPointer.poolId, sp.poolIndex)))
+    //objectPointer.storePointers.foreach(sp => sendReadRequestNoLogMessage(StoreId(objectPointer.poolId, sp.poolIndex)))
+    objectPointer.storePointers.foreach(sp => sendReadRequest(StoreId(objectPointer.poolId, sp.poolIndex)))
   }
 
   protected def sendOpportunisticRebuild(storeId: StoreId, os: ObjectState): Unit = {
@@ -132,8 +133,8 @@ abstract class BaseReadDriver(
                 case kvos: KeyValueObjectState => logger.info(s"Read UUID $readUUID: Successfully read KeyValueObject ${objectPointer.id} Rev ${kvos.revision} Ref ${kvos.refcount} Num Entries ${kvos.contents.size}")
                 case mos: MetadataObjectState => logger.info(s"Read UUID $readUUID: Successfully read MetadataObject ${objectPointer.id} Rev ${mos.revision} Ref ${mos.refcount}")
               }
-              promise.success(obj)
               onComplete()
+              promise.success(obj)
           }
         }
 

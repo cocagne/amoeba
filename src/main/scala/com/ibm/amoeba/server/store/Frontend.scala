@@ -131,6 +131,7 @@ class Frontend(val storeId: StoreId,
   def readObjectForNetwork(clientId: ClientId, readUUID: UUID, locater: Locater): Unit = {
     objectCache.get(locater.objectId) match {
       case Some(os) =>
+        logger.trace(s"Reading Cached object for read $readUUID")
         val cs = ReadResponse.CurrentState(os.metadata.revision, os.metadata.refcount, os.metadata.timestamp,
           os.data.size, Some(os.data), os.lockedWriteTransactions )
 
@@ -139,6 +140,7 @@ class Frontend(val storeId: StoreId,
 
 
       case None =>
+        logger.trace(s"Reading uncached object from backing store for read $readUUID")
         val nr = NetworkRead(clientId, readUUID)
 
         pendingReads.get(locater.objectId) match {
@@ -213,6 +215,7 @@ class Frontend(val storeId: StoreId,
         pendingReads.get(objectId).foreach { lpr =>
           lpr.foreach {
             case netRead: NetworkRead =>
+              logger.trace(s"Completed backend load for read ${netRead.requestUUID}. Sending read response")
               val cs = ReadResponse.CurrentState(os.metadata.revision, os.metadata.refcount, os.metadata.timestamp,
                 os.data.size, Some(os.data), os.lockedWriteTransactions )
 

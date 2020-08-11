@@ -114,8 +114,10 @@ abstract class TransactionDriver(
   {
     val kind: String = if (txd.designatedLeaderUID == storeId.poolIndex)
       "Designated Leader"
-    else
+    else {
+      nextRound()
       "Transaction Recovery"
+    }
     logger.info(s"Driving transaction to completion ($kind): ${txd.shortString}")
   }
 
@@ -144,7 +146,10 @@ abstract class TransactionDriver(
   def shutdown(): Unit = {}
 
   def heartbeat(): Unit = {
-    messenger.sendTransactionMessages(allDataStores.map(toStoreId => TxHeartbeat(toStoreId, storeId, txd.transactionId)))
+    if (finalized)
+      messenger.sendTransactionMessages(allDataStores.map(toStoreId => TxFinalized(toStoreId, storeId, txd.transactionId, resolvedValue)))
+    else
+      messenger.sendTransactionMessages(allDataStores.map(toStoreId => TxHeartbeat(toStoreId, storeId, txd.transactionId)))
   }
 
   // Must be called outside a syncrhonized block. Doing so avoids a race condition within the unit test
@@ -368,11 +373,11 @@ abstract class TransactionDriver(
 
     ofinal match {
       case Some(result) =>
-        logger.trace(s"Sending TxResolved(${txd.transactionId}) committed = $result to $toStoreId")
+        //logger.trace(s"Sending TxResolved(${txd.transactionId}) committed = $result to $toStoreId")
         messenger.sendTransactionMessage(TxResolved(toStoreId, storeId, txd.transactionId, result))
 
       case None =>
-        logger.trace(s"Sending TxPrepare(${txd.transactionId}) to $toStoreId")
+        //logger.trace(s"Sending TxPrepare(${txd.transactionId}) to $toStoreId")
         messenger.sendTransactionMessage(TxPrepare(toStoreId, storeId, txd, proposalId, Nil, Nil))
     }
   }
@@ -430,7 +435,7 @@ abstract class TransactionDriver(
         TxResolved(toStoreId, storeId, txd.transactionId, committed)
       }.toList
 
-      logger.trace(s"Sending TxResolved(${txd.transactionId}) committed = $committed to ${messages.head.to.poolId}:(${messages.map(_.to.poolIndex)})")
+      //logger.trace(s"Sending TxResolved(${txd.transactionId}) committed = $committed to ${messages.head.to.poolId}:(${messages.map(_.to.poolIndex)})")
 
       txMessages = Some(messages)
 

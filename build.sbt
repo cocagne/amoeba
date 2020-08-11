@@ -23,10 +23,11 @@ lazy val root = (project in file(".")).
       
     scalacOptions ++= Seq("-feature", "-deprecation"),
 
-    resolvers += "mvnrepository" at "http://mvnrepository.com/artifact/",
+    resolvers += "mvnrepository" at "https://mvnrepository.com/artifact/",
     
     resolvers += "dCache Repository" at "https://download.dcache.org/nexus/content/repositories/releases",
-    resolvers += "Oracle Repository" at "http://download.oracle.com/maven",
+    resolvers += "Oracle Repository" at "https://download.oracle.com/maven",
+    resolvers += "sonatype-nexus-snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
 
     libraryDependencies ++= Seq(
       "org.scalatest"                    %% "scalatest"               % "3.0.8" % "test",
@@ -44,7 +45,7 @@ lazy val root = (project in file(".")).
       "com.lmax"                         %  "disruptor"               % "3.3.7",
       "org.dcache"                       %  "nfs4j-core"              % "0.19.0",
       "org.yaml"                         %  "snakeyaml"               % "1.25",
-      "org.zeromq"                       %  "jeromq"                  % "0.5.2",
+      "org.zeromq"                       %  "jeromq"                  % "0.5.3-SNAPSHOT",
     )
   )
   

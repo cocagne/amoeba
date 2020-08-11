@@ -69,7 +69,7 @@ class SimpleTransactionDriver(
 
             sendAcceptMessages()
           case None =>
-            messenger.sendTransactionMessages(txd.allDataStores.map(toStore => TxPrepare(toStore, storeId, txd, proposer.currentProposalId, Nil, Nil)).toList)
+            txd.allDataStores.foreach(sendPrepareMessage)
         }
       }
 

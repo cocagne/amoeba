@@ -2,6 +2,13 @@
 # run "sbt pack"
 # then invoke ./target/pack/bin/demo
 
+sbt compile && rm -r local/nodes/* && rm local/*log
+./t bootstrap local/t.yaml
+
+./t node local/t.yaml node_a
+
+./t  nfs local/t.yaml local/amoeba-log4j.yaml
+
 Bootstrap Procedure:
     sbt pack
     rm -r ~/temp/aspen/*

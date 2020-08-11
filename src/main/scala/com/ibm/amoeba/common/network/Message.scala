@@ -25,6 +25,7 @@ sealed abstract class ClientResponse extends Message {
 sealed abstract class TxMessage extends Message {
   val to: StoreId
   val from: StoreId
+  val transactionId: TransactionId
 }
 
 final case class Allocate(
@@ -134,7 +135,9 @@ final case class TxPrepare(
                             txd: TransactionDescription,
                             proposalId: ProposalId,
                             objectUpdates: List[ObjectUpdate],
-                            preTxRebuilds: List[PreTransactionOpportunisticRebuild]) extends TxMessage
+                            preTxRebuilds: List[PreTransactionOpportunisticRebuild]) extends TxMessage {
+  override val transactionId: TransactionId = txd.transactionId
+}
 
 final case class TxPrepareResponse(
                                     to: StoreId,

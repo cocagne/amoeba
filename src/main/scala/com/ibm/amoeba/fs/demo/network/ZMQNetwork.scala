@@ -12,7 +12,8 @@ import com.ibm.amoeba.common.network.protocol.{Message => PMessage}
 import com.ibm.amoeba.common.objects.{Metadata, ObjectId}
 import com.ibm.amoeba.common.transaction.{ObjectUpdate, PreTransactionOpportunisticRebuild}
 import org.apache.logging.log4j.scala.Logging
-import org.zeromq.{SocketType, ZContext, ZMQ}
+import org.zeromq.ZMQ.PollItem
+import org.zeromq.{SocketType, ZContext, ZLoop, ZMQ}
 
 import scala.concurrent.duration.Duration
 
@@ -37,20 +38,21 @@ object ZMQNetwork {
     }
   }
 
-  class CliMessenger(net: ZMQNetwork) extends ClientMessenger {
+  class CliMessenger(net: ZMQNetwork) extends ClientMessenger with Logging {
     def sendClientRequest(msg: ClientRequest): Unit = {
       net.dealers(net.stores(msg.toStore)).send(MessageEncoder.encodeMessage(msg))
     }
 
     def sendTransactionMessage(msg: TxMessage): Unit = {
+      logger.trace(s"Sending TxId ${msg.transactionId} ${msg.getClass.getSimpleName} to ${msg.to}")
       net.dealers(net.stores(msg.to)).send(MessageEncoder.encodeMessage(msg))
     }
 
     def sendTransactionMessages(msg: List[TxMessage]): Unit = msg.foreach(sendTransactionMessage)
   }
 
-  class SrvMessenger(net: ZMQNetwork) extends ServerMessenger {
-    def sendClientResponse(msg: ClientResponse): Unit = {
+  class SrvMessenger(net: ZMQNetwork) extends ServerMessenger with Logging {
+    def sendClientResponse(msg: ClientResponse): Unit = synchronized {
       net.clients.get(msg.toClient).foreach { zmqIdentity =>
         net.routerSocket.foreach { router =>
           router.send(zmqIdentity, ZMQ.SNDMORE)
@@ -59,7 +61,8 @@ object ZMQNetwork {
       }
     }
 
-    def sendTransactionMessage(msg: TxMessage): Unit = {
+    def sendTransactionMessage(msg: TxMessage): Unit = synchronized {
+      logger.trace(s"Sending TxId ${msg.transactionId} ${msg.getClass.getSimpleName} to ${msg.to}")
       net.dealers(net.stores(msg.to)).send(MessageEncoder.encodeMessage(msg))
     }
 
@@ -106,16 +109,6 @@ class ZMQNetwork(val oclientId: Option[ClientId],
     nodeName -> dealer
   }
 
-  private val pollItems = dealers.iterator.map { t =>
-    val (nodeName, dealer) = t
-    new SocketState(nodeName, dealer)
-  }.toArray
-
-  private val poller = context.createPoller(pollItems.length + routerSocket.map(t => 1).getOrElse(0))
-
-  pollItems.foreach(ss => poller.register(ss.dealer, ZMQ.Poller.POLLIN))
-  routerSocket.foreach(router => poller.register(router, ZMQ.Poller.POLLIN))
-
   def clientMessenger: ClientMessenger = new CliMessenger(this)
 
   def serverMessenger: ServerMessenger = new SrvMessenger(this)
@@ -129,42 +122,51 @@ class ZMQNetwork(val oclientId: Option[ClientId],
       }
     }
     heartbeatMessage.foreach { msg =>
+      logger.trace("Sending node heartbeat to peers")
       dealers.valuesIterator.foreach(_.send(msg))
     }
   }
 
   def enterEventLoop(): Unit = {
-    var nextHeartbeat = System.nanoTime() + heartbeatPeriod.toNanos
 
-    while (!Thread.currentThread().isInterrupted) {
-      val now = System.nanoTime()
-      val pollTimeoutNanos = if (now < nextHeartbeat)
-        nextHeartbeat - now
-      else {
-        heartbeat()
-        nextHeartbeat = now + heartbeatPeriod.toNanos
-        heartbeatPeriod.toNanos
-      }
-
-      poller.poll(pollTimeoutNanos/1000000)
-
-      for( i <- pollItems.indices) {
-        if (poller.pollin(i)) {
-          val msg = pollItems(i).dealer.recv()
-          onDealerMessageReceived(msg)
-        }
-      }
-
-      routerSocket.foreach { router =>
-        if (poller.pollin(pollItems.length)) {
-          val from = router.recv()
-          val msg = router.recv()
-          onRouterMessageReceived(from, msg)
-        }
+    object DealerHandler extends ZLoop.IZLoopHandler {
+      override def handle(loop: ZLoop, item: PollItem, arg: Object): Int = {
+        val msg = item.getSocket.recv()
+        onDealerMessageReceived(msg)
+        0
       }
     }
-  }
 
+    object RouterHandler extends ZLoop.IZLoopHandler {
+      override def handle(loop: ZLoop, item: PollItem, arg: Object): Int = {
+        val from = item.getSocket.recv()
+        val msg = item.getSocket.recv()
+        onRouterMessageReceived(from, msg)
+        0
+      }
+    }
+
+    object HeartbeatTimerHandler extends ZLoop.IZLoopHandler {
+      override def handle(loop: ZLoop, item: PollItem, arg: Object): Int = {
+        heartbeat()
+        0
+      }
+    }
+
+    val zloop = new ZLoop(context)
+
+    dealers.valuesIterator.foreach { dealer  =>
+      zloop.addPoller(new PollItem(dealer, ZMQ.Poller.POLLIN), DealerHandler, null)
+    }
+
+    routerSocket.foreach { router =>
+      zloop.addPoller(new PollItem(router, ZMQ.Poller.POLLIN), RouterHandler, null)
+      zloop.addTimer(heartbeatPeriod.toMillis.asInstanceOf[Int], 0, HeartbeatTimerHandler, null)
+    }
+
+    zloop.start()
+  }
+  
   private def onDealerMessageReceived(msg: Array[Byte]): Unit = {
     val bb = ByteBuffer.wrap(msg)
 
@@ -223,7 +225,7 @@ class ZMQNetwork(val oclientId: Option[ClientId],
     }
     else if (p.read() != null) {
       val message = NetworkCodec.decode(p.read())
-      logger.trace(s"Read request for object ${message.objectPointer.id} from ${message.fromClient}")
+      logger.trace(s"Read requestid ${message.readUUID} for object ${message.objectPointer.id} from ${message.fromClient}")
       updateClientId(message.fromClient, from)
       onClientRequestReceived(message)
     }

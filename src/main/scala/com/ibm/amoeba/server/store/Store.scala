@@ -66,7 +66,7 @@ class Store(val backend: Backend,
     msg match {
       case m: TxPrepare =>
 
-        txStatusCache.getStatus(m.txd.transactionId).foreach { entry =>
+        val notFinalized = txStatusCache.getStatus(m.txd.transactionId).forall { entry =>
           val (r, committed: Boolean) = entry.status match {
             case TransactionStatus.Unresolved => (None, false)
             case TransactionStatus.Aborted =>
@@ -77,11 +77,19 @@ class Store(val backend: Backend,
 
           r.foreach(resolved => net.sendTransactionMessage(resolved))
 
-          if (entry.finalized)
+          if (entry.finalized) {
             net.sendTransactionMessage(TxFinalized(msg.from, msg.to, m.txd.transactionId, committed))
+
+            m.txd.originatingClient.foreach { client =>
+              net.sendClientResponse(TransactionFinalized(client, msg.to, m.txd.transactionId, committed))
+            }
+
+            false
+          } else
+            true
         }
 
-        if (m.txd.primaryObject.poolId == storeId.poolId && m.txd.designatedLeaderUID == storeId.poolIndex) {
+        if (notFinalized && m.txd.primaryObject.poolId == storeId.poolId && m.txd.designatedLeaderUID == storeId.poolIndex) {
           driveTransaction(m.txd)
         }
 

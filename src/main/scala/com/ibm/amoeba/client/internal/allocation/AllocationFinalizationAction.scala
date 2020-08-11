@@ -19,20 +19,18 @@ class AllocationFinalizationAction(val client: AmoebaClient,
 
   def complete: Future[Unit] = completionPromise.future
 
-  def execute(): Unit = {
-    println(s"**** AllocationFA for ${newObject.id} EXECUTE")
-    val fcomplete = client.retryStrategy.retryUntilSuccessful {
-      logger.trace(s"**** AllocationFA for ${newObject.id} Start")
-      for {
-        pool <- client.getStoragePool(newObject.poolId)
-        _=logger.trace(s"**** AllocationFA for ${newObject.id} Got Pool")
-        tx = client.newTransaction()
-        _ <- pool.allocationTree.set(Key(newObject.toArray), Value(Array()))(tx)
-        _=logger.trace(s"**** AllocationFA for ${newObject.id} Tx Prepped")
-        _ <- tx.commit()
-      } yield {
-        completionPromise.success(())
-      }
+  def execute(): Unit = client.retryStrategy.retryUntilSuccessful {
+    logger.trace(s"**** AllocationFA for ${newObject.id} Start")
+    for {
+      pool <- client.getStoragePool(newObject.poolId)
+      _=logger.trace(s"**** AllocationFA for ${newObject.id} Got Pool")
+      tx = client.newTransaction()
+      _ <- pool.allocationTree.set(Key(newObject.toArray), Value(Array()))(tx)
+      _=logger.trace(s"**** AllocationFA for ${newObject.id} Tx Prepped. Txid: ${tx.id}")
+      _ <- tx.commit()
+    } yield {
+      logger.trace(s"**** AllocationFA Completed Successfully for ${newObject.id}")
+      completionPromise.success(())
     }
   }
 }

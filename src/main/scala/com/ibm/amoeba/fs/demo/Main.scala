@@ -179,8 +179,8 @@ object Main {
     val (networkBridge, nnet) = onnet.getOrElse(createNetwork(cfg, None, None))
 
     val txStatusCacheDuration = Duration(10, SECONDS)
-    val initialReadDelay = Duration(1, SECONDS)
-    val maxReadDelay = Duration(3, SECONDS)
+    val initialReadDelay = Duration(5, SECONDS)
+    val maxReadDelay = Duration(6, SECONDS)
     val txRetransmitDelay = Duration(1, SECONDS)
     val allocationRetransmitDelay = Duration(5, SECONDS)
 

@@ -51,6 +51,7 @@ class SimpleReadDriver(
       super.begin()
       false
     })
+    super.begin()
   }
 
   override def shutdown(): Unit = task.foreach( t => t.cancel() )

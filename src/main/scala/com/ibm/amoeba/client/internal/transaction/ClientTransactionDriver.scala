@@ -7,6 +7,7 @@ import com.ibm.amoeba.common.network.{TransactionFinalized, TransactionResolved,
 import com.ibm.amoeba.common.paxos.ProposalId
 import com.ibm.amoeba.common.store.StoreId
 import com.ibm.amoeba.common.transaction.TransactionDescription
+import org.apache.logging.log4j.scala.Logging
 
 import scala.concurrent.{Future, Promise}
 
@@ -22,7 +23,7 @@ object ClientTransactionDriver {
 class ClientTransactionDriver(
                                val client: AmoebaClient,
                                val txd: TransactionDescription,
-                               val updateData: Map[StoreId, TransactionData]) {
+                               val updateData: Map[StoreId, TransactionData]) extends Logging {
 
   //protected val learner = new Learner(txd.primaryObject.ida.width, txd.primaryObject.ida.writeThreshold)
   protected val promise: Promise[Boolean] = Promise()
@@ -33,9 +34,12 @@ class ClientTransactionDriver(
 
   def shutdown(): Unit = {}
 
-  private def complete(committed: Boolean): Unit = if (!promise.isCompleted) {
-    HLCTimestamp.update(txd.startTimestamp)
-    promise.success(committed)
+  protected def complete(committed: Boolean): Unit = synchronized {
+    if (!promise.isCompleted) {
+      logger.trace(s"Client Transaction Completed: ${txd.transactionId}")
+      HLCTimestamp.update(txd.startTimestamp)
+      promise.success(committed)
+    }
   }
 
   /*
@@ -54,9 +58,9 @@ class ClientTransactionDriver(
   }
   */
 
-  def receive(finalized: TransactionFinalized): Unit = synchronized { complete(finalized.committed) }
+  def receive(finalized: TransactionFinalized): Unit = complete(finalized.committed)
 
-  def receive(resolved: TransactionResolved): Unit = synchronized { complete(resolved.committed) }
+  def receive(resolved: TransactionResolved): Unit = complete(resolved.committed)
 
   protected def sendPrepareMessages(): Unit = {
     val isCompleted = synchronized { promise.isCompleted }

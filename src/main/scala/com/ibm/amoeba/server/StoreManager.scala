@@ -12,6 +12,7 @@ import com.ibm.amoeba.server.store.backend.{Backend, Completion, CompletionHandl
 import com.ibm.amoeba.server.store.cache.ObjectCache
 import com.ibm.amoeba.server.store.{Frontend, Store}
 import com.ibm.amoeba.server.transaction.{TransactionDriver, TransactionFinalizer, TransactionStatusCache}
+import org.apache.logging.log4j.scala.Logging
 
 import scala.concurrent.duration.Duration
 import scala.concurrent.{ExecutionContext, Future, Promise}
@@ -48,7 +49,7 @@ class StoreManager(val objectCacheFactory: () => ObjectCache,
                    val finalizerFactory: TransactionFinalizer.Factory,
                    val txDriverFactory: TransactionDriver.Factory,
                    val heartbeatPeriod: Duration,
-                   initialBackends: List[Backend]) {
+                   initialBackends: List[Backend]) extends Logging {
   import StoreManager._
 
   private val events = new LinkedBlockingQueue[Event]()
@@ -85,7 +86,7 @@ class StoreManager(val objectCacheFactory: () => ObjectCache,
 
   protected var stores: Map[StoreId, Store] = initialBackends.map { backend =>
     val store = new Store(backend, objectCacheFactory(), net, backgroundTasks, crl,
-      txStatusCache, finalizerFactory, txDriverFactory, heartbeatPeriod*4)
+      txStatusCache, finalizerFactory, txDriverFactory, heartbeatPeriod*8)
 
     backend.setCompletionHandler(op => {
       events.add(IOCompletion(op))
@@ -187,11 +188,13 @@ class StoreManager(val objectCacheFactory: () => ObjectCache,
 
       case LoadStore(backend) =>
         val store = new Store(backend, objectCacheFactory(), net, backgroundTasks, crl,
-          txStatusCache,finalizerFactory, txDriverFactory, heartbeatPeriod*4)
+          txStatusCache,finalizerFactory, txDriverFactory, heartbeatPeriod*8)
         backend.setCompletionHandler(ioHandler)
         stores += (backend.storeId -> store)
 
-      case HeartbeatEvent() => stores.valuesIterator.foreach(_.heartbeat())
+      case HeartbeatEvent() =>
+        logger.trace("Main loop got heartbeat event")
+        stores.valuesIterator.foreach(_.heartbeat())
 
       case null => // nothing to do
 
