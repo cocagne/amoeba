@@ -68,8 +68,11 @@ abstract class BaseReadDriver(
     //logger.trace(s"Read UUID $readUUID: sending read requests to all stores for object ${objectPointer.id}. ${objectPointer.storePointers.map(sp => StoreId(objectPointer.poolId, sp.poolIndex)).toList}")
     synchronized {
       retryCount += 1
-      if (retryCount > 3)
-        logger.debug(s"RESENDING READ REQUESTS for Read UUID $readUUID")
+      if (retryCount > 3) {
+        //logger.debug(s"RESENDING READ REQUESTS for Read UUID $readUUID")
+        objectReader.debugLogStatus(s"RESENDING READ REQUESTS for Read UUID $readUUID",
+          s => logger.trace(s))
+      }
     }
     //objectPointer.storePointers.foreach(sp => sendReadRequestNoLogMessage(StoreId(objectPointer.poolId, sp.poolIndex)))
     objectPointer.storePointers.foreach(sp => sendReadRequest(StoreId(objectPointer.poolId, sp.poolIndex)))

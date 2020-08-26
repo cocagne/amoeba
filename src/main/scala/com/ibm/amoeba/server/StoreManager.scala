@@ -193,7 +193,7 @@ class StoreManager(val objectCacheFactory: () => ObjectCache,
         stores += (backend.storeId -> store)
 
       case HeartbeatEvent() =>
-        logger.trace("Main loop got heartbeat event")
+        //logger.trace("Main loop got heartbeat event")
         stores.valuesIterator.foreach(_.heartbeat())
 
       case null => // nothing to do

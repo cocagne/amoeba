@@ -402,5 +402,6 @@ object Main {
       if (sp.data.length > 0)
         println(s"          data: ${java.util.Base64.getEncoder.encodeToString(sp.data)}")
     }
+    sched.shutdownNow()
   }
 }
