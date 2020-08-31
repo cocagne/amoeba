@@ -343,6 +343,7 @@ object Main {
     networkThread.start()
 
     storeManager.start()
+    networkThread.join()
   }
 
   def mkdirectory(p: Path): Unit = {

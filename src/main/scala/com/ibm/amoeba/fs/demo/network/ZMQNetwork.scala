@@ -89,6 +89,8 @@ class ZMQNetwork(val oclientId: Option[ClientId],
 
   private var clients: Map[ClientId, Array[Byte]] = Map()
 
+  private var lastRouterMessageReceived = System.nanoTime()
+
   private var nodeStates: Map[String, NodeState] = nodes.map{t => t._1 -> new NodeState(t._1, 0, false)}
 
   private val routerSocket = storageNode.map { t =>
@@ -103,7 +105,7 @@ class ZMQNetwork(val oclientId: Option[ClientId],
     MessageEncoder.encodeMessage(NodeHeartbeat(nodeName))
   }
 
-  private var dealers = nodes.map { t =>
+  private val dealers = nodes.map { t =>
     val (nodeName, (host, port)) = t
     val dealer = context.createSocket(SocketType.DEALER)
     dealer.connect(s"tcp://$host:$port")
@@ -111,7 +113,10 @@ class ZMQNetwork(val oclientId: Option[ClientId],
     nodeName -> dealer
   }
 
-  private var pollItems = dealers.map(t => t._1 -> new PollItem(t._2, ZMQ.Poller.POLLIN))
+  private val pollItems = dealers.map(t => t._1 -> new PollItem(t._2, ZMQ.Poller.POLLIN))
+  private val routerPollItem = routerSocket.map { router =>
+    new PollItem(router, ZMQ.Poller.POLLIN)
+  }
 
   def clientMessenger: ClientMessenger = new CliMessenger(this)
 
@@ -125,26 +130,21 @@ class ZMQNetwork(val oclientId: Option[ClientId],
     }
   }
 
+  private object RouterHandler extends ZLoop.IZLoopHandler {
+    override def handle(loop: ZLoop, item: PollItem, arg: Object): Int = {
+      val from = item.getSocket.recv()
+      val msg = item.getSocket.recv()
+      onRouterMessageReceived(from, msg)
+      0
+    }
+  }
+
   private def heartbeat(): Unit = {
     val offlineThreshold = System.nanoTime() - (heartbeatPeriod * 3).toNanos
     nodeStates.foreach { t =>
       val (_, ns) = t
       if (ns.lastHeartbeatTime <= offlineThreshold && ns.isOnline) {
         ns.setOffline()
-        // Close the dealer socket and set up a new one
-        logger.trace(s"Attempting to reconnect to offline peer: ${ns.nodeName}")
-        val old_pi = pollItems(ns.nodeName)
-        val old_dealer = dealers(ns.nodeName)
-        zloop.removePoller(old_pi)
-        old_dealer.close()
-        val newDealer = context.createSocket(SocketType.DEALER)
-        val (host, port) = nodes(ns.nodeName)
-        newDealer.connect(s"tcp://$host:$port")
-        heartbeatMessage.foreach(msg => newDealer.send(msg))
-        val newPi = new PollItem(newDealer, ZMQ.Poller.POLLIN)
-        zloop.addPoller(newPi, DealerHandler, null)
-        pollItems += ns.nodeName -> newPi
-        dealers += ns.nodeName -> newDealer
       }
     }
     heartbeatMessage.foreach { msg =>
@@ -154,15 +154,6 @@ class ZMQNetwork(val oclientId: Option[ClientId],
   }
 
   def enterEventLoop(): Unit = {
-
-    object RouterHandler extends ZLoop.IZLoopHandler {
-      override def handle(loop: ZLoop, item: PollItem, arg: Object): Int = {
-        val from = item.getSocket.recv()
-        val msg = item.getSocket.recv()
-        onRouterMessageReceived(from, msg)
-        0
-      }
-    }
 
     object HeartbeatTimerHandler extends ZLoop.IZLoopHandler {
       override def handle(loop: ZLoop, item: PollItem, arg: Object): Int = {
@@ -174,7 +165,10 @@ class ZMQNetwork(val oclientId: Option[ClientId],
     pollItems.valuesIterator.foreach { zloop.addPoller(_, DealerHandler, null) }
 
     routerSocket.foreach { router =>
-      zloop.addPoller(new PollItem(router, ZMQ.Poller.POLLIN), RouterHandler, null)
+      routerPollItem.foreach { pollItem =>
+        zloop.addPoller(pollItem, RouterHandler, null)
+      }
+
       zloop.addTimer(heartbeatPeriod.toMillis.asInstanceOf[Int], 0, HeartbeatTimerHandler, null)
     }
 
@@ -220,6 +214,8 @@ class ZMQNetwork(val oclientId: Option[ClientId],
   private def onRouterMessageReceived(from: Array[Byte], msg: Array[Byte]): Unit = {
     val bb = ByteBuffer.wrap(msg)
     bb.order(ByteOrder.BIG_ENDIAN)
+
+    lastRouterMessageReceived = System.nanoTime()
 
     val msgLen = bb.getInt()
 
