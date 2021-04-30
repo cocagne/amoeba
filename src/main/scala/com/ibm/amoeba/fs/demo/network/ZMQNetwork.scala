@@ -40,12 +40,12 @@ object ZMQNetwork {
 
   class CliMessenger(net: ZMQNetwork) extends ClientMessenger with Logging {
     def sendClientRequest(msg: ClientRequest): Unit = synchronized {
-      net.dealers(net.stores(msg.toStore)).send(MessageEncoder.encodeMessage(msg))
+      net.peers(net.stores(msg.toStore)).dealer.send(MessageEncoder.encodeMessage(msg))
     }
 
     def sendTransactionMessage(msg: TxMessage): Unit = synchronized {
       logger.trace(s"Sending TxId ${msg.transactionId} ${msg.getClass.getSimpleName} to ${msg.to}")
-      net.dealers(net.stores(msg.to)).send(MessageEncoder.encodeMessage(msg))
+      net.peers(net.stores(msg.to)).dealer.send(MessageEncoder.encodeMessage(msg))
     }
 
     def sendTransactionMessages(msg: List[TxMessage]): Unit = msg.foreach(sendTransactionMessage)
@@ -63,7 +63,7 @@ object ZMQNetwork {
 
     def sendTransactionMessage(msg: TxMessage): Unit = synchronized {
       logger.trace(s"Sending TxId ${msg.transactionId} ${msg.getClass.getSimpleName} to ${msg.to}")
-      net.dealers(net.stores(msg.to)).send(MessageEncoder.encodeMessage(msg))
+      net.peers(net.stores(msg.to)).dealer.send(MessageEncoder.encodeMessage(msg))
     }
 
     def sendTransactionMessages(msg: List[TxMessage]): Unit = msg.foreach(sendTransactionMessage)
@@ -105,15 +105,18 @@ class ZMQNetwork(val oclientId: Option[ClientId],
     MessageEncoder.encodeMessage(NodeHeartbeat(nodeName))
   }
 
+  case class Peer(nodeName: String, dealer: ZMQ.Socket, pollItem: PollItem)
+
   private val dealers = nodes.map { t =>
     val (nodeName, (host, port)) = t
     val dealer = context.createSocket(SocketType.DEALER)
     dealer.connect(s"tcp://$host:$port")
     heartbeatMessage.foreach(msg => dealer.send(msg))
-    nodeName -> dealer
-  }
+    Peer(nodeName, dealer, new PollItem(dealer, ZMQ.Poller.POLLIN))
+  }.toArray
 
-  private val pollItems = dealers.map(t => t._1 -> new PollItem(t._2, ZMQ.Poller.POLLIN))
+  private val peers = dealers.map(p => p.nodeName -> p).toMap
+
   private val routerPollItem = routerSocket.map { router =>
     new PollItem(router, ZMQ.Poller.POLLIN)
   }
@@ -121,23 +124,6 @@ class ZMQNetwork(val oclientId: Option[ClientId],
   def clientMessenger: ClientMessenger = new CliMessenger(this)
 
   def serverMessenger: ServerMessenger = new SrvMessenger(this)
-
-  private object DealerHandler extends ZLoop.IZLoopHandler {
-    override def handle(loop: ZLoop, item: PollItem, arg: Object): Int = {
-      val msg = item.getSocket.recv()
-      onDealerMessageReceived(msg)
-      0
-    }
-  }
-
-  private object RouterHandler extends ZLoop.IZLoopHandler {
-    override def handle(loop: ZLoop, item: PollItem, arg: Object): Int = {
-      val from = item.getSocket.recv()
-      val msg = item.getSocket.recv()
-      onRouterMessageReceived(from, msg)
-      0
-    }
-  }
 
   private def heartbeat(): Unit = {
     val offlineThreshold = System.nanoTime() - (heartbeatPeriod * 3).toNanos
@@ -149,30 +135,58 @@ class ZMQNetwork(val oclientId: Option[ClientId],
     }
     heartbeatMessage.foreach { msg =>
       logger.trace("Sending node heartbeat to peers")
-      dealers.valuesIterator.foreach(_.send(msg))
+      dealers.foreach(_.dealer.send(msg))
     }
   }
 
   def enterEventLoop(): Unit = {
 
-    object HeartbeatTimerHandler extends ZLoop.IZLoopHandler {
-      override def handle(loop: ZLoop, item: PollItem, arg: Object): Int = {
+    var poller = context.createPoller(dealers.length + 1)
+
+    dealers.foreach(peer => poller.register(peer.pollItem))
+    routerPollItem.foreach(poller.register)
+
+    val heartBeatPeriodMillis = heartbeatPeriod.toMillis.asInstanceOf[Int]
+    var nextHeartbeat = System.currentTimeMillis() + heartBeatPeriodMillis
+
+    while (!Thread.currentThread().isInterrupted) {
+      val now = System.currentTimeMillis()
+
+      if (now >= nextHeartbeat) {
+        nextHeartbeat = now + heartBeatPeriodMillis
         heartbeat()
-        0
-      }
-    }
-
-    pollItems.valuesIterator.foreach { zloop.addPoller(_, DealerHandler, null) }
-
-    routerSocket.foreach { router =>
-      routerPollItem.foreach { pollItem =>
-        zloop.addPoller(pollItem, RouterHandler, null)
       }
 
-      zloop.addTimer(heartbeatPeriod.toMillis.asInstanceOf[Int], 0, HeartbeatTimerHandler, null)
-    }
+      try {
+        poller.poll(nextHeartbeat - now)
+      } catch {
+        case _: Throwable =>
+          logger.warn("Poll method threw an exception. Creating a new poller")
 
-    zloop.start()
+          dealers.foreach(peer => poller.unregister(peer.dealer))
+          routerSocket.foreach(poller.unregister)
+
+          poller = context.createPoller(dealers.length + 1)
+
+          dealers.foreach(peer => poller.register(peer.pollItem))
+          routerPollItem.foreach(poller.register)
+      }
+
+      for (i <- dealers.indices) {
+        if (poller.pollin(i)) {
+          val msg = dealers(i).dealer.recv()
+          onDealerMessageReceived(msg)
+        }
+      }
+
+      routerSocket.foreach { router =>
+        if (poller.pollin(dealers.length)) {
+          val from = router.recv()
+          val msg = router.recv()
+          onRouterMessageReceived(from, msg)
+        }
+      }
+    }
   }
 
   private def onDealerMessageReceived(msg: Array[Byte]): Unit = {
