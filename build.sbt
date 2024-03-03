@@ -18,7 +18,7 @@ lazy val root = (project in file(".")).
   settings(
     name         := "amoeba",
     version      := "0.1",
-    scalaVersion := "2.12.10",
+    scalaVersion := "2.12.18",
     organization := "com.ibm",
       
     scalacOptions ++= Seq("-feature", "-deprecation"),
@@ -45,7 +45,8 @@ lazy val root = (project in file(".")).
       "com.lmax"                         %  "disruptor"               % "3.3.7",
       "org.dcache"                       %  "nfs4j-core"              % "0.19.0",
       "org.yaml"                         %  "snakeyaml"               % "1.25",
-      "org.zeromq"                       %  "jeromq"                  % "0.5.3-SNAPSHOT",
+      "org.zeromq"                       %  "jeromq"                  % "0.6.0",
+      "com.google.flatbuffers"           %  "flatbuffers-java"        % "1.12.0",
     )
   )
   
