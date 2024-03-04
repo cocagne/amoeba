@@ -18,7 +18,7 @@ lazy val root = (project in file(".")).
   settings(
     name         := "amoeba",
     version      := "0.1",
-    scalaVersion := "2.12.18",
+    scalaVersion := "2.13.13",
     organization := "com.ibm",
       
     scalacOptions ++= Seq("-feature", "-deprecation"),
@@ -35,10 +35,10 @@ lazy val root = (project in file(".")).
       "org.rocksdb"                      %  "rocksdbjni"              % "6.3.6",
       "com.github.scopt"                 %% "scopt"                   % "4.0.0-RC2",
       "io.netty"                         %  "netty-all"               % "4.1.43.Final",
-      "org.apache.logging.log4j"         %  "log4j-api"               % "2.12.1",
-      "org.apache.logging.log4j"         %  "log4j-core"              % "2.12.1",
-      "org.apache.logging.log4j"         %% "log4j-api-scala"         % "11.0",
-      "org.slf4j"                        %  "slf4j-log4j12"           % "1.7.25",
+      "org.apache.logging.log4j"         %  "log4j-api"               % "2.22.0",
+      "org.apache.logging.log4j"         %  "log4j-core"              % "2.22.0",
+      "org.apache.logging.log4j"         %% "log4j-api-scala"         % "13.1.0",
+      "org.slf4j"                        %  "slf4j-log4j12"           % "2.0.12",
       "com.fasterxml.jackson.core"       %  "jackson-core"            % "2.9.4",
       "com.fasterxml.jackson.core"       %  "jackson-databind"        % "2.9.4",
       "com.fasterxml.jackson.dataformat" %  "jackson-dataformat-yaml" % "2.9.4",

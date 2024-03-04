@@ -28,7 +28,7 @@ class Store(val backend: Backend,
 
   private var transactionDrivers: Map[TransactionId, TransactionDriver] = Map()
 
-  def heartbeat() {
+  def heartbeat(): Unit = {
     transactionDrivers.values.foreach { td =>
       td.heartbeat()
     }

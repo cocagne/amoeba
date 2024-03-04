@@ -180,21 +180,23 @@ object BaseReadDriver {
 
     new BaseReadDriver(client, objectPointer, readUUID) {
 
-      implicit protected val ec: ExecutionContext = client.clientContext
+      implicit protected val ec: ExecutionContext = this.client.clientContext
 
       var hung = false
 
       val bgTasks = new BackgroundTaskPool
 
       val hangCheckTask: BackgroundTask.ScheduledTask = bgTasks.schedule(Duration(2, SECONDS)) {
-        val test = client.getSystemAttribute("unittest.name").getOrElse("UNKNOWN TEST")
+        val test = this.client.getSystemAttribute("unittest.name").getOrElse("UNKNOWN TEST")
         //println(s"**** HUNG READ: $test")
 
         objectReader.debugLogStatus(s"*** HUNG READ in test $test", println)
         // KeyValueObjectCodec.isRestorable(objectPointer.ida,
         //   storeStates.valuesIterator.map(ss => ss.asInstanceOf[KeyValueObjectStoreState].kvoss).toList)
 
-        synchronized(hung = true)
+        synchronized {
+          hung = true
+        }
       }
 
       readResult.foreach { _ =>
@@ -203,7 +205,7 @@ object BaseReadDriver {
         bgTasks.shutdown(Duration(0, SECONDS))
         synchronized {
           if (hung) {
-            val test = client.getSystemAttribute("unittest.name").getOrElse("UNKNOWN TEST")
+            val test = this.client.getSystemAttribute("unittest.name").getOrElse("UNKNOWN TEST")
             println(s"**** HUNG READ EVENTUALLY COMPLETED! : $test")
           }
         }

@@ -22,7 +22,7 @@ class IndexedFileContent(file: SimpleFile, osegmentSize: Option[Int]=None, otier
 
   private val fs = file.fs
 
-  def refresh()(implicit ec: ExecutionContext): Future[Unit] = refreshRoot.map(_=>())
+  def refresh()(implicit ec: ExecutionContext): Future[Unit] = refreshRoot().map(_=>())
 
   private def refreshRoot()(implicit ec: ExecutionContext): Future[IndexNode] = {
 

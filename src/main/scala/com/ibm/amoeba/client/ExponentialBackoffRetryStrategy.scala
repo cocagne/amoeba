@@ -37,7 +37,7 @@ class ExponentialBackoffRetryStrategy(client: AmoebaClient, backoffLimit: Int = 
       }
     }
 
-    def retry(retryCount: Int) {
+    def retry(retryCount: Int): Unit = {
       val shouldExit = synchronized { exit }
 
       if (shouldExit)
@@ -91,7 +91,7 @@ class ExponentialBackoffRetryStrategy(client: AmoebaClient, backoffLimit: Int = 
       }
     }
 
-    def retry(retryCount: Int) {
+    def retry(retryCount: Int): Unit = {
       val shouldExit = synchronized { exit }
 
       if (shouldExit)

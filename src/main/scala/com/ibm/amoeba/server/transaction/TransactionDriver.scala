@@ -46,7 +46,9 @@ object TransactionDriver {
         //println(s"**** HUNG TRANSACTION: $test")
         println(s"**** HUNG TRANSACTION")
         printState()
-        synchronized(hung = true)
+        synchronized {
+          hung = true
+        }
       }
 
       override protected def onFinalized(committed: Boolean): Unit = {

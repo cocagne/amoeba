@@ -70,7 +70,7 @@ object YamlFormat {
       case v: java.util.List[_] =>
         val jl = v.asInstanceOf[java.util.List[Object]]
 
-        import collection.JavaConverters._
+        import scala.jdk.CollectionConverters._
         var index = 1
 
         jl.asScala.map { o =>

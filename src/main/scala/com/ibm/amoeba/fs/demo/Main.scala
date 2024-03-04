@@ -72,7 +72,7 @@ object Main {
     System.setProperty("log4j2.configurationFile", s"file:${f.getAbsolutePath}")
   }
 
-  def main(args: Array[String]) {
+  def main(args: Array[String]): Unit = {
     val parser = new scopt.OptionParser[Args]("demo") {
       head("demo", "0.1")
 

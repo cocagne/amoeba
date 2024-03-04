@@ -26,7 +26,7 @@ class TransactionImpl(val client: AmoebaClient,
                       transactionDriverStrategy: Option[ClientTransactionDriver.Factory]) extends Transaction with Logging {
 
   val id: TransactionId = TransactionId(UUID.randomUUID())
-  private [this] val promise = Promise[HLCTimestamp]
+  private [this] val promise = Promise[HLCTimestamp]()
   private [this] var state: Either[HLCTimestamp, TransactionBuilder] = Right(new TransactionBuilder(id, chooseDesignatedLeader, client.clientId))
   private [this] var invalidated = false
   private [this] var havePendingUpdates = false

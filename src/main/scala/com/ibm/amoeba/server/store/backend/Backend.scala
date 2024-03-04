@@ -11,7 +11,7 @@ trait Backend {
 
   def close(): Unit
 
-  def setCompletionHandler(handler: CompletionHandler)
+  def setCompletionHandler(handler: CompletionHandler): Unit
 
   /** Bootstrap-only allocation method. It cannot fail and must return a StorePointer to data committed to disk */
   def bootstrapAllocate(objectId: ObjectId,

@@ -24,7 +24,7 @@ trait ObjectCache {
     *
     * @param objectId Identity of the object for which allocation was aborted
     */
-  def remove(objectId: ObjectId)
+  def remove(objectId: ObjectId): Unit
 }
 
 object ObjectCache {

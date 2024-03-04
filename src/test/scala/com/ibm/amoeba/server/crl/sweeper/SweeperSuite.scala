@@ -58,10 +58,9 @@ class SweeperSuite extends FileBasedTests {
       h.completions.take()
 
     } finally {
-      e: Throwable =>
-        s.shutdown()
-        throw e
+      s.shutdown()
     }
+
 
     val s2 = new Sweeper(tdir.toPath, 1, 4096*3, 5)
     try {
@@ -85,9 +84,7 @@ class SweeperSuite extends FileBasedTests {
       assert(t.paxosAcceptorState == pax)
 
     } finally {
-      e: Throwable =>
-        s2.shutdown()
-        throw e
+      s2.shutdown()
     }
   }
 
@@ -133,9 +130,7 @@ class SweeperSuite extends FileBasedTests {
       h.completions.take()
 
     } finally {
-      e: Throwable =>
-        s.shutdown()
-        throw e
+      s.shutdown()
     }
 
     val s2 = new Sweeper(tdir.toPath, 1, 4096*3, 5)
@@ -174,9 +169,7 @@ class SweeperSuite extends FileBasedTests {
       assert(a.serializedRevisionGuard == oud1)
 
     } finally {
-      e: Throwable =>
         s2.shutdown()
-        throw e
     }
   }
 
@@ -221,9 +214,7 @@ class SweeperSuite extends FileBasedTests {
       h.completions.take()
 
     } finally {
-      e: Throwable =>
-        s.shutdown()
-        throw e
+      s.shutdown()
     }
 
     val s2 = new Sweeper(tdir.toPath, 1, 4096*3, 5)
@@ -262,9 +253,7 @@ class SweeperSuite extends FileBasedTests {
       assert(a.serializedRevisionGuard == oud1)
 
     } finally {
-      e: Throwable =>
-        s2.shutdown()
-        throw e
+      s2.shutdown()
     }
   }
 
@@ -305,9 +294,7 @@ class SweeperSuite extends FileBasedTests {
       h.completions.take()
 
     } finally {
-      e: Throwable =>
-        s.shutdown()
-        throw e
+      s.shutdown()
     }
 
     val s2 = new Sweeper(tdir.toPath, 1, 4096*3, 5)
@@ -332,9 +319,7 @@ class SweeperSuite extends FileBasedTests {
       assert(t.paxosAcceptorState == pax)
 
     } finally {
-      e: Throwable =>
-        s2.shutdown()
-        throw e
+      s2.shutdown()
     }
   }
 
@@ -381,9 +366,7 @@ class SweeperSuite extends FileBasedTests {
       h.completions.take()
 
     } finally {
-      e: Throwable =>
-        s.shutdown()
-        throw e
+      s.shutdown()
     }
 
     val s2 = new Sweeper(tdir.toPath, 1, 4096*3, 5)
@@ -408,9 +391,7 @@ class SweeperSuite extends FileBasedTests {
       assert(t.paxosAcceptorState == pax)
 
     } finally {
-      e: Throwable =>
-        s2.shutdown()
-        throw e
+      s2.shutdown()
     }
   }
 
@@ -458,9 +439,7 @@ class SweeperSuite extends FileBasedTests {
       h.completions.take()
 
     } finally {
-      e: Throwable =>
-        s.shutdown()
-        throw e
+      s.shutdown()
     }
 
     val s2 = new Sweeper(tdir.toPath, 1, 4096*3, 5)
@@ -485,9 +464,7 @@ class SweeperSuite extends FileBasedTests {
       assert(t.paxosAcceptorState == pax)
 
     } finally {
-      e: Throwable =>
-        s2.shutdown()
-        throw e
+      s2.shutdown()
     }
   }
 
@@ -551,9 +528,7 @@ class SweeperSuite extends FileBasedTests {
       h.completions.take()
 
     } finally {
-      e: Throwable =>
-        s.shutdown()
-        throw e
+      s.shutdown()
     }
 
     val s2 = new Sweeper(tdir.toPath, 1, 4096*3, 5)
@@ -578,9 +553,7 @@ class SweeperSuite extends FileBasedTests {
       assert(t.paxosAcceptorState == pax)
 
     } finally {
-      e: Throwable =>
-        s2.shutdown()
-        throw e
+      s2.shutdown()
     }
   }
 }

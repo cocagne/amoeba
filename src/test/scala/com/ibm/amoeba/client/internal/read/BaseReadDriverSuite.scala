@@ -94,7 +94,7 @@ class BaseReadDriverSuite  extends AsyncFunSuite with Matchers {
                readUUID:UUID = readUUID,
                disableOpportunisticRebuild: Boolean = false) = {
     new BaseReadDriver(client, objectPointer, readUUID, disableOpportunisticRebuild) {
-      implicit protected val ec: ExecutionContext = client.clientContext
+      implicit protected val ec: ExecutionContext = this.client.clientContext
     }
   }
 

@@ -58,7 +58,7 @@ trait FileSystem extends Logging {
 
   def lookup(inodeNumber: Long): Future[Option[BaseFile]] = {
     implicit val ec: ExecutionContext = executionContext
-    val p = Promise[Option[BaseFile]]
+    val p = Promise[Option[BaseFile]]()
     inodeTable.lookup(inodeNumber) onComplete {
       case Success(oiptr) =>
         oiptr match {

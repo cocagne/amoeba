@@ -264,7 +264,8 @@ class AmoebaNFS(val fs: FileSystem,
       new DirectoryEntry(name, iptr.number, nfsStat(file), cookie)
     }
 
-    new DirectoryStream(DirectoryStream.ZERO_VERIFIER, asJavaCollection(entries))
+
+    new DirectoryStream(DirectoryStream.ZERO_VERIFIER, scala.jdk.javaapi.CollectionConverters.asJavaCollection(entries))
   }
 
   /**

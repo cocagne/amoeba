@@ -41,7 +41,7 @@ object SimpleFileSystem {
       inodeTableRoot = new Root(0, IntegerKeyOrdering, Some(inodeTableContentRoot), new SinglePoolNodeAllocator(client, taskRoot.poolId) )
       content = Map( FileSystemUUIDKey -> Value(uuid2byte(fileSystemUUID)),
         TaskExecutorRootKey -> Value(taskRoot.toArray),
-        InodeTableRootKey -> Value(inodeTableRoot.encode))
+        InodeTableRootKey -> Value(inodeTableRoot.encode()))
       fsRootPointer <- allocator.allocateKeyValueObject(guard, content)
       _=tx.overwrite(rootDirectory, tx.revision, rootDirInode.toArray) // ensure Tx has an object to modify
       _ <- tx.commit()
