@@ -1,3 +1,12 @@
+# Setting up intellij to use a JDK installed by homebrew:
+# homebrew install openjdk
+# Launch Intellj and open project folder
+# When a JDK is not detected:
+    Go to File -> Project Structure
+    In SDK option, add an SDK
+    Use the following path to the SDK:
+        /opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home
+
 # Building for demo appliction
 # run "sbt pack"
 # then invoke ./target/pack/bin/demo

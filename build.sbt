@@ -50,16 +50,16 @@ lazy val root = (project in file(".")).
     )
   )
   
-testOptions  in Test += Tests.Argument(TestFrameworks.ScalaTest, "-W", "10", "5")
+  Test / testOptions += Tests.Argument(TestFrameworks.ScalaTest, "-W", "10", "5")
 
 //parallelExecution in Test := false
 
 
-sourceGenerators in Compile += Def.task {
-  val base = (sourceManaged in Compile).value
+ Compile / sourceGenerators += Def.task {
+  val base = (Compile / sourceManaged).value
 
   // Network Protocol
-  val net_out_dir = (sourceManaged in Compile).value / "com" / "ibm" / "amoeba" / "common" / "network" / "protocol"
+  val net_out_dir = (Compile / sourceManaged).value / "com" / "ibm" / "amoeba" / "common" / "network" / "protocol"
 
   val net_schema = file("schema") / "network_protocol.fbs"
 
