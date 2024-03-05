@@ -33,7 +33,7 @@ class KeyValueObjectReader(metadataOnly: Boolean, pointer: KeyValueObjectPointer
     if (debug)
       println(s"DEBUG KV Restore Object")
     val storeStates = allStoreStates
-    
+
     val min = if (matchingStoreStates.count(_.kvoss.minimum.nonEmpty) >= threshold)
       matchingStoreStates.find(_.kvoss.minimum.nonEmpty).flatMap(_.kvoss.minimum)
     else

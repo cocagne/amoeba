@@ -91,7 +91,7 @@ class SimpleFileSystem(aclient: AmoebaClient,
 
   override protected val fileFactory: FileFactory = new SimpleFileFactory(writeBufferSize)
 
-  override private[fs] def retryStrategy = new ExponentialBackoffRetryStrategy(client)
+  override private[fs] def retryStrategy: com.ibm.amoeba.client.RetryStrategy = new ExponentialBackoffRetryStrategy(client)
 
   override private[fs] def taskExecutor = executor
 
@@ -103,11 +103,11 @@ class SimpleFileSystem(aclient: AmoebaClient,
 
   override private[fs] def client = aclient
 
-  override private[fs] val executionContext = ExecutionContext.fromExecutorService(sched)
+  override private[fs] val executionContext: scala.concurrent.ExecutionContext = ExecutionContext.fromExecutorService(sched)
 
   override private[fs] def getObjectAllocator(id: ObjectAllocatorId) = Future.successful(defaultAllocator)
 
-  override private[fs] def inodeTable = new SimpleInodeTable(this, defaultAllocator,
+  override private[fs] def inodeTable: com.ibm.amoeba.fs.InodeTable = new SimpleInodeTable(this, defaultAllocator,
     new KVObjectRootManager(client, InodeTableRootKey, fsRoot.pointer))
 
   FileSystem.register(this)
