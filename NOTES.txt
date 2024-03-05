@@ -7,6 +7,9 @@
     Use the following path to the SDK:
         /opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home
 
+# Run single test. Where "min/max" identifies a test containing this substring
+sbt 'testOnly *KeyValueObjectReaderSuite -- -z min/max'
+
 # Building for demo appliction
 # run "sbt pack"
 # then invoke ./target/pack/bin/demo
