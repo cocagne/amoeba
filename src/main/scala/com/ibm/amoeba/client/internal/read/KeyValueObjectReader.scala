@@ -33,9 +33,16 @@ class KeyValueObjectReader(metadataOnly: Boolean, pointer: KeyValueObjectPointer
     if (debug)
       println(s"DEBUG KV Restore Object")
     val storeStates = allStoreStates
+    
+    val min = if (matchingStoreStates.count(_.kvoss.minimum.nonEmpty) >= threshold)
+      matchingStoreStates.find(_.kvoss.minimum.nonEmpty).flatMap(_.kvoss.minimum)
+    else
+      None
 
-    val min = matchingStoreStates.head.kvoss.minimum
-    val max = matchingStoreStates.head.kvoss.maximum
+    val max = if (matchingStoreStates.count(_.kvoss.maximum.nonEmpty) >= threshold)
+      matchingStoreStates.find(_.kvoss.maximum.nonEmpty).flatMap(_.kvoss.maximum)
+    else
+      None
 
     val left = if (matchingStoreStates.head.kvoss.left.nonEmpty) {
       val lleft = matchingStoreStates.flatMap { ss => ss.kvoss.left.map(v => ss.storeId.poolIndex -> v.bytes) }
