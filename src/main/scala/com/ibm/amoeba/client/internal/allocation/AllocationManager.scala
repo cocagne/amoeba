@@ -76,10 +76,8 @@ class AllocationManager( val client: AmoebaClient,
 
     val encodedContent = objectIDA.encode(initialContent)
 
-    objectSize.foreach { max =>
-      if ( encodedContent(0).size > max )
-        return Future.failed(AllocationError(pool.poolId))
-    }
+    if (objectSize.exists(encodedContent(0).size > _))
+      Future.failed(AllocationError(pool.poolId))
 
     allocate(client, transaction, pool, objectSize, objectIDA, encodedContent, ObjectType.Data,
       initialRefcount, revisionGuard)
@@ -105,10 +103,8 @@ class AllocationManager( val client: AmoebaClient,
 
     val encodedContent = KVObjectState.encodeIDA(objectIDA, minimum, maximum, left, right, contents)
 
-    objectSize.foreach { max =>
-      if ( encodedContent(0).size > max )
-        return Future.failed(AllocationError(pool.poolId))
-    }
+    if (objectSize.exists(encodedContent(0).size > _))
+      return Future.failed(AllocationError(pool.poolId))
 
     allocate(client, transaction, pool, objectSize, objectIDA, encodedContent, ObjectType.KeyValue,
       initialRefcount, revisionGuard)

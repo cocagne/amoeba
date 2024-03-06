@@ -7,7 +7,8 @@ import com.ibm.amoeba.common.objects.{Metadata, ObjectId, ObjectRefcount, Object
 import com.ibm.amoeba.common.store.StorePointer
 import com.ibm.amoeba.common.transaction.TransactionId
 import com.ibm.amoeba.server.store.cache.SimpleLRUObjectCache
-import org.scalatest.{FunSuite, Matchers}
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers
 
 object SimpleLRUObjectCacheSuite {
 
@@ -61,7 +62,7 @@ object SimpleLRUObjectCacheSuite {
   }
 }
 
-class SimpleLRUObjectCacheSuite extends FunSuite with Matchers {
+class SimpleLRUObjectCacheSuite extends AnyFunSuite with Matchers {
   import SimpleLRUObjectCacheSuite._
 
   test("Max size") {

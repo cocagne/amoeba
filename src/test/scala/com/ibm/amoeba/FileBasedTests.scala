@@ -2,9 +2,13 @@ package com.ibm.amoeba
 
 import java.io.File
 
-import org.scalatest.{BeforeAndAfter, FunSuite, Matchers}
+import org.scalatest.BeforeAndAfter
 
-class FileBasedTests extends FunSuite with Matchers with BeforeAndAfter {
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers
+
+
+class FileBasedTests extends AnyFunSuite with Matchers with BeforeAndAfter {
   var tdir:File = _
   var tdirMgr: TempDirManager = _
 

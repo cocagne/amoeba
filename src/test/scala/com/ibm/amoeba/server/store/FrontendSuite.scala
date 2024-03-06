@@ -15,7 +15,8 @@ import com.ibm.amoeba.server.network.Messenger
 import com.ibm.amoeba.server.store.backend.MapBackend
 import com.ibm.amoeba.server.store.cache.SimpleLRUObjectCache
 import com.ibm.amoeba.server.transaction.TransactionStatusCache
-import org.scalatest.{FunSuite, Matchers}
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers
 
 object FrontendSuite {
 
@@ -77,7 +78,7 @@ object FrontendSuite {
   }
 }
 
-class FrontendSuite extends FunSuite with Matchers {
+class FrontendSuite extends AnyFunSuite with Matchers {
   import FrontendSuite._
 
   test("Allocation") {

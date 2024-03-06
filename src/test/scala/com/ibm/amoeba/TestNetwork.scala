@@ -135,7 +135,6 @@ object TestNetwork {
       case m: TransactionResolved => txManager.receive(m)
       case m: TransactionFinalized => txManager.receive(m)
       case m: AllocateResponse => allocationManager.receive(m)
-      case _ =>
     }
 
     def getSystemAttribute(key: String): Option[String] = attributes.get(key)

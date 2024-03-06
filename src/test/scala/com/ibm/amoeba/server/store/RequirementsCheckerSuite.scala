@@ -9,7 +9,8 @@ import com.ibm.amoeba.common.pool.PoolId
 import com.ibm.amoeba.common.store.StorePointer
 import com.ibm.amoeba.common.transaction.KeyValueUpdate.{FullContentLock, KeyRevision}
 import com.ibm.amoeba.common.transaction.{ContentMismatch, DataUpdate, DataUpdateOperation, KeyExistenceError, KeyValueUpdate, LocalTimeError, LocalTimeRequirement, MissingObjectUpdate, RefcountMismatch, RefcountUpdate, RequirementError, RevisionLock, RevisionMismatch, TransactionCollision, TransactionId, VersionBump, WithinRangeError}
-import org.scalatest.{FunSuite, Matchers}
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers
 
 import scala.collection.immutable.HashMap
 
@@ -31,7 +32,7 @@ object RequirementsCheckerSuite {
   val kp1 = new KeyValueObjectPointer(oid1, PoolId(new UUID(0,0)), None, Replication(1,1), Array())
 }
 
-class RequirementsCheckerSuite extends FunSuite with Matchers {
+class RequirementsCheckerSuite extends AnyFunSuite with Matchers {
 
   import RequirementsCheckerSuite._
 

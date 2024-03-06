@@ -15,7 +15,6 @@ import org.dcache.nfs.v4.{NfsIdMapping, SimpleIdMap}
 import org.dcache.nfs.v4.xdr.nfsace4
 import org.dcache.nfs.vfs.{AclCheckable, DirectoryEntry, DirectoryStream, FsStat, Inode, Stat, VirtualFileSystem}
 
-import scala.collection.JavaConverters.asJavaCollection
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration.Duration
 
@@ -264,8 +263,9 @@ class AmoebaNFS(val fs: FileSystem,
       new DirectoryEntry(name, iptr.number, nfsStat(file), cookie)
     }
 
+    import scala.jdk.CollectionConverters._
 
-    new DirectoryStream(DirectoryStream.ZERO_VERIFIER, scala.jdk.javaapi.CollectionConverters.asJavaCollection(entries))
+    new DirectoryStream(DirectoryStream.ZERO_VERIFIER, entries.asJavaCollection)
   }
 
   /**

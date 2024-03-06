@@ -5,9 +5,10 @@ import java.util.UUID
 import com.ibm.amoeba.common.HLCTimestamp
 import com.ibm.amoeba.common.objects.{Key, ObjectRevision, Value}
 import com.ibm.amoeba.common.transaction.TransactionId
-import org.scalatest.{FunSuite, Matchers}
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers
 
-class KVObjectStateSuite extends FunSuite with Matchers {
+class KVObjectStateSuite extends AnyFunSuite with Matchers {
   test("Empty Object") {
     val kv = new KVObjectState(None, None, None, None, Map(), Map())
     val db = kv.encode()

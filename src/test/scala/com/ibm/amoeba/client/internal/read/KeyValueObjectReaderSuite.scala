@@ -13,7 +13,9 @@ import com.ibm.amoeba.common.pool.PoolId
 import com.ibm.amoeba.common.store.StoreId
 import com.ibm.amoeba.common.transaction.TransactionId
 import com.ibm.amoeba.server.store.{KVObjectState, ValueState => StoreValueState}
-import org.scalatest.{Assertion, FunSuite, Matchers}
+import org.scalatest.Assertion
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers
 
 object KeyValueObjectReaderSuite {
   val pool = PoolId(new UUID(0,1))
@@ -113,7 +115,6 @@ object KeyValueObjectReaderSuite {
         case o: SetLeft => left = Some(Value(o.value))
         case o: SetRight => right = Some(Value(o.value))
         case o: Insert => contents += o.key -> new StoreValueState(Value(o.value), o.revision.get, o.timestamp.get, None)
-        case _ =>
       }
 
       val odata = if (ops.isEmpty) None else {
@@ -137,7 +138,7 @@ object KeyValueObjectReaderSuite {
   }
 }
 
-class KeyValueObjectReaderSuite extends FunSuite with Matchers {
+class KeyValueObjectReaderSuite extends AnyFunSuite with Matchers {
   import KeyValueObjectReaderSuite._
 
   test("Resolve empty object") {

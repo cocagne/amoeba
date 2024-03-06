@@ -75,7 +75,7 @@ class TieredKeyValueList(val client: AmoebaClient,
       }
     }
 
-   rootManager.getRootNode().flatMap { t =>
+    rootManager.getRootNode().flatMap { t =>
       val (tier, ordering, oroot) = t
       oroot match {
         case None => empty(tier, ordering)

@@ -21,7 +21,7 @@ lazy val root = (project in file(".")).
     scalaVersion := "3.3.3",
     organization := "com.ibm",
       
-    scalacOptions ++= Seq("-feature", "-deprecation", "-rewrite", "-source:3.0-migration"),
+    scalacOptions ++= Seq("-feature", "-deprecation"), //, "-rewrite", "-source:3.0-migration"),
 
     resolvers += "mvnrepository" at "https://mvnrepository.com/artifact/",
     

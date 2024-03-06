@@ -13,6 +13,7 @@ import org.apache.logging.log4j.scala.Logging
 
 import scala.concurrent.duration.{Duration, SECONDS}
 import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.util.boundary, boundary.break
 
 object TransactionDriver {
 
@@ -220,37 +221,46 @@ abstract class TransactionDriver(
           if (proposer.prepareQuorumReached && !proposer.haveLocalProposal) {
 
             var canCommitTransaction = true
+            var cantAttempt = false
 
             // Before we can make a decision, we must ensure that we have a write-threshold number of replies for
             // each of the objects referenced by the transaction
-            for (ptr <- allObjects) {
-              var nReplies = 0
-              var nAbortVotes = 0
-              var nCommitVotes = 0
-              var canCommitObject = true
+            boundary:
+              for (ptr <- allObjects) {
+                var nReplies = 0
+                var nAbortVotes = 0
+                var nCommitVotes = 0
+                var canCommitObject = true
 
-              ptr.storePointers.foreach(sp => peerDispositions.get(StoreId(ptr.poolId, sp.poolIndex)).foreach(disposition => {
-                nReplies += 1
-                disposition match {
-                  case TransactionDisposition.VoteCommit => nCommitVotes += 1
-                  case _ =>
-                    // TODO: We can be quite a bit smarter about choosing when we must abort
-                    nAbortVotes += 1
+                ptr.storePointers.foreach(sp => peerDispositions.get(StoreId(ptr.poolId, sp.poolIndex)).foreach(disposition => {
+                  nReplies += 1
+                  disposition match {
+                    case TransactionDisposition.VoteCommit => nCommitVotes += 1
+                    case _ =>
+                      // TODO: We can be quite a bit smarter about choosing when we must abort
+                      nAbortVotes += 1
+                  }
+                }))
+
+                if (nReplies < ptr.ida.writeThreshold) {
+                  cantAttempt = true
+                  break()
                 }
-              }))
 
-              if (nReplies < ptr.ida.writeThreshold)
-                return
+                if (nReplies != ptr.ida.width && nCommitVotes < ptr.ida.writeThreshold && ptr.ida.width - nAbortVotes >= ptr.ida.writeThreshold) {
+                  cantAttempt = true
+                  break()
+                }
 
-              if (nReplies != ptr.ida.width && nCommitVotes < ptr.ida.writeThreshold && ptr.ida.width - nAbortVotes >= ptr.ida.writeThreshold)
-                return
+                if (ptr.ida.width - nAbortVotes < ptr.ida.writeThreshold)
+                  canCommitObject = false
 
-              if (ptr.ida.width - nAbortVotes < ptr.ida.writeThreshold)
-                canCommitObject = false
+                // Once canCommitTransaction flips to false, it stays there
+                canCommitTransaction = canCommitTransaction && canCommitObject
+              }
 
-              // Once canCommitTransaction flips to false, it stays there
-              canCommitTransaction = canCommitTransaction && canCommitObject
-            }
+            if (cantAttempt)
+              return
 
             // If we get here, we've made our decision
             proposer.setLocalProposal(canCommitTransaction)

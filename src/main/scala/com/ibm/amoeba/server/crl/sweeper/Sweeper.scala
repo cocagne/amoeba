@@ -17,6 +17,8 @@ import org.apache.logging.log4j.scala.Logging
 import scala.annotation.tailrec
 import scala.collection.immutable.{HashMap, HashSet}
 
+import scala.util.boundary, boundary.break
+
 object Sweeper {
   def createLogFile(directory: Path, fileId: FileId, maxSize: Long): LogFile = {
     new LogFile(directory.resolve(s"${fileId.number}"), fileId, maxSize)
@@ -360,12 +362,21 @@ class Sweeper(directory: Path,
     val rfiles = files.sortBy(f => f.findLastValidEntry().
       getOrElse((LogEntrySerialNumber(0), 0))._1.number).reverse.toList
 
-    for (f <- rfiles) {
-      try {
-        return loadState(f)
-      } catch {
-        case e: CorruptedEntry => logger.warn(s"Corrupted CRL Entry: ${e.getMessage}")
+    var fstate: Option[RecoveringState] = None
+
+    boundary:
+      for (f <- rfiles) {
+        try {
+          fstate = Some(loadState(f))
+          break()
+        } catch {
+          case e: CorruptedEntry => logger.warn(s"Corrupted CRL Entry: ${e.getMessage}")
+        }
       }
+
+    fstate match {
+      case Some(f) => return f
+      case None =>
     }
     new RecoveringState
   }

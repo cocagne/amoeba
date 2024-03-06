@@ -15,7 +15,7 @@ class IndexedFileContentSuite extends FilesSystemTestSuite {
 
     fdir <- rootDir.prepareCreateFile("foo", mode=0, uid=1, gid=2)(tx)
 
-    _=tx.commit()
+    _ <- tx.commit()
 
     newFilePointer <- fdir
 

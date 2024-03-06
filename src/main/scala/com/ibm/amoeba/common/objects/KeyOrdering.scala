@@ -26,15 +26,17 @@ object ByteArrayKeyOrdering extends KeyOrdering {
   override def compare(a: Key, b: Key): Int = {
     if (b.bytes.length == 0 && a.bytes.length != 0) return 1
 
+    var result = 0 // a and b are the same length and have matching content
+
     for (i <- a.bytes.indices) {
-      if (i > b.bytes.length-1) return 1 // a is longer than b and all preceeding bytes are equal
-      if (a.bytes(i) < b.bytes(i)) return -1 // a is less than b
-      if (a.bytes(i) > b.bytes(i)) return 1  // a is greater than b
+      if (i > b.bytes.length-1) result = 1 // a is longer than b and all preceeding bytes are equal
+      if (a.bytes(i) < b.bytes(i)) result = -1 // a is less than b
+      if (a.bytes(i) > b.bytes(i)) result = 1  // a is greater than b
     }
 
-    if (b.bytes.length > a.bytes.length) return -1 // b is longer than a and all preceeding bytes are equal
+    if (b.bytes.length > a.bytes.length) result = -1 // b is longer than a and all preceeding bytes are equal
 
-    0 // a and b are the same length and have matching content
+    result
   }
 }
 

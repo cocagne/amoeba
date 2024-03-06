@@ -4,7 +4,9 @@ import java.util.concurrent.TimeoutException
 
 import com.ibm.amoeba.client.AmoebaClient
 import com.ibm.amoeba.common.objects.KeyValueObjectPointer
-import org.scalatest.{AsyncFunSuite, BeforeAndAfter, FutureOutcome, Matchers}
+import org.scalatest.{BeforeAndAfter, FutureOutcome}
+import org.scalatest.funsuite.AsyncFunSuite
+import org.scalatest.matchers.should.Matchers
 
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration.{Duration, MILLISECONDS}

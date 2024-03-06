@@ -10,7 +10,8 @@ import com.ibm.amoeba.common.objects.{DataObjectPointer, ObjectId, ObjectRefcoun
 import com.ibm.amoeba.common.pool.PoolId
 import com.ibm.amoeba.common.store.StoreId
 import com.ibm.amoeba.common.transaction.TransactionId
-import org.scalatest.{FunSuite, Matchers}
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers
 
 object DataObjectReaderSuite {
   
@@ -72,7 +73,7 @@ object DataObjectReaderSuite {
 
 }
 
-class DataObjectReaderSuite extends FunSuite with Matchers {
+class DataObjectReaderSuite extends AnyFunSuite with Matchers {
   import DataObjectReaderSuite._
   /*
   final case class ReadResponse(

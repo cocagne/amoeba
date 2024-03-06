@@ -58,10 +58,14 @@ sealed abstract class ObjectPointer(
   def getEncodedDataIndexForStore(storeId: StoreId): Option[Int] = {
     if (storeId.poolId != poolId)
       return None
+
+    var result: Option[Int] = None
+
     for (i <- storePointers.indices)
       if (storePointers(i).poolIndex == storeId.poolIndex)
-        return Some(i)
-    None
+        result = Some(i)
+
+    result
   }
 
   def objectType: ObjectType.Value

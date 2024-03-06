@@ -1,8 +1,10 @@
 package com.ibm.amoeba.common.paxos
 
 import org.scalatest._
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers
 
-class ProposerSuite extends FunSuite with Matchers {
+class ProposerSuite extends AnyFunSuite with Matchers {
   test("Update Proposal ID") {
 	  val p = new Proposer(0, 3, 2)
 	  

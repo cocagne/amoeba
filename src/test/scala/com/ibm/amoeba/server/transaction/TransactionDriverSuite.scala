@@ -11,7 +11,8 @@ import com.ibm.amoeba.common.store.{StoreId, StorePointer}
 import com.ibm.amoeba.common.transaction.{DataUpdate, DataUpdateOperation, RefcountUpdate, TransactionDescription, TransactionDisposition, TransactionId}
 import com.ibm.amoeba.common.util.BackgroundTask.NoBackgroundTasks
 import com.ibm.amoeba.server.network.Messenger
-import org.scalatest.{FunSuite, Matchers}
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers
 
 import scala.concurrent.{Future, Promise}
 
@@ -82,7 +83,7 @@ object TransactionDriverSuite {
 
 }
 
-class TransactionDriverSuite extends FunSuite with Matchers {
+class TransactionDriverSuite extends AnyFunSuite with Matchers {
 
   import TransactionDriverSuite._
 
