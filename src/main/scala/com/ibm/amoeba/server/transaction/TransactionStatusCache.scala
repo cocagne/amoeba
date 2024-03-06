@@ -3,13 +3,13 @@ package com.ibm.amoeba.server.transaction
 import com.github.blemale.scaffeine.{Cache, Scaffeine}
 import com.ibm.amoeba.common.transaction.{TransactionId, TransactionStatus}
 
-import scala.concurrent.duration.{Duration, SECONDS}
+import scala.concurrent.duration.{Duration, FiniteDuration, SECONDS}
 
 object TransactionStatusCache {
   case class Entry(status: TransactionStatus.Value, finalized: Boolean)
 }
 
-class TransactionStatusCache(cacheDuration: Duration = Duration(30, SECONDS)) {
+class TransactionStatusCache(cacheDuration: FiniteDuration = FiniteDuration(30, SECONDS)) {
   import TransactionStatusCache._
 
   private val cache: Cache[TransactionId,Entry] = Scaffeine()

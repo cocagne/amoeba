@@ -4,7 +4,7 @@ import com.github.blemale.scaffeine.{Cache, Scaffeine}
 import com.ibm.amoeba.common.store.StoreId
 import com.ibm.amoeba.common.transaction.TransactionId
 
-import scala.concurrent.duration.{Duration, SECONDS}
+import scala.concurrent.duration.{Duration, FiniteDuration, SECONDS}
 
 object TransactionStatusCache {
   private sealed abstract class TxStatus
@@ -25,7 +25,7 @@ object TransactionStatusCache {
   }
 }
 
-class TransactionStatusCache(cacheDuration: Duration = Duration(30, SECONDS)) {
+class TransactionStatusCache(cacheDuration: FiniteDuration = FiniteDuration(30, SECONDS)) {
 
   import TransactionStatusCache._
 

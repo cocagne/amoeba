@@ -85,12 +85,12 @@ object Varint {
     var i = 0
     var v = 0
     var read = 0
-    do {
+    while ({ {
       read = bb.get
       v |= (read & 0x7F) << i
       i += 7
       if (i > 35) throw new VarintEncodingError
-    } while((read & 0x80) != 0)
+    } ;(read & 0x80) != 0}) ()
     v
   }
 
@@ -109,12 +109,12 @@ object Varint {
     var i = 0
     var v = 0L
     var read = 0L
-    do {
+    while ({ {
       read = bb.get
       v |= (read & 0x7F) << i
       i += 7
       if (i > 70) throw new VarintEncodingError
-    } while((read & 0x80L) != 0)
+    } ;(read & 0x80L) != 0}) ()
     v
   }
 }

@@ -29,14 +29,14 @@ class BackgroundTaskPool extends BackgroundTask {
   }
 
   def schedule(delay: Duration)(fn: => Unit): ScheduledTask = synchronized {
-    BGTask(sched.schedule(new Runnable { override def run(): Unit = fn }, delay.length, delay.unit))
+    BGTask(sched.schedule( () => fn , delay.length, delay.unit))
   }
 
   def scheduleRandomlyWithinWindow(window: Duration)(fn: => Unit): ScheduledTask = synchronized {
     // TODO: Fix Long -> Int conversion
     val actualDelay = rand.nextInt(window.length.asInstanceOf[Int])
 
-    BGTask(sched.schedule(new Runnable { override def run(): Unit = fn }, actualDelay, window.unit))
+    BGTask(sched.schedule(() => fn, actualDelay, window.unit))
   }
 
   /** initialDelay uses the same units as the period

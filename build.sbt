@@ -18,10 +18,10 @@ lazy val root = (project in file(".")).
   settings(
     name         := "amoeba",
     version      := "0.1",
-    scalaVersion := "2.13.13",
+    scalaVersion := "3.3.3",
     organization := "com.ibm",
       
-    scalacOptions ++= Seq("-feature", "-deprecation"),
+    scalacOptions ++= Seq("-feature", "-deprecation", "-rewrite", "-source:3.0-migration"),
 
     resolvers += "mvnrepository" at "https://mvnrepository.com/artifact/",
     
@@ -30,10 +30,10 @@ lazy val root = (project in file(".")).
     resolvers += "sonatype-nexus-snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
 
     libraryDependencies ++= Seq(
-      "org.scalatest"                    %% "scalatest"               % "3.0.8" % "test",
-      "com.github.blemale"               %% "scaffeine"               % "3.1.0" % "compile",
+      "org.scalatest"                    %% "scalatest"               % "3.2.18" % "test",
+      "com.github.blemale"               %% "scaffeine"               % "5.2.1" % "compile",
       "org.rocksdb"                      %  "rocksdbjni"              % "6.3.6",
-      "com.github.scopt"                 %% "scopt"                   % "4.0.0-RC2",
+      "com.github.scopt"                 %% "scopt"                   % "4.1.0",
       "io.netty"                         %  "netty-all"               % "4.1.43.Final",
       "org.apache.logging.log4j"         %  "log4j-api"               % "2.22.0",
       "org.apache.logging.log4j"         %  "log4j-core"              % "2.22.0",

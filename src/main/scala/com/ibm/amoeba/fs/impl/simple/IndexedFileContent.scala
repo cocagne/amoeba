@@ -504,7 +504,7 @@ class IndexedFileContent(file: SimpleFile, osegmentSize: Option[Int]=None, otier
               val (wb, rb) = toWrite.head.split(bb.limit() - objOffset)
               (wb, rb :: toWrite.tail)
             } else {
-              DataBuffer.compact(nwrite, toWrite)
+              DataBuffer.compact(nwrite.asInstanceOf[Int], toWrite)
             }
 
             bb.position(objOffset)
@@ -514,7 +514,7 @@ class IndexedFileContent(file: SimpleFile, osegmentSize: Option[Int]=None, otier
             tx.note(s"IndexedFileContent - updateContiguousRange(segment=${dos.pointer.id}, nbytes=${bb.remaining()})")
             tx.overwrite(dos.pointer, dos.revision, bb)
 
-            rupdate(writeOffset + nwrite, remaining, elist.tail)
+            rupdate(writeOffset + nwrite.asInstanceOf[Int], remaining, elist.tail)
           }
         }
 

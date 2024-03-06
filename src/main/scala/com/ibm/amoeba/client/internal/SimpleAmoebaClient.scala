@@ -14,13 +14,13 @@ import com.ibm.amoeba.common.pool.PoolId
 import com.ibm.amoeba.common.util.{BackgroundTask, BackgroundTaskPool}
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.concurrent.duration.{Duration, MILLISECONDS}
+import scala.concurrent.duration.{Duration, FiniteDuration, MILLISECONDS}
 
 class SimpleAmoebaClient(val msngr: ClientMessenger,
                          override val clientId: ClientId,
                          implicit val executionContext: ExecutionContext,
                          val nucleus: KeyValueObjectPointer,
-                         txStatusCacheDuration: Duration,
+                         txStatusCacheDuration: FiniteDuration,
                          initialReadDelay: Duration,
                          maxReadDelay: Duration,
                          txRetransmitDelay: Duration,
@@ -83,7 +83,6 @@ class SimpleAmoebaClient(val msngr: ClientMessenger,
     case m: TransactionResolved => txManager.receive(m)
     case m: TransactionFinalized => txManager.receive(m)
     case m: AllocateResponse => allocationManager.receive(m)
-    case _ =>
   }
 
   def getSystemAttribute(key: String): Option[String] = attributes.get(key)
