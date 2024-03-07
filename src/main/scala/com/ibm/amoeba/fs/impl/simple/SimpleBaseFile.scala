@@ -196,8 +196,8 @@ abstract class SimpleBaseFile(val pointer: InodePointer,
   private[this] def executeOp(op: FileOperation): Unit = {
 
     def onCommitFailure(foo: Throwable): Future[Unit] = {
-      println(s"OnCommitFailure: $foo")
-      foo.printStackTrace()
+      //println(s"OnCommitFailure: $foo")
+      //foo.printStackTrace()
       refresh().recover {
         case err: InvalidObject => throw StopRetrying(err) // Only InvalidObject should cause a read failure, which means the object has been deleted
         case err =>

@@ -82,11 +82,14 @@ object Bootstrap {
         Key(poolTreeRoot.id.uuid) -> poolTreeRoot.toArray,
         Key(nucleus.id.uuid) -> nucleus.toArray
       ))
-      println(s"ErrorTreeRoot: ${errTreeRoot.id.uuid}")
-      println(s"AllocTreeRoot: ${allocTreeRoot.id.uuid}")
-      println(s"Nucleus Pool : ${pool.id.uuid}")
-      println(s"PoolTreeRoot : ${poolTreeRoot.id.uuid}")
-      println(s"Nucleus      : ${nucleus.id.uuid}")
+
+      if false then
+        println(s"ErrorTreeRoot: ${errTreeRoot.id.uuid}")
+        println(s"AllocTreeRoot: ${allocTreeRoot.id.uuid}")
+        println(s"Nucleus Pool : ${pool.id.uuid}")
+        println(s"PoolTreeRoot : ${poolTreeRoot.id.uuid}")
+        println(s"Nucleus      : ${nucleus.id.uuid}")
+
       nucleus
     }
 

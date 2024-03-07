@@ -4,7 +4,11 @@ import com.ibm.amoeba.client.internal.allocation.SinglePoolObjectAllocator
 import com.ibm.amoeba.common.objects.ObjectRevisionGuard
 import com.ibm.amoeba.fs.{DirectoryInode, DirectoryPointer, FileInode, FileType}
 
+import scala.concurrent.Future
+
 class SimpleFileSystemTestSuite extends FilesSystemTestSuite {
+
+  def async_sleep(msec: Int): Future[Unit] = Future {Thread.sleep(msec)}
 
   test("Load root directory pointer") {
     for {
@@ -57,6 +61,7 @@ class SimpleFileSystemTestSuite extends FilesSystemTestSuite {
       tx = client.newTransaction()
       _ = dir.prepareHardLink()(tx)
       _ <- tx.commit()
+      _ <- async_sleep(1) // Cached Inode is updated via a .foreach on the commit future so we need to wait a bit
       nlinks2 = dir.links
     } yield {
       rootInode.fileType should be (FileType.Directory)

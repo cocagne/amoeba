@@ -43,7 +43,7 @@ object AllocationFinalizationAction extends RegisteredTypeFactory with Finalizat
     bb.order(ByteOrder.BIG_ENDIAN)
     val newObject = ObjectPointer.fromByteBuffer(bb)
 
-    println(s"****************** CRATED ALLOC FA for ${newObject.id}")
+    //println(s"****************** CRATED ALLOC FA for ${newObject.id}")
 
     new AllocationFinalizationAction(client, newObject)
   }
