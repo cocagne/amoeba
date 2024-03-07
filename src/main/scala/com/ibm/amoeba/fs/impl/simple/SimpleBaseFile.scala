@@ -196,6 +196,8 @@ abstract class SimpleBaseFile(val pointer: InodePointer,
   private[this] def executeOp(op: FileOperation): Unit = {
 
     def onCommitFailure(foo: Throwable): Future[Unit] = {
+      println(s"OnCommitFailure: $foo")
+      foo.printStackTrace()
       refresh().recover {
         case err: InvalidObject => throw StopRetrying(err) // Only InvalidObject should cause a read failure, which means the object has been deleted
         case err =>
@@ -236,7 +238,7 @@ abstract class SimpleBaseFile(val pointer: InodePointer,
       retryCount += 1
 
       if (retryCount % 10 == 0)
-        println(s"Slow/Hung write. Retry count: $retryCount")
+        println(s"Slow/Hung write. Retry count: $retryCount. ${op.getClass.getSimpleName}: ${op.toString}")
 
       attempt() map { t =>
         synchronized {

@@ -58,7 +58,7 @@ class IndexedFileContent(file: SimpleFile, osegmentSize: Option[Int]=None, otier
   private val segmentSize = osegmentSize.getOrElse(fs.defaultSegmentSize)
 
   def getSegmentOffset(offset: Long): SegmentOffset = {
-    val offsetWithinSegment = (offset % segmentSize).asInstanceOf[Int]
+    val offsetWithinSegment = (offset % segmentSize).toInt
     SegmentOffset(offset - offsetWithinSegment, offsetWithinSegment)
   }
 
@@ -147,14 +147,14 @@ class IndexedFileContent(file: SimpleFile, osegmentSize: Option[Int]=None, otier
                 val bufferOffset = if (doffset <= offset)
                   0
                 else
-                  (doffset - offset).asInstanceOf[Int]
+                  (doffset - offset).toInt
 
                 try {
 
                   if (bufferOffset < nbytes) {
                     if (doffset + rawdb.size > offset) {
                       logger.info(s"*** lslice doffset $doffset offset $offset rawdb.size ${rawdb.size} lslice ${offset - doffset}")
-                      val lslice = if (doffset < offset) rawdb.slice((offset - doffset).asInstanceOf[Int]) else rawdb
+                      val lslice = if (doffset < offset) rawdb.slice((offset - doffset).toInt) else rawdb
                       logger.info(s"*** trim bufferOffset $bufferOffset lslice.size ${lslice.size} nbytes $nbytes nbytes-bufferOffset ${nbytes - bufferOffset}")
                       val trimmed = if (bufferOffset + lslice.size > nbytes) lslice.slice(0, nbytes - bufferOffset) else lslice
                       logger.info(s"*** bb.position($bufferOffset)")
@@ -177,7 +177,7 @@ class IndexedFileContent(file: SimpleFile, osegmentSize: Option[Int]=None, otier
     }
   }
 
-  def debugReadFully()(implicit ec: ExecutionContext): Future[Array[Byte]] = read(0, file.inode.size.asInstanceOf[Int]).map {
+  def debugReadFully()(implicit ec: ExecutionContext): Future[Array[Byte]] = read(0, file.inode.size.toInt).map {
     case None => new Array[Byte](0)
     case Some(db) => db.getByteArray
   }
@@ -227,7 +227,7 @@ class IndexedFileContent(file: SimpleFile, osegmentSize: Option[Int]=None, otier
     val nbytes = buffers.foldLeft(0)((sz, db) => sz + db.size)
     val writeEnd = offset + nbytes
     val segmentEnd = segmentOffset + segmentSize
-    val offsetInSegment = (offset - segmentOffset).asInstanceOf[Int]
+    val offsetInSegment = (offset - segmentOffset).toInt
 
     if (offset >= segmentEnd) {
       (data, buffers, offset)
@@ -249,14 +249,14 @@ class IndexedFileContent(file: SimpleFile, osegmentSize: Option[Int]=None, otier
       val objectSize = if (writeEnd >= segmentEnd)
         segmentSize
       else if (writeEnd > segmentOffset + data.size)
-        (writeEnd - segmentOffset).asInstanceOf[Int]
+        (writeEnd - segmentOffset).toInt
       else
         data.size
 
       val bb = ByteBuffer.allocate(objectSize)
 
       if (offset != segmentOffset)
-        bb.put(data.slice(0, (offset - segmentOffset).asInstanceOf[Int]))
+        bb.put(data.slice(0, (offset - segmentOffset).toInt))
 
       val (overwriteBuff, remaining) = DataBuffer.compact(bb.remaining(), buffers)
       bb.put(overwriteBuff)
@@ -490,21 +490,21 @@ class IndexedFileContent(file: SimpleFile, osegmentSize: Option[Int]=None, otier
 
             val (d, _, dos) = elist.head
             val nleft = toWrite.foldLeft(0)((sz, db) => sz + db.size)
-            val objOffset = (writeOffset - d.offset).asInstanceOf[Int]
-            val objSize = if (objOffset + nleft > dos.data.size) {
+            val objOffset = (writeOffset - d.offset).toInt
+            val objSize: Long = if (objOffset + nleft > dos.data.size) {
               if (objOffset + nleft > segmentSize) segmentSize else objOffset + nleft
             } else
               dos.size
 
-            val bb = ByteBuffer.allocate(objSize.asInstanceOf[Int])
+            val bb = ByteBuffer.allocate(objSize.toInt)
             bb.put(dos.data)
 
-            val nwrite = if (objOffset + nleft < segmentSize) nleft else segmentSize - objOffset
+            val nwrite: Long = if (objOffset + nleft < segmentSize) nleft else segmentSize - objOffset
             val (writeBuff, remaining) = if (objOffset + toWrite.head.size > bb.limit()) {
               val (wb, rb) = toWrite.head.split(bb.limit() - objOffset)
               (wb, rb :: toWrite.tail)
             } else {
-              DataBuffer.compact(nwrite.asInstanceOf[Int], toWrite)
+              DataBuffer.compact(nwrite.toInt, toWrite)
             }
 
             bb.position(objOffset)
@@ -514,7 +514,7 @@ class IndexedFileContent(file: SimpleFile, osegmentSize: Option[Int]=None, otier
             tx.note(s"IndexedFileContent - updateContiguousRange(segment=${dos.pointer.id}, nbytes=${bb.remaining()})")
             tx.overwrite(dos.pointer, dos.revision, bb)
 
-            rupdate(writeOffset + nwrite.asInstanceOf[Int], remaining, elist.tail)
+            rupdate(writeOffset + nwrite.toInt, remaining, elist.tail)
           }
         }
 
@@ -543,7 +543,7 @@ class IndexedFileContent(file: SimpleFile, osegmentSize: Option[Int]=None, otier
         }
         else if (!entryContains(entries.head._1, offset)) {
           // Write begins with an allocation in a hole and extends over at least one object.
-          val allocSize = (entries.head._1.offset - offset).asInstanceOf[Int]
+          val allocSize = (entries.head._1.offset - offset).toInt
 
           val (alloc, remaining) = DataBuffer.compact(allocSize, buffers)
 
@@ -804,7 +804,7 @@ object IndexedFileContent {
             path.head.index.read(d.pointer).map { dos =>
               if (d.offset + dos.data.size > endOffset) {
                 tx.note(s"IndexedFileContent - prepareTruncation shortening final segment ${dos.pointer.id}")
-                tx.overwrite(dos.pointer, dos.revision, dos.data.slice(0, (endOffset - d.offset).asInstanceOf[Int]))
+                tx.overwrite(dos.pointer, dos.revision, dos.data.slice(0, (endOffset - d.offset).toInt))
               }
             }
           } else
