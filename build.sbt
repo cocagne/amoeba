@@ -16,6 +16,7 @@ import scala.sys.process._
 
 lazy val root = (project in file(".")).
   settings(
+
     name         := "amoeba",
     version      := "0.1",
     scalaVersion := "3.3.3",
@@ -32,7 +33,7 @@ lazy val root = (project in file(".")).
     libraryDependencies ++= Seq(
       "org.scalatest"                    %% "scalatest"               % "3.2.18" % "test",
       "com.github.blemale"               %% "scaffeine"               % "5.2.1" % "compile",
-      "org.rocksdb"                      %  "rocksdbjni"              % "6.3.6",
+      "org.rocksdb"                      %  "rocksdbjni"              % "8.11.3",
       "com.github.scopt"                 %% "scopt"                   % "4.1.0",
       "io.netty"                         %  "netty-all"               % "4.1.43.Final",
       "org.apache.logging.log4j"         %  "log4j-api"               % "2.22.0",
