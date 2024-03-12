@@ -55,6 +55,7 @@ lazy val root = (project in file(".")).
 
 //parallelExecution in Test := false
 
+ enablePlugins(PackPlugin)
 
  Compile / sourceGenerators += Def.task {
   val base = (Compile / sourceManaged).value

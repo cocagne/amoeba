@@ -42,6 +42,7 @@ object Bootstrap {
 
       def overwrite(pointer: KeyValueObjectPointer,
                     content: List[(Key, Array[Byte])]): Unit = {
+
         val contents = content.map { t =>
           t._1 -> new ValueState(Value(t._2), bootstrapMetadata.revision, bootstrapMetadata.timestamp, None)
         }.toMap
@@ -49,7 +50,6 @@ object Bootstrap {
         KVObjectState.encodeIDA(ida, None, None, None, None, contents).zip(stores).foreach { t =>
           val (storeData, store) = t
           val sp = pointer.getStorePointer(store.storeId).get
-
           store.bootstrapOverwrite(pointer.id, sp, storeData)
         }
       }

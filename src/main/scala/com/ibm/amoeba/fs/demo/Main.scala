@@ -370,7 +370,10 @@ object Main {
           mkdirectory(Paths.get(b.path).getParent)
           new RocksDBBackend(b.path, dataStoreId, ec)
       }
-    }.toList
+    }.toList.filter( backend =>
+      // Create all stores but filter this list down to just the bootstrap-pool for Bootstrap process
+      backend.storeId.poolId.uuid.getMostSignificantBits == 0 &&
+      backend.storeId.poolId.uuid.getLeastSignificantBits == 0)
 
     cfg.nodes.values.foreach { n =>
       n.crl match {

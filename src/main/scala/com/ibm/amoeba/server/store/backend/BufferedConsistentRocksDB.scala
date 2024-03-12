@@ -2,7 +2,9 @@ package com.ibm.amoeba.server.store.backend
 
 import org.rocksdb.{Options, RocksDB, WriteBatch, WriteOptions}
 
-import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.concurrent.{Await, ExecutionContext, Future, Promise}
+
+import scala.concurrent.duration.*
 
 object BufferedConsistentRocksDB {
   case class DBClosed() extends Throwable
@@ -38,13 +40,14 @@ class BufferedConsistentRocksDB(
   private[this] var closing: Option[Promise[Unit]] = None
   private[this] var outsandingOpCount = 0
 
-  private[this] def doNextCommit(): Unit = {
+  private[this] def doNextCommit(): Future[Unit] = {
     val nbatch = nextBatch
     val npromise = nextPromise
     nextBatch = new WriteBatch()
     nextPromise = Promise[Unit]()
     commitInProgress = true
     commit(nbatch, npromise)
+    npromise.future
   }
 
   private[this] def beginOperation(): Unit = synchronized {
@@ -59,7 +62,6 @@ class BufferedConsistentRocksDB(
 
 
   private[this] def commit(batch:WriteBatch, promise: Promise[Unit]): Unit = Future {
-
     val writeOpts = new WriteOptions()
     writeOpts.setSync(true)
 
@@ -83,9 +85,12 @@ class BufferedConsistentRocksDB(
     }
   }
 
-  def bootstrapPut(key: Array[Byte], value: Array[Byte]): Unit = synchronized {
-    nextBatch.put(key, value)
-    doNextCommit()
+  def bootstrapPut(key: Array[Byte], value: Array[Byte]): Unit = {
+    val fcommit = synchronized {
+      nextBatch.put(key, value)
+      doNextCommit()
+    }
+    Await.result(fcommit, 10.seconds)
   }
   def bootstrapGet(key: Array[Byte]): Array[Byte] = synchronized {
     db.get(key)
