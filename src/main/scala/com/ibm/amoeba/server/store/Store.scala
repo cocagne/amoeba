@@ -1,7 +1,7 @@
 package com.ibm.amoeba.server.store
 
 import com.github.blemale.scaffeine.Scaffeine
-import com.ibm.amoeba.common.network._
+import com.ibm.amoeba.common.network.*
 import com.ibm.amoeba.common.store.StoreId
 import com.ibm.amoeba.common.transaction.{TransactionDescription, TransactionId, TransactionStatus}
 import com.ibm.amoeba.common.util.BackgroundTask
@@ -10,8 +10,9 @@ import com.ibm.amoeba.server.network.Messenger
 import com.ibm.amoeba.server.store.backend.Backend
 import com.ibm.amoeba.server.store.cache.ObjectCache
 import com.ibm.amoeba.server.transaction.{TransactionDriver, TransactionFinalizer, TransactionStatusCache}
+import org.apache.logging.log4j.scala.Logging
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class Store(val backend: Backend,
             val objectCache: ObjectCache,
@@ -21,7 +22,7 @@ class Store(val backend: Backend,
             val txStatusCache: TransactionStatusCache,
             val finalizerFactory: TransactionFinalizer.Factory,
             val txDriverFactory: TransactionDriver.Factory,
-            val txHeartbeatTimeout: Duration) {
+            val txHeartbeatTimeout: Duration) extends Logging {
 
   val storeId: StoreId = backend.storeId
   val frontend = new Frontend(backend.storeId, backend, objectCache, net, crl, txStatusCache)
@@ -44,6 +45,7 @@ class Store(val backend: Backend,
 
   def driveTransaction(txd: TransactionDescription): Unit = synchronized {
     if (!transactionDrivers.contains(txd.transactionId)) {
+
       val driver = txDriverFactory.create(storeId, net, backgroundTasks, txd, finalizerFactory)
 
       transactionDrivers += txd.transactionId -> driver

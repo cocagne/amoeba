@@ -33,6 +33,8 @@ import org.dcache.nfs.v4.xdr.nfs4_prot
 import org.dcache.nfs.vfs.VirtualFileSystem
 import org.dcache.oncrpc4j.rpc.{OncRpcProgram, OncRpcSvcBuilder}
 
+import org.apache.logging.log4j.scala.Logging
+
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration.{Duration, MILLISECONDS, SECONDS}
 
@@ -49,7 +51,7 @@ object Main {
 
   class ConfigError(msg: String) extends AmoebaError(msg)
 
-  class NetworkBridge {
+  class NetworkBridge extends Logging {
     var oclient: Option[AmoebaClient] = None
     var onode: Option[StoreManager] = None
 
@@ -224,6 +226,7 @@ object Main {
   }
 
   def amoeba_server(log4jConfigFile: File, cfg: ConfigFile.Config): Unit = {
+    println(s"LOG4J CONFIG $log4jConfigFile")
     setLog4jConfigFile(log4jConfigFile)
 
     val (client, network, nucleus) = createAmoebaClient(cfg)
@@ -239,7 +242,7 @@ object Main {
 
     val fs = Await.result(f, Duration(5000, MILLISECONDS))
 
-    val exports = "/ 192.168.56.2(rw)\n"
+    val exports = "/ 192.168.64.1(rw)\n"
 
     val sched = Executors.newScheduledThreadPool(10)
     val ec = ExecutionContext.fromExecutorService(sched)

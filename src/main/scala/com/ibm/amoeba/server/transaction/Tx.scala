@@ -206,6 +206,7 @@ class Tx( trs: TransactionRecoveryState,
   }
 
   def receivePrepare(m: TxPrepare): Unit = {
+    logger.trace(s"*** Got Prepare: ${m.transactionId}")
     lastProposer = m.from
     updateLastEvent()
 
@@ -221,7 +222,7 @@ class Tx( trs: TransactionRecoveryState,
     }
 
     val txr = TxPrepareResponse(m.from, storeId, transactionId, result, m.proposalId, disposition, collisions)
-
+    logger.trace(s"*** PrepareResponse: ${m.transactionId}, Disposition:$disposition. All Objects Loaded: $allObjectsLoaded")
     delayedPrepare.response = Some(txr)
 
     if (allObjectsLoaded) {

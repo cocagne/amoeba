@@ -80,8 +80,11 @@ class Frontend(val storeId: StoreId,
   }
 
   private def receivePrepare(m: TxPrepare): Unit = transactions.get(m.txd.transactionId) match {
-    case Some(tx) => tx.receivePrepare(m)
+    case Some(tx) =>
+      logger.trace(s"**** EXISTING TX: ${m.txd.transactionId}. $tx")
+      tx.receivePrepare(m)
     case None =>
+      logger.trace(s"**** CREATING NEW TX: ${m.txd.transactionId}")
       val trs = TransactionRecoveryState.initial(m.to, m.txd, m.objectUpdates)
       val locaters = m.txd.hostedObjectLocaters(m.to)
       val tx = new Tx(trs, m.txd, backend, net, crl, statusCache, m.preTxRebuilds, locaters)

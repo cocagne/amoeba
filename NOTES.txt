@@ -10,6 +10,13 @@
 # Run single test. Where "min/max" identifies a test containing this substring
 sbt 'testOnly *KeyValueObjectReaderSuite -- -z min/max'
 
+# New testing approach
+
+sbt compile; rm -r local/node_*
+./t bootstrap local/cfg.yaml
+
+./t nfs local/cfg.yaml local/log4j-conf.xml
+
 # Building for demo appliction
 # run "sbt pack"
 # then invoke ./target/pack/bin/demo

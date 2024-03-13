@@ -1,15 +1,15 @@
 package com.ibm.amoeba.server.transaction
 
 import java.util.concurrent.ThreadLocalRandom
-
 import com.ibm.amoeba.common.network.{TxPrepare, TxResolved}
 import com.ibm.amoeba.common.store.StoreId
 import com.ibm.amoeba.common.transaction.TransactionDescription
 import com.ibm.amoeba.common.util.BackgroundTask
 import com.ibm.amoeba.server.network.Messenger
+import org.apache.logging.log4j.scala.Logger
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 object SimpleTransactionDriver {
 
@@ -44,19 +44,25 @@ class SimpleTransactionDriver(
   storeId, messenger, backgroundTasks, txd, finalizerFactory) {
 
   private[this] var backoffDelay = initialDelay
-  private[this] var nextTry = backgroundTasks.schedule(initialDelay) { sendMessages() }
+  private[this] var nextTry = backgroundTasks.schedule(initialDelay) { sendPeerMessages() }
 
   private[this] var sendCount = 0
 
-  override def shutdown(): Unit = nextTry.cancel()
+  if !designatedLeader then nextRound()
 
-  private def sendMessages(): Unit = synchronized {
+  override def shutdown(): Unit = {
+    logger.trace(s"**** Shutting down tx: ${txd.transactionId}")
+    nextTry.cancel()
+  }
+
+  private def sendPeerMessages(): Unit = synchronized {
     // Generally this shouldn't be called if finalized=true but a race condition between onFinalized and the next
     // call to sendMessages could do so. We need to prevent execution in this case so we don't start up the the
     // retry loop again
     if (!finalized) {
 
       if (resolved) {
+        logger.trace(s"*** Sending TxResolved for transaction ${txd.transactionId}")
         txd.allDataStores.filter(!knownResolved.contains(_)).map(toStore => TxResolved(toStore, storeId, txd.transactionId, resolvedValue))
       } else {
         proposer.currentAcceptMessage() match {
@@ -83,7 +89,7 @@ class SimpleTransactionDriver(
       // if we get interrupted, the backoff mechanism will protect against contention
       nextTry.cancel()
       nextTry = backgroundTasks.schedule(initialDelay) {
-        sendMessages()
+        sendPeerMessages()
       }
     }
   }
@@ -99,7 +105,7 @@ class SimpleTransactionDriver(
     val thisDelay = ThreadLocalRandom.current().nextInt(0, backoffDelay.toMillis.asInstanceOf[Int])
 
     nextTry.cancel()
-    nextTry = backgroundTasks.schedule(Duration(thisDelay, MILLISECONDS)) { sendMessages() }
+    nextTry = backgroundTasks.schedule(Duration(thisDelay, MILLISECONDS)) { sendPeerMessages() }
   }
 
 }

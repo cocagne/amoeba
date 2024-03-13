@@ -19,9 +19,9 @@ trait SimpleDriverRecoveryMixin extends StoreManager {
     stores.valuesIterator.foreach { store =>
       store.frontend.transactions.valuesIterator.foreach { tx =>
         val delay = Duration(now - tx.lastEventTime, NANOSECONDS)
-
-        if (delay > txDriverFactory.failedDriverDuration)
+        if (delay > txDriverFactory.failedDriverDuration) {
           store.driveTransaction(tx.txd)
+        }
       }
     }
   }

@@ -83,7 +83,6 @@ abstract class TransactionDriver(
                                   val backgroundTasks: BackgroundTask,
                                   val txd: TransactionDescription,
                                   private val finalizerFactory: TransactionFinalizer.Factory)(implicit ec: ExecutionContext) extends Logging {
-
   def ida: IDA = txd.primaryObject.ida
 
   protected val proposer: Proposer = new Proposer(storeId.poolIndex, ida.width, ida.writeThreshold)
@@ -112,15 +111,15 @@ abstract class TransactionDriver(
   private var clientFinalized: Option[TransactionFinalized] = None
   private var txMessages: Option[List[TxMessage]] = None
 
+  def designatedLeader: Boolean = txd.designatedLeaderUID == storeId.poolIndex
+
   def complete: Future[TransactionDescription] = completionPromise.future
 
   {
-    val kind: String = if (txd.designatedLeaderUID == storeId.poolIndex)
+    val kind: String = if (designatedLeader)
       "Designated Leader"
-    else {
-      nextRound()
+    else
       "Transaction Recovery"
-    }
     logger.info(s"Driving transaction to completion ($kind): ${txd.shortString}")
   }
 
@@ -402,8 +401,8 @@ abstract class TransactionDriver(
       val messages = primaryObjectDataStores.filter(!alreadyAccepted.contains(_)).map { toStoreId =>
         TxAccept(toStoreId, storeId, txd.transactionId, paxAccept.proposalId, paxAccept.proposalValue)
       }.toList
-//      if (messages.nonEmpty)
-//        logger.trace(s"Sending TxAccept(${txd.transactionUUID}) to ${messages.head.to.poolUUID}:(${messages.map(_.to.poolIndex)})")
+      if (messages.nonEmpty)
+        logger.trace(s"Sending TxAccept(${txd.transactionId}) to ${messages.head.to.poolId}:(${messages.map(_.to.poolIndex)})")
       messenger.sendTransactionMessages(messages)
     }
   }
@@ -418,6 +417,8 @@ abstract class TransactionDriver(
     resolved = true
 
     resolvedValue = committed
+
+    logger.trace(s"Got TxResolved message for transaction ${txd.transactionId}. Committed: $committed")
 
     if (committed) {
 

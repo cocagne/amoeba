@@ -44,7 +44,7 @@ lazy val root = (project in file(".")).
       "com.fasterxml.jackson.core"       %  "jackson-databind"        % "2.9.4",
       "com.fasterxml.jackson.dataformat" %  "jackson-dataformat-yaml" % "2.9.4",
       "com.lmax"                         %  "disruptor"               % "3.3.7",
-      "org.dcache"                       %  "nfs4j-core"              % "0.19.0",
+      "org.dcache"                       %  "nfs4j-core"              % "0.24.0",
       "org.yaml"                         %  "snakeyaml"               % "1.25",
       "org.zeromq"                       %  "jeromq"                  % "0.6.0",
       "com.google.flatbuffers"           %  "flatbuffers-java"        % "1.12.0",

@@ -9,7 +9,8 @@ import com.ibm.amoeba.fs.error.{DirectoryEntryDoesNotExist, DirectoryEntryExists
 import com.ibm.amoeba.fs.{BaseFile, BlockDevice, CharacterDevice, Directory, DirectoryInode, File, FileHandle, FileMode, FileSystem, FileType, InodePointer, Symlink, Timespec}
 import javax.security.auth.Subject
 import org.apache.logging.log4j.scala.Logging
-import org.dcache.auth.Subjects
+//import org.dcache.auth.Subjects
+import org.dcache.nfs.util.UnixSubjects
 import org.dcache.nfs.status.{ExistException, InvalException, NoEntException, NotDirException, NotSuppException, ServerFaultException}
 import org.dcache.nfs.v4.{NfsIdMapping, SimpleIdMap}
 import org.dcache.nfs.v4.xdr.nfsace4
@@ -43,7 +44,7 @@ object AmoebaNFS {
     stats.setATime(file.atime.millis)
     stats.setMTime(file.mtime.millis)
     stats.setCTime(file.ctime.millis)
-    stats.setFileid(file.pointer.number.asInstanceOf[Int])
+    stats.setIno(file.pointer.number.asInstanceOf[Int])
     stats.setUid(file.uid)
     stats.setGid(file.gid)
 
@@ -145,8 +146,8 @@ class AmoebaNFS(val fs: FileSystem,
 
     val dir = getDirectory(parent)
 
-    val uid = Subjects.getUid(subject).toInt
-    val gid = Subjects.getPrimaryGid(subject).toInt
+    val uid = UnixSubjects.getUid(subject).toInt
+    val gid = UnixSubjects.getPrimaryGid(subject).toInt
 
     val iptr = `type` match {
       case Stat.Type.REGULAR => blockingCall { dir.createFile(name, mode, uid, gid) }
@@ -295,8 +296,8 @@ class AmoebaNFS(val fs: FileSystem,
 
     val pdir = getDirectory(parent)
 
-    val uid = Subjects.getUid(subject).toInt
-    val gid = Subjects.getPrimaryGid(subject).toInt
+    val uid = UnixSubjects.getUid(subject).toInt
+    val gid = UnixSubjects.getPrimaryGid(subject).toInt
 
     val iptr = blockingCall { pdir.createDirectory(name, mode, uid, gid) }
 
@@ -452,8 +453,8 @@ class AmoebaNFS(val fs: FileSystem,
   def symlink(parent: Inode, name: String, link: String, subject: Subject, mode: Int): Inode = {
     val pdir = getDirectory(parent)
 
-    val uid = Subjects.getUid(subject).toInt
-    val gid = Subjects.getPrimaryGid(subject).toInt
+    val uid = UnixSubjects.getUid(subject).toInt
+    val gid = UnixSubjects.getPrimaryGid(subject).toInt
 
     val iptr = blockingCall { pdir.createSymlink(name, mode, uid, gid, link) }
 
@@ -610,5 +611,11 @@ class AmoebaNFS(val fs: FileSystem,
     * @return instance of NfsIdMapping.
     */
   def getIdMapper: NfsIdMapping = IdMapper
+
+  def access(s: javax.security.auth.Subject, ino: org.dcache.nfs.vfs.Inode, num: Int) = 0xFFFF
+
+  def getCaseInsensitive: Boolean = false
+
+  def getCasePreserving: Boolean = true
 }
 

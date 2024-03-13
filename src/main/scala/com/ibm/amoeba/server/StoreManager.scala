@@ -144,7 +144,6 @@ class StoreManager(val objectCacheFactory: () => ObjectCache,
   }
 
   private def handleEvent(event: Event): Unit = {
-
     event match {
 
       case IOCompletion(op) => stores.get(op.storeId).foreach { store =>
@@ -155,9 +154,10 @@ class StoreManager(val objectCacheFactory: () => ObjectCache,
         store.frontend.crlSaveComplete(op)
       }
 
-      case TransactionMessage(msg) => stores.get(msg.to).foreach { store =>
-        store.receiveTransactionMessage(msg)
-      }
+      case TransactionMessage(msg) =>
+        stores.get(msg.to).foreach { store =>
+          store.receiveTransactionMessage(msg)
+        }
 
       case ClientReq(msg) => stores.get(msg.toStore).foreach { store =>
 
@@ -184,7 +184,8 @@ class StoreManager(val objectCacheFactory: () => ObjectCache,
         }
       }
 
-      case RecoveryEvent() => handleRecoveryEvent()
+      case RecoveryEvent() =>
+        handleRecoveryEvent()
 
       case LoadStore(backend) =>
         val store = new Store(backend, objectCacheFactory(), net, backgroundTasks, crl,
