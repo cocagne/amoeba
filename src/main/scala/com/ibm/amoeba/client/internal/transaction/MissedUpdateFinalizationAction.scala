@@ -23,6 +23,8 @@ class MissedUpdateFinalizationAction(val client: AmoebaClient) extends Finalizat
 
   private val completionPromise: Promise[Unit] = Promise()
 
+  logger.debug(s"Created MissedUpdateFinalizationAction")
+
   def complete: Future[Unit] = completionPromise.future
 
   override def updateCommitErrors(commitErrors: Map[StoreId, List[ObjectId]]): Unit = synchronized {

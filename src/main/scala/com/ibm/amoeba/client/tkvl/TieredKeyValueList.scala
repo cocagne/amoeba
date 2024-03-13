@@ -159,7 +159,7 @@ object TieredKeyValueList {
         if (candidates.isEmpty) {
           p.success(Left(blacklist + currentNode.pointer.id))
         } else {
-          fetchNode(client, ordering, candidates.head._1, candidates.head._2, blacklist) foreach {
+          fetchNode(client, ordering, targetTier, candidates.head._1, candidates.head._2, blacklist) foreach {
             case Left(blklst) => rtry(candidates.tail, blklst)
             case Right(next) => fetchContainingNode(client, currentTier-1, targetTier, ordering, target,
               next, blacklist).foreach {
@@ -187,6 +187,7 @@ object TieredKeyValueList {
 
   private def fetchNode(client: AmoebaClient,
                         ordering: KeyOrdering,
+                        targetTier: Int,
                         minimum: Key,
                         pointer: KeyValueObjectPointer,
                         blacklist: Set[ObjectId]): Future[Either[Set[ObjectId], KeyValueListNode]] = {
@@ -198,7 +199,7 @@ object TieredKeyValueList {
     } else {
       val p = Promise[Either[Set[ObjectId], KeyValueListNode]]()
 
-      client.read(pointer) onComplete {
+      client.read(pointer, s"TKVL read of tier $targetTier, key: $minimum") onComplete {
         case Failure(_) => p.success(Left(blacklist + pointer.id))
 
         case Success(kvos) =>

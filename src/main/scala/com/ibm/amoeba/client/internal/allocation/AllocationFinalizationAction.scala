@@ -17,6 +17,7 @@ class AllocationFinalizationAction(val client: AmoebaClient,
 
   private val completionPromise: Promise[Unit] = Promise()
 
+  logger.debug(s"Created AllocationFinalizationAction for object ${newObject.id}")
   def complete: Future[Unit] = completionPromise.future
 
   def execute(): Unit = client.retryStrategy.retryUntilSuccessful {

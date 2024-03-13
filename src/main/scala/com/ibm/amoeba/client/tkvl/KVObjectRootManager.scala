@@ -24,7 +24,7 @@ class KVObjectRootManager(val client: AmoebaClient,
   private def getRoot(): Future[RData] = {
     val p = Promise[RData]()
 
-    client.read(pointer).onComplete {
+    client.read(pointer, s"Object hosting TKVL Root for tree $treeKey").onComplete {
       case Failure(err) => p.failure(err)
       case Success(container) =>
 
@@ -36,7 +36,7 @@ class KVObjectRootManager(val client: AmoebaClient,
             root.orootObject match {
               case None => p.success(RData(root, v.revision, None))
               case Some(rootObject) =>
-                client.read(rootObject).onComplete {
+                client.read(rootObject, s"Root node for TKVL tree $treeKey").onComplete {
                   case Failure(err) => p.failure(err)
                   case Success(rootKvos) =>
 
@@ -107,7 +107,7 @@ class KVObjectRootManager(val client: AmoebaClient,
     for {
       RData(root, _, _) <- getRoot()
       alloc <- root.nodeAllocator.getAllocatorForTier(0)
-      kvos <- client.read(pointer)
+      kvos <- client.read(pointer, s"Reading root node of TKVL tree $treeKey for createInitialNode")
       rptr <- alloc.allocateKeyValueObject(ObjectRevisionGuard(pointer, kvos.revision), contents)
     } yield {
       val newRoot = Root(0, root.ordering, Some(rptr), root.nodeAllocator)
@@ -158,7 +158,7 @@ object KVObjectRootManager extends RegisteredTypeFactory with RootManagerFactory
     } else {
       for {
         alloc <- nodeAllocator.getAllocatorForTier(0)
-        kvos <- client.read(pointer)
+        kvos <- client.read(pointer, s"Reading node hosting new TKVL tree $key")
         rptr <- alloc.allocateKeyValueObject(ObjectRevisionGuard(pointer, kvos.revision), initialContent)
       } yield {
         val root = Root(0, ordering, Some(rptr), nodeAllocator)

@@ -1,10 +1,10 @@
 package com.ibm.amoeba.client.internal.allocation
 import java.nio.{ByteBuffer, ByteOrder}
 import java.util.UUID
-
 import com.ibm.amoeba.client.{AmoebaClient, FinalizationAction, FinalizationActionFactory, RegisteredTypeFactory, Transaction}
 import com.ibm.amoeba.common.objects.{Key, ObjectPointer, Value}
 import com.ibm.amoeba.common.transaction.{FinalizationActionId, SerializedFinalizationAction}
+import org.apache.logging.log4j.scala.{Logger, Logging}
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
@@ -14,6 +14,8 @@ class DeletionFinalizationAction(val client: AmoebaClient,
   implicit val ec: ExecutionContext = client.clientContext
 
   private val completionPromise: Promise[Unit] = Promise()
+  
+  logger.debug(s"Created DeletionFinalizationAction for object ${deletedObject.id}")
 
   def complete: Future[Unit] = completionPromise.future
 

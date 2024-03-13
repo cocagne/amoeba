@@ -2,10 +2,11 @@ package com.ibm.amoeba.client
 
 import com.ibm.amoeba.common.objects.ObjectId
 import com.ibm.amoeba.common.store.StoreId
+import org.apache.logging.log4j.scala.Logging
 
 import scala.concurrent.Future
 
-trait FinalizationAction {
+trait FinalizationAction extends Logging {
 
   def complete: Future[Unit]
 

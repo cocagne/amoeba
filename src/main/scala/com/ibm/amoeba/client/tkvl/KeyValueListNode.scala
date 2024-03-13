@@ -24,7 +24,7 @@ class KeyValueListNode(val reader: ObjectReader,
 
   def maximum: Option[Key] = tail.map(rp => rp.minimum)
 
-  def refresh(): Future[KeyValueListNode] = reader.read(pointer).map { kvos =>
+  def refresh(): Future[KeyValueListNode] = reader.read(pointer, s"Refresh KVListNode node ${pointer.id}. Minimum: $minimum").map { kvos =>
     new KeyValueListNode(reader, pointer, ordering, minimum,
       kvos.revision, kvos.refcount, kvos.contents, kvos.right.map(v => KeyValueListPointer(v.bytes)))
   }
@@ -43,7 +43,7 @@ class KeyValueListNode(val reader: ObjectReader,
 
     val p = Promise[KeyValueListNode]()
 
-    def scan(right: KeyValueListPointer): Unit = reader.read(right.pointer) onComplete {
+    def scan(right: KeyValueListPointer): Unit = reader.read(right.pointer, s"Scanning right KVListNode node ${pointer.id}. Minimum: $minimum. target: $target") onComplete {
       case Failure(err) => p.failure(err)
 
       case Success(kvos) =>
@@ -111,7 +111,7 @@ class KeyValueListNode(val reader: ObjectReader,
       node.tail match {
         case None => p.success(newz)
 
-        case Some(nodeTail) => reader.read(nodeTail.pointer) onComplete {
+        case Some(nodeTail) => reader.read(nodeTail.pointer, s"foldLeft() KVListNode node ${pointer.id}. Minimum: $minimum.") onComplete {
 
           case Failure(err) => p.failure(err)
 
@@ -342,7 +342,7 @@ object KeyValueListNode {
             Future.successful(())
 
           case Some(rp) =>
-            reader.read(rp.pointer).flatMap { kvos =>
+            reader.read(rp.pointer, s"Deleting key from KVListNode node ${rp.pointer.id}. Minimum: ${rp.minimum}. target: $key").flatMap { kvos =>
               var ops: List[KeyValueOperation] = Delete(key) :: Nil
               kvos.right match {
                 case None => ops = DeleteRight() :: ops
