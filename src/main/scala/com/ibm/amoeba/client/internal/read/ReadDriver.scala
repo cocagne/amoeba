@@ -27,8 +27,9 @@ object ReadDriver {
     * objectPointer: ObjectPointer,
     * readType: ReadType,
     * readUUID:UUID,
+    * comment: String Comment describing purpose of the read for debug/trace logs
     * disableOpportunisticRebuild: Boolean
     */
-  type Factory = (AmoebaClient, ObjectPointer, UUID, Boolean) => ReadDriver
+  type Factory = (AmoebaClient, ObjectPointer, UUID, String, Boolean) => ReadDriver
 
 }

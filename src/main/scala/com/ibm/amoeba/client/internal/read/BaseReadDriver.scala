@@ -17,12 +17,13 @@ abstract class BaseReadDriver(
                       val client: AmoebaClient,
                       val objectPointer: ObjectPointer,
                       val readUUID:UUID,
+                      val comment: String,
                       val disableOpportunisticRebuild: Boolean = false
                     ) extends ReadDriver with Logging {
 
   implicit protected val ec: ExecutionContext
 
-  logger.info(s"Read UUID $readUUID: Beginning read of ${objectPointer.objectType} object ${objectPointer.id}")
+  logger.info(s"Read UUID $readUUID: Beginning read of ${objectPointer.objectType} object ${objectPointer.id}. Comment: $comment")
 
   // TODO: Support multiple read types
   private val readType: ReadType = FullObject()
@@ -59,7 +60,7 @@ abstract class BaseReadDriver(
 
   /** Sends a Read request to the specified store. */
   protected def sendReadRequest(dataStoreId: StoreId): Unit = {
-    logger.trace(s"Read UUID $readUUID: Sending read request for object ${objectPointer.id} to store $dataStoreId")
+    logger.trace(s"Read UUID $readUUID: Sending read request for object ${objectPointer.id} to store $dataStoreId. Comment: $comment")
     client.messenger.sendClientRequest(Read(dataStoreId, client.clientId, readUUID, objectPointer, readType))
   }
 
@@ -176,9 +177,10 @@ object BaseReadDriver {
     client: AmoebaClient,
     objectPointer: ObjectPointer,
     readUUID:UUID,
+    comment: String,
     disableOpportunisticRebuild: Boolean): ReadDriver = {
 
-    new BaseReadDriver(client, objectPointer, readUUID) {
+    new BaseReadDriver(client, objectPointer, readUUID, comment) {
 
       implicit protected val ec: ExecutionContext = this.client.clientContext
 

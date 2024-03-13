@@ -56,8 +56,8 @@ object BaseReadDriverSuite {
 
     val typeRegistry: TypeRegistry = null
 
-    def read(pointer: DataObjectPointer): Future[DataObjectState] = Future.failed(new Exception("TODO"))
-    def read(pointer: KeyValueObjectPointer): Future[KeyValueObjectState] = Future.failed(new Exception("TODO"))
+    def read(pointer: DataObjectPointer, comment: String): Future[DataObjectState] = Future.failed(new Exception("TODO"))
+    def read(pointer: KeyValueObjectPointer, comment: String): Future[KeyValueObjectState] = Future.failed(new Exception("TODO"))
 
     def newTransaction(): Transaction = null
 
@@ -94,8 +94,9 @@ class BaseReadDriverSuite  extends AsyncFunSuite with Matchers {
   def mkReader(client: AmoebaClient,
                objectPointer: ObjectPointer = ptr,
                readUUID:UUID = readUUID,
+               comment: String = "",
                disableOpportunisticRebuild: Boolean = false) = {
-    new BaseReadDriver(client, objectPointer, readUUID, disableOpportunisticRebuild) {
+    new BaseReadDriver(client, objectPointer, readUUID, comment, disableOpportunisticRebuild) {
       implicit protected val ec: ExecutionContext = this.client.clientContext
     }
   }

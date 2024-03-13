@@ -35,12 +35,12 @@ class SimpleAmoebaClient(val msngr: ClientMessenger,
   private val rmgr = new ReadManager(this,
     new SimpleReadDriver.Factory(initialReadDelay, maxReadDelay).apply)
 
-  def read(pointer: DataObjectPointer): Future[DataObjectState] = {
-    rmgr.read(pointer).map(_.asInstanceOf[DataObjectState])
+  def read(pointer: DataObjectPointer, comment: String): Future[DataObjectState] = {
+    rmgr.read(pointer, comment).map(_.asInstanceOf[DataObjectState])
   }
 
-  def read(pointer: KeyValueObjectPointer): Future[KeyValueObjectState] = {
-    rmgr.read(pointer).map(_.asInstanceOf[KeyValueObjectState])
+  def read(pointer: KeyValueObjectPointer, comment: String): Future[KeyValueObjectState] = {
+    rmgr.read(pointer, comment).map(_.asInstanceOf[KeyValueObjectState])
   }
 
   private val txManager = new TransactionManager(this, SimpleClientTransactionDriver.factory(txRetransmitDelay))

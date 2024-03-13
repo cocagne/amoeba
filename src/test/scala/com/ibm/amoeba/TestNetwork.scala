@@ -87,12 +87,12 @@ object TestNetwork {
 
     val rmgr = new ReadManager(this, BaseReadDriver.noErrorRecoveryReadDriver)
 
-    def read(pointer: DataObjectPointer): Future[DataObjectState] = {
-      rmgr.read(pointer).map(_.asInstanceOf[DataObjectState])
+    def read(pointer: DataObjectPointer, comment: String): Future[DataObjectState] = {
+      rmgr.read(pointer, comment).map(_.asInstanceOf[DataObjectState])
     }
 
-    def read(pointer: KeyValueObjectPointer): Future[KeyValueObjectState] = {
-      rmgr.read(pointer).map(_.asInstanceOf[KeyValueObjectState])
+    def read(pointer: KeyValueObjectPointer, comment: String): Future[KeyValueObjectState] = {
+      rmgr.read(pointer, comment).map(_.asInstanceOf[KeyValueObjectState])
     }
 
     val txManager = new TransactionManager(this, ClientTransactionDriver.noErrorRecoveryFactory)

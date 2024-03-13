@@ -17,9 +17,10 @@ object SimpleReadDriver {
                client: AmoebaClient,
                objectPointer: ObjectPointer,
                readUUID:UUID,
+               comment: String,
                disableOpportunisticRebuild: Boolean): ReadDriver = {
       new SimpleReadDriver(initialDelay, maxDelay, client,
-        objectPointer, readUUID, disableOpportunisticRebuild)
+        objectPointer, readUUID, comment, disableOpportunisticRebuild)
     }
   }
 }
@@ -34,8 +35,9 @@ class SimpleReadDriver(
                         client: AmoebaClient,
                         objectPointer: ObjectPointer,
                         readUUID:UUID,
+                        comment: String,
                         disableOpportunisticRebuild: Boolean) extends BaseReadDriver( client,
-  objectPointer, readUUID, disableOpportunisticRebuild) {
+  objectPointer, readUUID, comment, disableOpportunisticRebuild) {
 
   implicit protected val ec: ExecutionContext = client.clientContext
 

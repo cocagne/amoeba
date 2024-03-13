@@ -98,12 +98,13 @@ class ReadManager(val client: AmoebaClient, val driverFactory: ReadDriver.Factor
     */
   def read(
             objectPointer: ObjectPointer,
+            comment: String,
             disableOpportunisticRebuild:Boolean=false,
             ): Future[ObjectState] = {
 
     val readUUID = UUID.randomUUID()
 
-    val driver = driverFactory(client, objectPointer, readUUID, disableOpportunisticRebuild)
+    val driver = driverFactory(client, objectPointer, readUUID, comment, disableOpportunisticRebuild)
 
     synchronized { outstandingReads += (readUUID -> driver) }
 

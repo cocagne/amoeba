@@ -23,9 +23,9 @@ trait AmoebaClient extends ObjectReader {
 
   def shutdown(): Unit = ()
 
-  def read(pointer: DataObjectPointer): Future[DataObjectState]
+  def read(pointer: DataObjectPointer, comment: String): Future[DataObjectState]
 
-  def read(pointer: KeyValueObjectPointer): Future[KeyValueObjectState]
+  def read(pointer: KeyValueObjectPointer, comment: String): Future[KeyValueObjectState]
 
   def newTransaction(): Transaction
 
