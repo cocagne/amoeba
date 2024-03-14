@@ -94,6 +94,8 @@ class Tx( trs: TransactionRecoveryState,
 
     pendingObjectLoads -= 1
 
+    logger.trace(s"Object loaded tx: ${txd.transactionId}. Object: ${os.objectId}. Pending: $pendingObjectLoads")
+
     if (allObjectsLoaded)
       onAllObjectsLoaded()
   }

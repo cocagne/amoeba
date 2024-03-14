@@ -49,6 +49,7 @@ class Frontend(val storeId: StoreId,
       val locaters = txd.hostedObjectLocaters(storeId)
       val tx = new Tx(trs, txd, backend, net, crl, statusCache, Nil, locaters)
       transactions += (txd.transactionId -> tx)
+      locaters.foreach(locater => readObjectForTransaction(tx, locater))
     }
 
     lalloc.foreach { ars =>
@@ -175,8 +176,11 @@ class Frontend(val storeId: StoreId,
   }
 
   private def readObjectForTransaction(transaction: Tx, locater: Locater): Unit = {
+    logger.trace(s"Loading object for Tx: ${transaction.transactionId}. Object: ${locater.objectId}")
     objectCache.get(locater.objectId) match {
-      case Some(os) => transaction.objectLoaded(os)
+      case Some(os) =>
+        logger.trace(s"Loading object from CACHE for Tx: ${transaction.transactionId}. Object: ${locater.objectId}")
+        transaction.objectLoaded(os)
       case None =>
         val tr = TransactionRead(transaction.transactionId)
 
@@ -186,6 +190,7 @@ class Frontend(val storeId: StoreId,
 
           case None =>
             pendingReads += (locater.objectId -> (tr :: Nil))
+            logger.trace(s"Loading object from Backend for Tx: ${transaction.transactionId}. Object: ${locater.objectId}")
             backend.read(locater)
         }
     }
@@ -225,7 +230,9 @@ class Frontend(val storeId: StoreId,
               val rr = ReadResponse(netRead.clientId, storeId, netRead.requestUUID, HLCTimestamp.now, Right(cs) )
               net.sendClientResponse(rr)
 
-            case tr: TransactionRead => transactions.get(tr.transactionId).foreach { tx => tx.objectLoaded(os) }
+            case tr: TransactionRead =>
+              logger.trace(s"Completed read for transaction ${tr.transactionId}. Object: ${os.objectId}")
+              transactions.get(tr.transactionId).foreach { tx => tx.objectLoaded(os) }
 
             case OpportuneRebuild(op) => opportunisticRebuild(op, os)
           }

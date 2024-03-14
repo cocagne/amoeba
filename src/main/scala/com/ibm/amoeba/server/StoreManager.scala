@@ -85,12 +85,13 @@ class StoreManager(val objectCacheFactory: () => ObjectCache,
   }
 
   protected var stores: Map[StoreId, Store] = initialBackends.map { backend =>
-    val store = new Store(backend, objectCacheFactory(), net, backgroundTasks, crl,
-      txStatusCache, finalizerFactory, txDriverFactory, heartbeatPeriod*8)
-
     backend.setCompletionHandler(op => {
+      logger.trace(s"Backend completed operation: $op")
       events.add(IOCompletion(op))
     })
+
+    val store = new Store(backend, objectCacheFactory(), net, backgroundTasks, crl,
+      txStatusCache, finalizerFactory, txDriverFactory, heartbeatPeriod*8)
 
     backend.storeId -> store
   }.toMap

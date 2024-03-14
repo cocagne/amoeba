@@ -336,8 +336,6 @@ abstract class TransactionDriver(
       if (!finalized) {
         finalized = true
 
-        shutdown() // release retry resources
-
         txd.originatingClient.foreach(client => {
           logger.trace(s"Sending TxFinalized(${txd.transactionId}) to originating client $client)")
           clientFinalized = Some(TransactionFinalized(client, storeId, txd.transactionId, committed))
@@ -348,6 +346,8 @@ abstract class TransactionDriver(
         logger.trace(s"Sending TxFinalized(${txd.transactionId}) to ${messages.head.to.poolId}:(${messages.map(_.to.poolIndex)})")
 
         txMessages = Some(messages)
+
+        shutdown() // release retry resources
 
         completionPromise.success(txd)
       }

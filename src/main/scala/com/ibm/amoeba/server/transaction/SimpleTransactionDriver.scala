@@ -88,7 +88,7 @@ class SimpleTransactionDriver(
       // Continually re-broadcast the prepare/accept messages for our current proposal at a fixed rate
       // if we get interrupted, the backoff mechanism will protect against contention
       nextTry.cancel()
-      nextTry = backgroundTasks.schedule(initialDelay) {
+      nextTry = backgroundTasks.schedule(maxDelay) {
         sendPeerMessages()
       }
     }

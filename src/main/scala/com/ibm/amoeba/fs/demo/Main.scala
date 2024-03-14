@@ -240,7 +240,7 @@ object Main {
 
     val f = initializeAmoeba(client, nucleus)
 
-    val fs = Await.result(f, Duration(5000, MILLISECONDS))
+    val fs = Await.result(f, Duration(10000, MILLISECONDS))
 
     val exports = "/ 192.168.64.1(rw)\n"
 

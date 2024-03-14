@@ -5,8 +5,9 @@ import com.ibm.amoeba.common.objects.{Metadata, ObjectId, ObjectType}
 import com.ibm.amoeba.common.store.{StoreId, StorePointer}
 import com.ibm.amoeba.common.transaction.TransactionId
 import com.ibm.amoeba.server.store.Locater
+import org.apache.logging.log4j.scala.Logging
 
-trait Backend {
+trait Backend extends Logging {
   val storeId: StoreId
 
   def close(): Unit
