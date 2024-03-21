@@ -3,10 +3,11 @@ package com.ibm.amoeba.client.tkvl
 import com.ibm.amoeba.client.KeyValueObjectState.ValueState
 import com.ibm.amoeba.client.{KeyValueObjectState, ObjectAllocator, ObjectReader, Transaction}
 import com.ibm.amoeba.common.HLCTimestamp
-import com.ibm.amoeba.common.objects._
+import com.ibm.amoeba.common.objects.*
 import com.ibm.amoeba.common.transaction.{KeyValueUpdate, RevisionLock}
 import com.ibm.amoeba.common.transaction.KeyValueUpdate.{DoesNotExist, FullContentLock, KeyObjectRevision, KeyRequirement, KeyRevision, WithinRange}
 import com.ibm.amoeba.server.store.KVObjectState
+import org.apache.logging.log4j.scala.Logging
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
@@ -18,7 +19,7 @@ class KeyValueListNode(val reader: ObjectReader,
                        val revision: ObjectRevision,
                        val refcount: ObjectRefcount,
                        val contents: Map[Key, ValueState],
-                       val tail: Option[KeyValueListPointer]) {
+                       val tail: Option[KeyValueListPointer]) extends Logging {
 
   implicit val ec: ExecutionContext = reader.client.clientContext
 
@@ -84,6 +85,7 @@ class KeyValueListNode(val reader: ObjectReader,
              prepareForSplit: (Key, KeyValueObjectPointer) => Future[Unit] = (_,_) => Future.successful(()),
              requirement: Option[Either[Boolean, ObjectRevision]] = None
             )(implicit tx: Transaction): Future[Unit] = fetchContainingNode(key).flatMap { node =>
+    logger.trace(s"KeyValueListNode got containing node for key $key. Min: ${node.minimum}")
     KeyValueListNode.insert(node, ordering, key, value, maxNodeSize, allocator, prepareForSplit, requirement)
   }
 

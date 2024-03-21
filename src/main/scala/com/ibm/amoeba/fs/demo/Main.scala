@@ -311,7 +311,7 @@ object Main {
       tkvl = new TieredKeyValueList(client, rootMgr)
 
       _=println("------------ Setting Key(1) ---------------")
-      _ = tkvl.set(Key(1), Value(Array[Byte](1,2,3)))(tx)
+      _ <- tkvl.set(Key(1), Value(Array[Byte](1,2,3)))(tx)
 
       _=println("------------ Committing! ---------------")
       _ <- tx.commit()
