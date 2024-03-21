@@ -53,6 +53,7 @@ object ZMQNetwork {
 
   class SrvMessenger(net: ZMQNetwork) extends ServerMessenger with Logging {
     def sendClientResponse(msg: ClientResponse): Unit = synchronized {
+      //logger.trace(s"Sending ClientResponse: $msg")
       net.clients.get(msg.toClient).foreach { zmqIdentity =>
         net.routerSocket.foreach { router =>
           router.send(zmqIdentity, ZMQ.SNDMORE)
@@ -83,6 +84,8 @@ class ZMQNetwork(val oclientId: Option[ClientId],
 
   val clientId: ClientId = oclientId.getOrElse(ClientId(UUID.randomUUID()))
 
+  logger.debug(s"ZMQNetwork Client ID: ${clientId.uuid.toString}")
+
   private val context = new ZContext()
 
   private val zloop = new ZLoop(context)
@@ -110,6 +113,7 @@ class ZMQNetwork(val oclientId: Option[ClientId],
   private val dealers = nodes.map { t =>
     val (nodeName, (host, port)) = t
     val dealer = context.createSocket(SocketType.DEALER)
+    dealer.setIdentity(clientId.toBytes)
     dealer.connect(s"tcp://$host:$port")
     heartbeatMessage.foreach(msg => dealer.send(msg))
     Peer(nodeName, dealer, new PollItem(dealer, ZMQ.Poller.POLLIN))
@@ -141,7 +145,11 @@ class ZMQNetwork(val oclientId: Option[ClientId],
 
   def enterEventLoop(): Unit = {
 
-    var poller = context.createPoller(dealers.length + 1)
+    val size = routerPollItem match {
+      case Some(_) => dealers.length + 1
+      case None => dealers.length
+    }
+    var poller = context.createPoller(size)
 
     dealers.foreach(peer => poller.register(peer.pollItem))
     routerPollItem.foreach(poller.register)
@@ -198,7 +206,7 @@ class ZMQNetwork(val oclientId: Option[ClientId],
 
     if (p.readResponse() != null) {
       val message = NetworkCodec.decode(p.readResponse())
-      logger.trace(s"Got read response for read ${message.readUUID} from store ${message.fromStore}")
+      //logger.trace(s"Got read response for read ${message.readUUID} from store ${message.fromStore}")
       onClientResponseReceived(message)
     }
     else if (p.txResolved() != null) {

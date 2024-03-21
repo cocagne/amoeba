@@ -4,14 +4,14 @@ import java.io.{File, StringReader}
 import java.nio.file.{Files, Path, Paths}
 import java.util.UUID
 import java.util.concurrent.Executors
-
 import com.ibm.amoeba.AmoebaError
 import com.ibm.amoeba.client.{AmoebaClient, KeyValueObjectState}
 import com.ibm.amoeba.client.internal.SimpleAmoebaClient
 import com.ibm.amoeba.client.internal.allocation.SinglePoolObjectAllocator
+import com.ibm.amoeba.client.tkvl.{KVObjectRootManager, Root, SinglePoolNodeAllocator, TieredKeyValueList}
 import com.ibm.amoeba.common.ida.{ReedSolomon, Replication}
 import com.ibm.amoeba.common.network.{ClientId, ClientRequest, ClientResponse, TxMessage}
-import com.ibm.amoeba.common.objects.{Key, KeyValueObjectPointer, ObjectRevisionGuard}
+import com.ibm.amoeba.common.objects.{ByteArrayKeyOrdering, Key, KeyValueObjectPointer, LexicalKeyOrdering, ObjectRevisionGuard, Value}
 import com.ibm.amoeba.common.pool.PoolId
 import com.ibm.amoeba.common.store.StoreId
 import com.ibm.amoeba.common.util.{BackgroundTaskPool, YamlFormat}
@@ -32,7 +32,6 @@ import org.dcache.nfs.v4.NFSServerV41
 import org.dcache.nfs.v4.xdr.nfs4_prot
 import org.dcache.nfs.vfs.VirtualFileSystem
 import org.dcache.oncrpc4j.rpc.{OncRpcProgram, OncRpcSvcBuilder}
-
 import org.apache.logging.log4j.scala.Logging
 
 import scala.concurrent.{Await, ExecutionContext, Future}
@@ -56,6 +55,7 @@ object Main {
     var onode: Option[StoreManager] = None
 
     def onClientResponseReceived(msg: ClientResponse): Unit ={
+      //logger.trace(s"**** Recieved ClientResponse: $msg. $oclient")
       oclient.foreach(_.receiveClientResponse(msg))
     }
     def onClientRequestReceived(msg: ClientRequest): Unit = {
@@ -67,8 +67,6 @@ object Main {
   }
 
   def setLog4jConfigFile(f: File): Unit = {
-    //System.setProperty("log4j2.debug", "true")
-
     // Set all loggers to Asynchronous Logging
     System.setProperty("log4j2.contextSelector", "org.apache.logging.log4j.core.async.AsyncLoggerContextSelector")
     System.setProperty("log4j2.configurationFile", s"file:${f.getAbsolutePath}")
@@ -84,6 +82,18 @@ object Main {
           arg[File]("<config-file>").text("Configuration File").
             action( (x, c) => c.copy(configFile=x)).
             validate( x => if (x.exists()) success else failure(s"Config file does not exist: $x"))
+        )
+
+      cmd("debug").text("Runs debugging code").
+        action((_, c) => c.copy(mode = "debug")).
+        children(
+          arg[File]("<config-file>").text("Configuration File").
+            action((x, c) => c.copy(configFile = x)).
+            validate(x => if (x.exists()) success else failure(s"Config file does not exist: $x")),
+
+          arg[File]("<log4j-config-file>").text("Log4j Configuration File").
+            action( (x, c) => c.copy(log4jConfigFile=x)).
+            validate( x => if (x.exists()) success else failure(s"Log4j Config file does not exist: $x"))
         )
 
       cmd("node").text("Starts an Amoeba Storage Node").
@@ -145,6 +155,7 @@ object Main {
             case "bootstrap" => bootstrap(config)
             case "node" => node(cfg.nodeName, config)
             case "amoeba" => amoeba_server(cfg.log4jConfigFile, config)
+            case "debug" => run_debug_code(cfg.log4jConfigFile, config)
             //case "rebuild" => rebuild(cfg.nodeName, config)
           }
         } catch {
@@ -223,6 +234,59 @@ object Main {
     }
 
     client.read(nucleus).flatMap(loadFileSystem)
+  }
+
+  def run_debug_code(log4jConfigFile: File, cfg: ConfigFile.Config): Unit = {
+    println(s"LOG4J CONFIG $log4jConfigFile")
+    setLog4jConfigFile(log4jConfigFile)
+
+    val (client, network, nucleus) = createAmoebaClient(cfg)
+
+    val networkThread = new Thread {
+      override def run(): Unit = {
+        network.enterEventLoop()
+      }
+    }
+    networkThread.start()
+
+    implicit val ec: ExecutionContext = client.clientContext
+
+    println("------------ Reading Nucleus ---------------")
+    for
+      kvos <- client.read(nucleus)
+      _=println("------------ Getting Storage Pool---------------")
+      pool <- client.getStoragePool(kvos.pointer.poolId)
+      _=println("------------ New Transaction---------------")
+      tx = client.newTransaction()
+      _=println("------------ New Root Manager---------------")
+      frootMgr <- KVObjectRootManager.createNewTree(client, kvos.pointer, Key(100), ByteArrayKeyOrdering,
+        new SinglePoolNodeAllocator(client, kvos.pointer.poolId),
+        Map(Key(0) -> Value(Array[Byte](1,2,3))))(tx)
+      _=println("------------ New Root Manager Step 2---------------")
+
+      _ <- tx.commit()
+
+      rootMgr <- frootMgr
+
+      tx = client.newTransaction()
+
+      _=println("------------ New TKVL ---------------")
+      tkvl = new TieredKeyValueList(client, rootMgr)
+
+      _=println("------------ Setting Key(1) ---------------")
+      _ = tkvl.set(Key(1), Value(Array[Byte](1,2,3)))(tx)
+
+      _=println("------------ Committing! ---------------")
+      _ <- tx.commit()
+      _=println("------------ Commit Complete! ---------------")
+
+      //guard = ObjectRevisionGuard(kvos.pointer, kvos.revision)
+      //allocator = new SinglePoolObjectAllocator(client, pool, kvos.pointer.ida, None)
+      //alloc <- allocator.allocateDataObject(guard, Array[Byte](0,1,2,3))(tx)
+      //_ = tx.overwrite(kvos, tx.revision, rootDirInode.toArray) // ensure Tx has an object to modify
+
+    yield
+      ()
   }
 
   def amoeba_server(log4jConfigFile: File, cfg: ConfigFile.Config): Unit = {

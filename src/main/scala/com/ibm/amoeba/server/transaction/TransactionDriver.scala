@@ -212,6 +212,8 @@ abstract class TransactionDriver(
 
         case Right(promise) =>
 
+          logger.trace(s"Received PrepareResponse from ${msg.from}. Disposition: ${msg.disposition}")
+
           peerDispositions += (msg.from -> msg.disposition)
 
           if (isValidAcceptor(msg.from))
@@ -290,6 +292,8 @@ abstract class TransactionDriver(
         case Right(accepted) =>
           acceptedPeers += msg.from
 
+          logger.trace(s"Received Accepted from ${msg.from}. ProposalId: ${msg.proposalId}. Committed: ${accepted.value}")
+
           learner.receiveAccepted(paxos.Accepted(msg.from.poolIndex, msg.proposalId, accepted.value))
 
           learner.finalValue.foreach(onResolution(_, sendResolutionMessage = true))
@@ -337,7 +341,7 @@ abstract class TransactionDriver(
         finalized = true
 
         txd.originatingClient.foreach(client => {
-          logger.trace(s"Sending TxFinalized(${txd.transactionId}) to originating client $client)")
+          logger.trace(s"Sending TxFinalized(${txd.transactionId}) to originating client $client. Committed: $committed")
           clientFinalized = Some(TransactionFinalized(client, storeId, txd.transactionId, committed))
         })
 

@@ -131,11 +131,18 @@ class Tx( trs: TransactionRecoveryState,
 
     // Find all objects with transaction collisions for inclusion into the response message
     m.foreach { t => t._2 match {
-      case TransactionCollision(txid) => collisions = txid :: collisions
+      case TransactionCollision(txid) =>
+        logger.trace(s"Tx ${txd.transactionId}. Collision with Tx $txid")
+        collisions = txid :: collisions
       case _ =>
     }}
 
     disposition = if (m.isEmpty && l.isEmpty) TransactionDisposition.VoteCommit else TransactionDisposition.VoteAbort
+
+    if (disposition == TransactionDisposition.VoteAbort) {
+      m.foreach(t => logger.trace(s"Tx ${txd.transactionId}. Object: ${t._1.uuid}. Requirement Error: ${t._2}"))
+      l.foreach(e => logger.trace(s"Tx ${txd.transactionId}. Requirement Error: ${e}"))
+    }
 
     // Case Resolution Complete
     oresolution.foreach { resolution =>

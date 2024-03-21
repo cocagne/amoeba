@@ -15,6 +15,7 @@ sbt 'testOnly *KeyValueObjectReaderSuite -- -z min/max'
 sbt compile; rm -r local/node_*
 ./t bootstrap local/cfg.yaml
 
+sudo launchctl start com.apple.rpcbind
 ./t nfs local/cfg.yaml local/log4j-conf.xml
 
 # Building for demo appliction
