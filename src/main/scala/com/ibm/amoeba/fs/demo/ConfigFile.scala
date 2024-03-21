@@ -15,34 +15,131 @@ import org.yaml.snakeyaml.constructor.SafeConstructor
 /*
  pools:
   - name: bootstrap-pool
-    width: 5
-    uuid: 65da619d-8e80-47dd-be70-98c3776ce0cd
+    width: 3
+    uuid: 00000000-0000-0000-0000-000000000000
 
   - name: inode-pool
-    width: 5
+    width: 3
+    uuid: 00000000-0000-0000-0000-000000000001
 
   - name: file-data-pool
-    width: 5
+    width: 3
+    uuid: 00000000-0000-0000-0000-000000000002
 
 object-allocaters:
+  - name: bootstrap-allocater
+    pool: bootstrap-pool
+    uuid: 00000000-0000-0000-0000-000000000000
+    ida:
+      type: replication
+      width: 3
+      write-threshold: 2
+
   - name: inode-allocater
     pool: inode-pool
+    uuid: 00000000-0000-0000-0000-111000000001
     ida:
-       type: replication
-       width: 5
-       writeThreshold: 3
+      type: replication
+      width: 3
+      write-threshold: 2
+
+  - name: file-data-allocater
+    pool: file-data-pool
+    uuid: 00000000-0000-0000-0000-111000000002
+    ida:
+      type: replication
+      width: 3
+      write-threshold: 2
 
 storage-nodes:
   - name: node_a
-    endpoint: tcp://127.0.0.1:5001
+    endpoint:
+      host: 127.0.0.1
+      port: 5000
+    uuid: 00000000-0000-0000-0000-222000000000
+    log4j-config: local/log4j-conf.xml
     crl:
-       type: rocksdb
-       path  /var/lib/aspen/node_a/crl
+      storage-engine: sweeper
+      path: local/node_a/crl
     stores:
-       - pool: bootstrap
-         store: 0
-         type: rocksdb
-         path:  /var/lib/aspen/node_a/bootstrap-0*/
+      - pool: bootstrap-pool
+        store: 0
+        backend:
+          storage-engine: rocksdb
+          path:  local/node_a/bootstrap-0
+      - pool: inode-pool
+        store: 0
+        backend:
+          storage-engine: rocksdb
+          path: local/node_a/inode-0
+      - pool: file-data-pool
+        store: 0
+        backend:
+          storage-engine: rocksdb
+          path: local/node_a/file-data-0
+
+  - name: node_b
+    endpoint:
+      host: 127.0.0.1
+      port: 5001
+    uuid: 00000000-0000-0000-0000-222000000001
+    log4j-config: local/log4j-conf.xml
+    crl:
+      storage-engine: sweeper
+      path: local/node_b/crl
+    stores:
+      - pool: bootstrap-pool
+        store: 1
+        backend:
+          storage-engine: rocksdb
+          path: local/node_b/bootstrap-1
+      - pool: inode-pool
+        store: 1
+        backend:
+          storage-engine: rocksdb
+          path: local/node_b/inode-1
+      - pool: file-data-pool
+        store: 1
+        backend:
+          storage-engine: rocksdb
+          path: local/node_b/file-data-1
+
+  - name: node_c
+    endpoint:
+      host: 127.0.0.1
+      port: 5002
+    uuid: 00000000-0000-0000-0000-222000000002
+    log4j-config: local/log4j-conf.xml
+    crl:
+      storage-engine: sweeper
+      path: local/node_c/crl
+    stores:
+      - pool: bootstrap-pool
+        store: 2
+        backend:
+          storage-engine: rocksdb
+          path: local/node_c/bootstrap-2
+      - pool: inode-pool
+        store: 2
+        backend:
+          storage-engine: rocksdb
+          path: local/node_c/inode-2
+      - pool: file-data-pool
+        store: 2
+        backend:
+          storage-engine: rocksdb
+          path: local/node_c/file-data-2
+
+nucleus:
+  ida:
+    type: replication
+    width: 3
+    write-threshold: 2
+  store-pointers:
+    - pool-index: 0
+    - pool-index: 1
+    - pool-index: 2
+*/
 object ConfigFile {
 
   object ReplicationFormat extends YObject[IDA] {

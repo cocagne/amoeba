@@ -2,7 +2,6 @@ package com.ibm.amoeba.fs.demo
 
 import java.io.{File, StringReader}
 import java.nio.file.{Files, Path, Paths}
-import java.util.UUID
 import java.util.concurrent.Executors
 import com.ibm.amoeba.AmoebaError
 import com.ibm.amoeba.client.{AmoebaClient, KeyValueObjectState}
@@ -36,6 +35,44 @@ import org.apache.logging.log4j.scala.Logging
 
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration.{Duration, MILLISECONDS, SECONDS}
+
+/*
+place this file in the head of the CLASSPATH
+---- log4j.properties ----
+
+# Set root logger level to DEBUG and its only appender to A1.
+log4j.rootLogger=TRACE, stdout
+
+# A1 is set to be a ConsoleAppender.
+log4j.appender.stdout=org.apache.log4j.ConsoleAppender
+log4j.appender.stdout.layout=org.apache.log4j.PatternLayout
+log4j.appender.stdout.layout.ConversionPattern=%-4r [%t] %-5p %c %x - %m%n
+
+---- log4j-conf.xml ----
+
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration>
+    <Appenders>
+        <Console name="Console">
+            <PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/>
+        </Console>
+    </Appenders>
+    <appender name="stdout" class="org.apache.log4j.ConsoleAppender">
+        <layout class="org.apache.log4j.PatternLayout">
+            <param name="ConversionPattern" value="%d{yyyy-MM-dd HH:mm:ss} %p %m%n"/>
+        </layout>
+    </appender>
+    <Loggers>
+        <Root level="trace">
+            <AppenderRef ref="Console"/>
+        </Root>
+        <logger name="org.dcache.oncrpc4j.rpc.OncRpcSvc" level="TRACE">
+            <AppenderRef ref="Console"/>
+        </logger>
+    </Loggers>
+</Configuration>
+
+ */
 
 object Main {
 
