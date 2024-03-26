@@ -27,7 +27,7 @@ import com.ibm.amoeba.server.transaction.SimpleTransactionDriver
 import org.dcache.nfs.ExportFile
 import org.dcache.nfs.v3.{MountServer, NfsServerV3}
 import org.dcache.nfs.v3.xdr.{mount_prot, nfs3_prot}
-import org.dcache.nfs.v4.NFSServerV41
+import org.dcache.nfs.v4.{MDSOperationExecutor, NFSServerV41}
 import org.dcache.nfs.v4.xdr.nfs4_prot
 import org.dcache.nfs.vfs.VirtualFileSystem
 import org.dcache.oncrpc4j.rpc.{OncRpcProgram, OncRpcSvcBuilder}
@@ -343,7 +343,7 @@ object Main {
 
     val fs = Await.result(f, Duration(10000, MILLISECONDS))
 
-    val exports = "/ 192.168.64.1(rw)\n"
+    val exports = "/ 192.168.64.2(rw)\n"
 
     val sched = Executors.newScheduledThreadPool(10)
     val ec = ExecutionContext.fromExecutorService(sched)
@@ -363,6 +363,7 @@ object Main {
       withExportTable(exportFile).
       withVfs(vfs).
       //withOperationFactory(new MDSOperationFactory).
+      withOperationExecutor(new MDSOperationExecutor).
       build
 
     val nfs3 = new NfsServerV3(exportFile, vfs)

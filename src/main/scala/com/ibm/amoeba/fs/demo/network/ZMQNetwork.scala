@@ -152,7 +152,6 @@ class ZMQNetwork(val oclientId: Option[ClientId],
   // Queue message in concurrent linked list and send an empty message to the queue socket
   // to wake the IO thread if it's sleeping in a call to poll()
   def queueMessageForSend(msg: SendQueueMsg): Unit =
-    logger.trace(s"Queuing Send Message! ${msg.getClass.getSimpleName}")
     sendQueue.add(msg)
     sendQueueClientSocket.get().send("")
 

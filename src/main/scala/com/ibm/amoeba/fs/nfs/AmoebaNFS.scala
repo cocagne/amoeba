@@ -9,7 +9,6 @@ import com.ibm.amoeba.fs.error.{DirectoryEntryDoesNotExist, DirectoryEntryExists
 import com.ibm.amoeba.fs.{BaseFile, BlockDevice, CharacterDevice, Directory, DirectoryInode, File, FileHandle, FileMode, FileSystem, FileType, InodePointer, Symlink, Timespec}
 import javax.security.auth.Subject
 import org.apache.logging.log4j.scala.Logging
-//import org.dcache.auth.Subjects
 import org.dcache.nfs.util.UnixSubjects
 import org.dcache.nfs.status.{ExistException, InvalException, NoEntException, NotDirException, NotSuppException, ServerFaultException}
 import org.dcache.nfs.v4.{NfsIdMapping, SimpleIdMap}
@@ -40,11 +39,10 @@ object AmoebaNFS {
     stats.setMode(file.mode)
     stats.setNlink(file.links)
     stats.setGeneration(0L)
-    stats.setIno(file.pointer.number.asInstanceOf[Int])
+    stats.setIno(file.pointer.number)
     stats.setATime(file.atime.millis)
     stats.setMTime(file.mtime.millis)
     stats.setCTime(file.ctime.millis)
-    stats.setIno(file.pointer.number.asInstanceOf[Int])
     stats.setUid(file.uid)
     stats.setGid(file.gid)
 
