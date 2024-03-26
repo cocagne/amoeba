@@ -66,7 +66,7 @@ abstract class BaseReadDriver(
 
   /** Sends a Read request to all stores that have not already responded. May be called outside a synchronized block */
   protected def sendReadRequests(): Unit = {
-    //logger.trace(s"Read UUID $readUUID: sending read requests to all stores for object ${objectPointer.id}. ${objectPointer.storePointers.map(sp => StoreId(objectPointer.poolId, sp.poolIndex)).toList}")
+    logger.trace(s"Read UUID $readUUID: sending read requests to all stores for object ${objectPointer.id}. ${objectPointer.storePointers.map(sp => StoreId(objectPointer.poolId, sp.poolIndex)).toList}")
     synchronized {
       retryCount += 1
       if (retryCount > 3) {
@@ -81,7 +81,7 @@ abstract class BaseReadDriver(
 
   protected def sendOpportunisticRebuild(storeId: StoreId, os: ObjectState): Unit = {
     if (!rebuildsSent.contains(storeId)) {
-      logger.info(s"Read UUID $readUUID: Sending Opprotunistic Rebuild to store $storeId for objerct ${objectPointer.id}")
+      logger.info(s"Read UUID $readUUID: Sending Opportunistic Rebuild to store $storeId for object ${objectPointer.id}")
       rebuildsSent += storeId
       client.messenger.sendClientRequest(OpportunisticRebuild(storeId, client.clientId, objectPointer, os.revision,
         os.refcount, os.timestamp, os.getRebuildDataForStore(storeId).get))

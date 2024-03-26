@@ -34,7 +34,7 @@ class RegisteredTransactionFinalizerFactory(val client: AmoebaClient) extends Tr
   def create(txd: TransactionDescription, messenger: Messenger): TransactionFinalizer = {
     val actions = txd.finalizationActions.map { sfa =>
       val f = client.typeRegistry.getType[FinalizationActionFactory](sfa.typeId.uuid).get
-      f.createFinalizationAction(client, sfa.data)
+      f.createFinalizationAction(client, txd, sfa.data)
     }
 
     new server.RegisteredTransactionFinalizerFactory.Finalizer(client, actions)

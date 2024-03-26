@@ -113,7 +113,6 @@ class RocksDBBackend(dbPath:String,
         db.get(key).onComplete {
           case Failure(err) => logger.error(s"RocksDBBackend failed to load object: ${locater.objectId}. Error: $err")
           case Success(oresult) =>
-            logger.trace(s"RocksDBBackend loaded object: ${locater.objectId}")
             chandler.foreach { handler =>
               oresult match {
                 case None =>

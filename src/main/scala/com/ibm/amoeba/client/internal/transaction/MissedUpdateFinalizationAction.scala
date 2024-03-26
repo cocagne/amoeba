@@ -2,17 +2,17 @@ package com.ibm.amoeba.client.internal.transaction
 
 import java.nio.{ByteBuffer, ByteOrder}
 import java.util.UUID
-
 import com.ibm.amoeba.client.{AmoebaClient, FinalizationAction, FinalizationActionFactory, RegisteredTypeFactory, StopRetrying, Transaction, UnknownStoragePool}
 import com.ibm.amoeba.common.objects.{Key, ObjectId, ObjectPointer, Value}
 import com.ibm.amoeba.common.store.StoreId
-import com.ibm.amoeba.common.transaction.{FinalizationActionId, SerializedFinalizationAction}
+import com.ibm.amoeba.common.transaction.{FinalizationActionId, SerializedFinalizationAction, TransactionDescription}
 import com.ibm.amoeba.common.util.BackgroundTask.ScheduledTask
 
 import scala.concurrent.duration.{Duration, MILLISECONDS}
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
-class MissedUpdateFinalizationAction(val client: AmoebaClient) extends FinalizationAction {
+class MissedUpdateFinalizationAction(val client: AmoebaClient,
+                                     val txd: TransactionDescription) extends FinalizationAction {
 
   implicit val ec: ExecutionContext = client.clientContext
 
@@ -23,7 +23,7 @@ class MissedUpdateFinalizationAction(val client: AmoebaClient) extends Finalizat
 
   private val completionPromise: Promise[Unit] = Promise()
 
-  logger.debug(s"Created MissedUpdateFinalizationAction")
+  logger.debug(s"Created MissedUpdateFinalizationAction for Tx ${txd.transactionId}")
 
   def complete: Future[Unit] = completionPromise.future
 
@@ -79,6 +79,7 @@ class MissedUpdateFinalizationAction(val client: AmoebaClient) extends Finalizat
     val key = Key(keyBytes)
 
     client.retryStrategy.retryUntilSuccessful(onFail _) {
+      logger.trace(s"Marking missed update for Tx ${txd.transactionId}. Object: $objectId")
       for {
         pool <- client.getStoragePool(storeId.poolId)
         tx = client.newTransaction()
@@ -86,6 +87,7 @@ class MissedUpdateFinalizationAction(val client: AmoebaClient) extends Finalizat
         _ <- pool.errorTree.set(key, Value(Array()))(tx)
         _ <- tx.commit()
       } yield {
+        logger.trace(s"COMPLETED - Marking missed update for Tx ${txd.transactionId}. Object: $objectId")
         ()
       }
     }
@@ -97,9 +99,11 @@ object MissedUpdateFinalizationAction extends RegisteredTypeFactory with Finaliz
 
   var errorTimeout = Duration(250, MILLISECONDS)
 
-  def createFinalizationAction(client: AmoebaClient, data: Array[Byte]): FinalizationAction = {
+  def createFinalizationAction(client: AmoebaClient,
+                               txd: TransactionDescription,
+                               data: Array[Byte]): FinalizationAction = {
 
-    new MissedUpdateFinalizationAction(client)
+    new MissedUpdateFinalizationAction(client, txd)
   }
 
   def createSerializedFA(missedCommitDelayInMs: Int): SerializedFinalizationAction = {

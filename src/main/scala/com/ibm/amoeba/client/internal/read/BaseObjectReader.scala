@@ -47,6 +47,7 @@ abstract class BaseObjectReader[PointerType <: ObjectPointer, StoreStateType <: 
     sb.append(header)
     sb.append("\n")
     sb.append(s"Read Transaction: $readUUID\n")
+    sb.append(s"Num Responses: $numResponses. Num Errors: $numErrors\n")
     responses.keys.toList.sortWith((a,b) => a.poolIndex < b.poolIndex).foreach { storeId =>
       responses(storeId) match {
         case Left(err) =>

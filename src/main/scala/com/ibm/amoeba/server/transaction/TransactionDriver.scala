@@ -187,6 +187,8 @@ abstract class TransactionDriver(
                                transactionCache: TransactionStatusCache): Unit = {
 
     synchronized {
+      logger.trace(s"Received PrepareResponse ${msg.transactionId} ProposalId: ${msg.proposalId} current ProposalId ${proposer.currentProposalId} from ${msg.from}. Disposition: ${msg.disposition}")
+
       if (msg.proposalId != proposer.currentProposalId)
         return
 
@@ -211,8 +213,6 @@ abstract class TransactionDriver(
           onNack(nack.promisedId)
 
         case Right(promise) =>
-
-          logger.trace(s"Received PrepareResponse from ${msg.from}. Disposition: ${msg.disposition}")
 
           peerDispositions += (msg.from -> msg.disposition)
 
@@ -263,8 +263,9 @@ abstract class TransactionDriver(
             if (cantAttempt)
               return
 
-            // If we get here, we've made our decision
-            proposer.setLocalProposal(canCommitTransaction)
+            if !proposer.haveLocalProposal then
+              // If we get here, we've made our decision
+              proposer.setLocalProposal(canCommitTransaction)
 
             shouldSendAcceptMessages = true
           }
@@ -278,6 +279,8 @@ abstract class TransactionDriver(
   def receiveTxAcceptResponse(msg: TxAcceptResponse): Unit = {
 
     synchronized {
+      logger.trace(s"Received AcceptResponse ${msg.transactionId} ProposalId: ${msg.proposalId} current ProposalId ${proposer.currentProposalId} from ${msg.from}. Response: ${msg.response}")
+
       if (msg.proposalId != proposer.currentProposalId)
         return
 
@@ -361,7 +364,7 @@ abstract class TransactionDriver(
     sendMessages()
   }
 
-  protected def nextRound(): Unit = {
+  protected def nextRound(): Unit = synchronized {
     peerDispositions = Map()
     acceptedPeers = Set()
     proposer.nextRound()
@@ -412,56 +415,61 @@ abstract class TransactionDriver(
   }
 
   protected def onNack(promisedId: paxos.ProposalId): Unit = {
-    proposer.updateHighestProposalId(promisedId)
+    synchronized {
+      logger.trace(s"NACK received! Current ProposalId: ${proposer.currentProposalId}. Highest: ${promisedId}")
+      proposer.updateHighestProposalId(promisedId)
+    }
     nextRound()
   }
 
-  protected def onResolution(committed: Boolean, sendResolutionMessage: Boolean): Unit = if (!resolved) {
+  protected def onResolution(committed: Boolean, sendResolutionMessage: Boolean): Unit = synchronized {
+    if (!resolved) {
 
-    resolved = true
+      resolved = true
 
-    resolvedValue = committed
+      resolvedValue = committed
 
-    logger.trace(s"Got TxResolved message for transaction ${txd.transactionId}. Committed: $committed")
+      logger.trace(s"Got TxResolved message for transaction ${txd.transactionId}. Committed: $committed")
 
-    if (committed) {
+      if (committed) {
 
-      // TODO: If sendResolutionMessage is false, another driver sent us a resolution message and will have
-      //       started executing the finalizers. Ideally, we'd watch the heartbeats of the other driver and
-      //       only start the finalizers ourselves if they time out to prevent contention. Could be tricky to
-      //       get this right though so we'll go with the simple approach for now
+        // TODO: If sendResolutionMessage is false, another driver sent us a resolution message and will have
+        //       started executing the finalizers. Ideally, we'd watch the heartbeats of the other driver and
+        //       only start the finalizers ourselves if they time out to prevent contention. Could be tricky to
+        //       get this right though so we'll go with the simple approach for now
 
-      logger.trace(s"Running finalization actions for transaction ${txd.transactionId}")
-      val f = finalizerFactory.create(txd, messenger)
+        logger.trace(s"Running finalization actions for transaction ${txd.transactionId}")
+        val f = finalizerFactory.create(txd, messenger)
 
-      // Update with initial commitErrors. This avoids problems when all TxCommit messages arrive
-      // before we notice that resolution has been achieved
-      f.updateCommitErrors(commitErrors)
+        // Update with initial commitErrors. This avoids problems when all TxCommit messages arrive
+        // before we notice that resolution has been achieved
+        f.updateCommitErrors(commitErrors)
 
-      f.complete foreach { _ =>
-        logger.trace(s"Finalization actions completed for transaction ${txd.transactionId}")
-        onFinalized(committed)
+        f.complete foreach { _ =>
+          logger.trace(s"Finalization actions completed for transaction ${txd.transactionId}")
+          onFinalized(committed)
+        }
+
+        finalizer = Some(f)
+      } else
+        onFinalized(false)
+
+      if (sendResolutionMessage) {
+        val messages = (allDataStores.iterator ++ txd.notifyOnResolution.iterator).map { toStoreId =>
+          TxResolved(toStoreId, storeId, txd.transactionId, committed)
+        }.toList
+
+        //logger.trace(s"Sending TxResolved(${txd.transactionId}) committed = $committed to ${messages.head.to.poolId}:(${messages.map(_.to.poolIndex)})")
+
+        txMessages = Some(messages)
+
+        clientResolved = txd.originatingClient.map { clientId =>
+          logger.trace(s"Sending TxResolved(${txd.transactionId}) committed = $committed to originating client $clientId")
+          TransactionResolved(clientId, storeId, txd.transactionId, committed)
+        }
       }
 
-      finalizer = Some(f)
-    } else
-      onFinalized(false)
-
-    if (sendResolutionMessage) {
-      val messages = (allDataStores.iterator ++ txd.notifyOnResolution.iterator).map { toStoreId =>
-        TxResolved(toStoreId, storeId, txd.transactionId, committed)
-      }.toList
-
-      //logger.trace(s"Sending TxResolved(${txd.transactionId}) committed = $committed to ${messages.head.to.poolId}:(${messages.map(_.to.poolIndex)})")
-
-      txMessages = Some(messages)
-
-      clientResolved = txd.originatingClient.map { clientId =>
-        logger.trace(s"Sending TxResolved(${txd.transactionId}) committed = $committed to originating client $clientId")
-        TransactionResolved(clientId, storeId, txd.transactionId, committed)
-      }
     }
-
   }
 }
 

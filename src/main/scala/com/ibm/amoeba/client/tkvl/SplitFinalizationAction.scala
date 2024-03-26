@@ -2,16 +2,16 @@ package com.ibm.amoeba.client.tkvl
 
 import java.nio.{ByteBuffer, ByteOrder}
 import java.util.UUID
-
-import com.ibm.amoeba.client._
+import com.ibm.amoeba.client.*
 import com.ibm.amoeba.client.internal.read.BaseReadDriver
 import com.ibm.amoeba.common.objects.{Key, KeyOrdering, KeyValueObjectPointer, ObjectId, Value}
-import com.ibm.amoeba.common.transaction.FinalizationActionId
+import com.ibm.amoeba.common.transaction.{FinalizationActionId, TransactionDescription}
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
 
 class SplitFinalizationAction(val client: AmoebaClient,
+                              val txd: TransactionDescription,
                               val rootManager: RootManager,
                               val tier: Int,
                               val newMinimum: Key,
@@ -101,7 +101,9 @@ class SplitFinalizationAction(val client: AmoebaClient,
 object SplitFinalizationAction extends RegisteredTypeFactory with FinalizationActionFactory {
   val typeUUID: UUID = UUID.fromString("68C3D242-CEA0-49D7-AA14-AB8E16D32FAD")
 
-  def createFinalizationAction(client: AmoebaClient, data: Array[Byte]): FinalizationAction = {
+  def createFinalizationAction(client: AmoebaClient,
+                               txd: TransactionDescription,
+                               data: Array[Byte]): FinalizationAction = {
     val bb = ByteBuffer.wrap(data)
     bb.order(ByteOrder.BIG_ENDIAN)
     val msb = bb.getLong()
@@ -121,7 +123,7 @@ object SplitFinalizationAction extends RegisteredTypeFactory with FinalizationAc
 
     val rootManager = factory.createRootManager(client, emgr)
 
-    new SplitFinalizationAction(client, rootManager, tier, Key(karr), ptr)
+    new SplitFinalizationAction(client, txd, rootManager, tier, Key(karr), ptr)
   }
 
   def addToTransaction(mgr: RootManager,

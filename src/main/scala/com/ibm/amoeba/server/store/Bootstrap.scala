@@ -83,7 +83,7 @@ object Bootstrap {
         Key(nucleus.id.uuid) -> nucleus.toArray
       ))
 
-      if true then
+      if false then
         println(s"ErrorTreeRoot: ${errTreeRoot.id.uuid}")
         println(s"AllocTreeRoot: ${allocTreeRoot.id.uuid}")
         println(s"Nucleus Pool : ${pool.id.uuid}")

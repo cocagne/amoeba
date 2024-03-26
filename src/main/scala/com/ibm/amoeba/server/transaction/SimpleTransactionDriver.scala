@@ -50,7 +50,7 @@ class SimpleTransactionDriver(
 
   if !designatedLeader then nextRound()
 
-  override def shutdown(): Unit = {
+  override def shutdown(): Unit = synchronized {
     logger.trace(s"**** Shutting down tx: ${txd.transactionId}")
     nextTry.cancel()
   }
@@ -81,7 +81,7 @@ class SimpleTransactionDriver(
 
       sendCount += 1
 
-      if (sendCount % 10 == 0) {
+      if (sendCount % 5 == 0) {
         printState(s => logger.debug(s))
       }
 

@@ -2,18 +2,17 @@ package com.ibm.amoeba.fs.demo.network
 
 import java.nio.{ByteBuffer, ByteOrder}
 import java.util.UUID
-
-import com.ibm.amoeba.client.internal.network.{Messenger => ClientMessenger}
-import com.ibm.amoeba.server.network.{Messenger => ServerMessenger}
+import com.ibm.amoeba.client.internal.network.Messenger as ClientMessenger
+import com.ibm.amoeba.server.network.Messenger as ServerMessenger
 import com.ibm.amoeba.common.DataBuffer
-import com.ibm.amoeba.common.network.{ClientId, ClientRequest, ClientResponse, NetworkCodec, NodeHeartbeat, TxMessage}
+import com.ibm.amoeba.common.network.{ClientId, ClientRequest, ClientResponse, NetworkCodec, NodeHeartbeat, Read, ReadResponse, TxMessage}
 import com.ibm.amoeba.common.store.StoreId
-import com.ibm.amoeba.common.network.protocol.{Message => PMessage}
+import com.ibm.amoeba.common.network.protocol.Message as PMessage
 import com.ibm.amoeba.common.objects.{Metadata, ObjectId}
 import com.ibm.amoeba.common.transaction.{ObjectUpdate, PreTransactionOpportunisticRebuild}
 import org.apache.logging.log4j.scala.Logging
-import org.zeromq.ZMQ.PollItem
-import org.zeromq.{SocketType, ZContext, ZLoop, ZMQ}
+import org.zeromq.ZMQ.{DONTWAIT, PollItem}
+import org.zeromq.{SocketType, ZContext, ZMQ}
 
 import scala.concurrent.duration.Duration
 
@@ -38,14 +37,23 @@ object ZMQNetwork {
     }
   }
 
+  sealed abstract class SendQueueMsg
+  case class SendClientRequest(msg: ClientRequest) extends SendQueueMsg
+  case class SendClientTransactionMessage(msg: TxMessage) extends SendQueueMsg
+  case class SendClientResponse(msg: ClientResponse) extends SendQueueMsg
+  case class SendServerTransactionMessage(msg: TxMessage) extends SendQueueMsg
+
   class CliMessenger(net: ZMQNetwork) extends ClientMessenger with Logging {
     def sendClientRequest(msg: ClientRequest): Unit = synchronized {
-      net.peers(net.stores(msg.toStore)).dealer.send(MessageEncoder.encodeMessage(msg))
+      msg match
+        case rr: Read => logger.trace(s"Sending ${msg.getClass.getSimpleName} ${rr.readUUID} to ${msg.toStore}")
+        case _ => logger.trace(s"Sending ${msg.getClass.getSimpleName} to ${msg.toStore}")
+      net.queueMessageForSend(SendClientRequest(msg))
     }
 
     def sendTransactionMessage(msg: TxMessage): Unit = synchronized {
       logger.trace(s"Sending TxId ${msg.transactionId} ${msg.getClass.getSimpleName} to ${msg.to}")
-      net.peers(net.stores(msg.to)).dealer.send(MessageEncoder.encodeMessage(msg))
+      net.queueMessageForSend(SendClientTransactionMessage(msg))
     }
 
     def sendTransactionMessages(msg: List[TxMessage]): Unit = msg.foreach(sendTransactionMessage)
@@ -53,18 +61,20 @@ object ZMQNetwork {
 
   class SrvMessenger(net: ZMQNetwork) extends ServerMessenger with Logging {
     def sendClientResponse(msg: ClientResponse): Unit = synchronized {
-      //logger.trace(s"Sending ClientResponse: $msg")
-      net.clients.get(msg.toClient).foreach { zmqIdentity =>
-        net.routerSocket.foreach { router =>
-          router.send(zmqIdentity, ZMQ.SNDMORE)
-          router.send(MessageEncoder.encodeMessage(msg))
-        }
-      }
+      val zaddr = net.clients.get(msg.toClient) match
+        case Some(zmqIdentity) => String(zmqIdentity)
+        case None => "UNKNOWN!"
+
+      msg match
+        case rr: ReadResponse => logger.trace(s"Sending ReadResponse for read ${rr.readUUID} to ${msg.toClient}. ZAddr: $zaddr")
+        case _ => logger.trace(s"Sending ${msg.getClass.getSimpleName} to ${msg.toClient}. ZAddr: $zaddr")
+
+      net.queueMessageForSend(SendClientResponse(msg))
     }
 
     def sendTransactionMessage(msg: TxMessage): Unit = synchronized {
       logger.trace(s"Sending TxId ${msg.transactionId} ${msg.getClass.getSimpleName} to ${msg.to}")
-      net.peers(net.stores(msg.to)).dealer.send(MessageEncoder.encodeMessage(msg))
+      net.queueMessageForSend(SendServerTransactionMessage(msg))
     }
 
     def sendTransactionMessages(msg: List[TxMessage]): Unit = msg.foreach(sendTransactionMessage)
@@ -88,13 +98,23 @@ class ZMQNetwork(val oclientId: Option[ClientId],
 
   private val context = new ZContext()
 
-  private val zloop = new ZLoop(context)
-
   private var clients: Map[ClientId, Array[Byte]] = Map()
 
   private var lastRouterMessageReceived = System.nanoTime()
 
   private var nodeStates: Map[String, NodeState] = nodes.map{t => t._1 -> new NodeState(t._1, 0, false)}
+
+  private val sendQueueSocket = context.createSocket(SocketType.DEALER)
+  sendQueueSocket.bind("inproc://send-message-queued")
+
+  private val sendQueue = new java.util.concurrent.ConcurrentLinkedQueue[SendQueueMsg]()
+
+  private val sendQueueClientSocket = ThreadLocal.withInitial[ZMQ.Socket]: () =>
+    val socket = context.createSocket(SocketType.DEALER)
+    socket.connect("inproc://send-message-queued")
+    socket
+
+  private val sendQueuePollItem = new PollItem(sendQueueSocket, ZMQ.Poller.POLLIN)
 
   private val routerSocket = storageNode.map { t =>
     val (_, _, port) = t
@@ -129,6 +149,13 @@ class ZMQNetwork(val oclientId: Option[ClientId],
 
   def serverMessenger: ServerMessenger = new SrvMessenger(this)
 
+  // Queue message in concurrent linked list and send an empty message to the queue socket
+  // to wake the IO thread if it's sleeping in a call to poll()
+  def queueMessageForSend(msg: SendQueueMsg): Unit =
+    logger.trace(s"Queuing Send Message! ${msg.getClass.getSimpleName}")
+    sendQueue.add(msg)
+    sendQueueClientSocket.get().send("")
+
   private def heartbeat(): Unit = {
     val offlineThreshold = System.nanoTime() - (heartbeatPeriod * 3).toNanos
     nodeStates.foreach { t =>
@@ -143,15 +170,16 @@ class ZMQNetwork(val oclientId: Option[ClientId],
     }
   }
 
-  def enterEventLoop(): Unit = {
+  def ioThread(): Unit = {
 
-    val size = routerPollItem match {
-      case Some(_) => dealers.length + 1
-      case None => dealers.length
-    }
+    val (size, routerSocketIndex) = routerPollItem match
+      case Some(_) => (dealers.length + 2, dealers.length + 1)
+      case None => (dealers.length + 1, -1)
+
     var poller = context.createPoller(size)
 
     dealers.foreach(peer => poller.register(peer.pollItem))
+    poller.register(sendQueuePollItem)
     routerPollItem.foreach(poller.register)
 
     val heartBeatPeriodMillis = heartbeatPeriod.toMillis.asInstanceOf[Int]
@@ -166,10 +194,14 @@ class ZMQNetwork(val oclientId: Option[ClientId],
       }
 
       try {
-        poller.poll(nextHeartbeat - now)
+        val timeToNextHB = nextHeartbeat - now
+        if timeToNextHB > 0 then
+          //logger.trace(s"*** SLEEPING. Time to next HB: $timeToNextHB")
+          poller.poll(timeToNextHB)
+          //logger.trace(s"*** Woke from poll. Time to next HB: ${nextHeartbeat - System.currentTimeMillis()}")
       } catch {
-        case _: Throwable =>
-          logger.warn("Poll method threw an exception. Creating a new poller")
+        case e: Throwable =>
+          logger.warn(s"Poll method threw an exception. Creating a new poller. Error: $e")
 
           dealers.foreach(peer => poller.unregister(peer.dealer))
           routerSocket.foreach(poller.unregister)
@@ -182,19 +214,53 @@ class ZMQNetwork(val oclientId: Option[ClientId],
 
       for (i <- dealers.indices) {
         if (poller.pollin(i)) {
-          val msg = dealers(i).dealer.recv()
-          onDealerMessageReceived(msg)
+          var msg = dealers(i).dealer.recv(ZMQ.DONTWAIT)
+          while msg != null do
+            try
+              onDealerMessageReceived(msg)
+            catch
+              case t: Throwable => logger.error(s"**** Error in onDealerMessageReceived: $t", t)
+            msg = dealers(i).dealer.recv(ZMQ.DONTWAIT)
         }
       }
 
       routerSocket.foreach { router =>
-        if (poller.pollin(dealers.length)) {
-          val from = router.recv()
-          val msg = router.recv()
-          onRouterMessageReceived(from, msg)
+        if (poller.pollin(routerSocketIndex)) {
+          var from = router.recv(ZMQ.DONTWAIT)
+          var msg = router.recv(ZMQ.DONTWAIT)
+          while from != null && msg != null do
+            try
+              onRouterMessageReceived(from, msg)
+            catch
+              case t: Throwable => logger.error(s"**** Error in onRouterMessageReceived: $t", t)
+            from = router.recv(ZMQ.DONTWAIT)
+            msg = router.recv(ZMQ.DONTWAIT)
         }
       }
+
+      if poller.pollin(dealers.length) then
+        var msg = sendQueueSocket.recv(ZMQ.DONTWAIT)
+        while msg != null do
+          msg = sendQueueSocket.recv(ZMQ.DONTWAIT)
+
+      var qmsg = sendQueue.poll()
+      while qmsg != null do
+        qmsg match
+          case SendClientRequest(msg) =>
+            peers(stores(msg.toStore)).dealer.send(MessageEncoder.encodeMessage(msg))
+          case SendClientTransactionMessage(msg) =>
+            peers(stores(msg.to)).dealer.send(MessageEncoder.encodeMessage(msg))
+          case SendClientResponse(msg) =>
+            clients.get(msg.toClient).foreach: zmqIdentity =>
+              routerSocket.foreach: router =>
+                router.send(zmqIdentity, ZMQ.SNDMORE)
+                router.send(MessageEncoder.encodeMessage(msg))
+          case SendServerTransactionMessage(msg) =>
+            peers(stores(msg.to)).dealer.send(MessageEncoder.encodeMessage(msg))
+        qmsg = sendQueue.poll()
     }
+
+    logger.trace("ZMQNetwork.enterEventLoop EXITING")
   }
 
   private def onDealerMessageReceived(msg: Array[Byte]): Unit = {
@@ -202,24 +268,29 @@ class ZMQNetwork(val oclientId: Option[ClientId],
 
     val msgLen = bb.getInt()
 
-    val p = PMessage.getRootAsMessage(bb)
+    val p = try PMessage.getRootAsMessage(bb.asReadOnlyBuffer()) catch
+      case t: Throwable =>
+        logger.error(s"******* PARSE DEALER MESSAGE ERROR: $t", t)
+        throw t
 
     if (p.readResponse() != null) {
       val message = NetworkCodec.decode(p.readResponse())
-      //logger.trace(s"Got read response for read ${message.readUUID} from store ${message.fromStore}")
+      logger.trace(s"Got ReadResponse for read ${message.readUUID} from store ${message.fromStore}")
       onClientResponseReceived(message)
     }
     else if (p.txResolved() != null) {
       val message = NetworkCodec.decode(p.txResolved())
+      logger.trace(s"Got TxResolved for TxId ${message.transactionId} from store ${message.fromStore}. Committed: ${message.committed}")
       onClientResponseReceived(message)
     }
     else if (p.txFinalized() != null) {
       val message = NetworkCodec.decode(p.txFinalized())
+      logger.trace(s"Got TxFinalized for TxId ${message.transactionId} from store ${message.fromStore}. Committed: ${message.committed}")
       onClientResponseReceived(message)
     }
     else if (p.allocateResponse() != null) {
       val message = NetworkCodec.decode(p.allocateResponse())
-      logger.trace(s"*** Allocate response from ${message.fromStore} obj ${message.newObjectId}")
+      logger.trace(s"Got AllocateResponse from ${message.fromStore} obj ${message.newObjectId}")
       onClientResponseReceived(message)
     }
   }
@@ -242,7 +313,10 @@ class ZMQNetwork(val oclientId: Option[ClientId],
     val msgLen = bb.getInt()
 
     // Must pass a read-only copy to the following method. It'll corrupt the rest of the buffer otherwise
-    val p = PMessage.getRootAsMessage(bb.asReadOnlyBuffer())
+    val p = try PMessage.getRootAsMessage(bb.asReadOnlyBuffer()) catch
+      case t: Throwable =>
+        logger.error(s"******* PARSE ROUTER MESSAGE ERROR: $t", t)
+        throw t
 
     if (p.nodeHeartbeat() != null) {
       val msg = NetworkCodec.decode(p.nodeHeartbeat())
@@ -316,7 +390,7 @@ class ZMQNetwork(val oclientId: Option[ClientId],
     else if (p.prepareResponse() != null) {
       //println("got prepareResponse")
       val message = NetworkCodec.decode(p.prepareResponse())
-      logger.trace(s"Tx ${message.transactionId} PrepareResponse from ${message.from}")
+      logger.trace(s"Tx ${message.transactionId} PrepareResponse from ${message.from}. Disposition ${message.disposition}")
       onTransactionMessageReceived(message)
     }
     else if (p.accept() != null) {
@@ -333,7 +407,7 @@ class ZMQNetwork(val oclientId: Option[ClientId],
     }
     else if (p.resolved() != null) {
       val message = NetworkCodec.decode(p.resolved())
-      logger.trace(s"Tx ${message.transactionId} Resolved from ${message.from}")
+      logger.trace(s"Tx ${message.transactionId} Resolved from ${message.from}. Committed: ${message.committed}")
       //println(s"got resolved for txid ${message.transactionUUID} committed = ${message.committed}")
       onTransactionMessageReceived(message)
     }

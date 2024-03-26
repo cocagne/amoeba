@@ -281,7 +281,7 @@ object Main {
 
     val networkThread = new Thread {
       override def run(): Unit = {
-        network.enterEventLoop()
+        network.ioThread()
       }
     }
     networkThread.start()
@@ -334,7 +334,7 @@ object Main {
 
     val networkThread = new Thread {
       override def run(): Unit = {
-        network.enterEventLoop()
+        network.ioThread()
       }
     }
     networkThread.start()
@@ -441,7 +441,7 @@ object Main {
 
     val networkThread = new Thread {
       override def run(): Unit = {
-        network.enterEventLoop()
+        network.ioThread()
       }
     }
     networkThread.start()

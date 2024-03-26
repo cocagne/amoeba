@@ -2,14 +2,14 @@ package com.ibm.amoeba.client.tkvl
 
 import java.nio.{ByteBuffer, ByteOrder}
 import java.util.UUID
-
 import com.ibm.amoeba.client.{AmoebaClient, FinalizationAction, FinalizationActionFactory, ObjectAllocator, RegisteredTypeFactory, Transaction}
 import com.ibm.amoeba.common.objects.{Key, KeyOrdering, KeyValueObjectPointer, ObjectId, Value}
-import com.ibm.amoeba.common.transaction.FinalizationActionId
+import com.ibm.amoeba.common.transaction.{FinalizationActionId, TransactionDescription}
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
 class JoinFinalizationAction(val client: AmoebaClient,
+                             val txd: TransactionDescription,
                              val rootManager: RootManager,
                              val tier: Int,
                              val deleteMinimum: Key,
@@ -91,7 +91,9 @@ class JoinFinalizationAction(val client: AmoebaClient,
 object JoinFinalizationAction extends RegisteredTypeFactory with FinalizationActionFactory {
   val typeUUID: UUID = UUID.fromString("C9EA4384-74A9-4044-8C64-7641D328F529")
 
-  def createFinalizationAction(client: AmoebaClient, data: Array[Byte]): FinalizationAction = {
+  def createFinalizationAction(client: AmoebaClient, 
+                               txd: TransactionDescription, 
+                               data: Array[Byte]): FinalizationAction = {
     val bb = ByteBuffer.wrap(data)
     bb.order(ByteOrder.BIG_ENDIAN)
     val msb = bb.getLong()
@@ -111,7 +113,7 @@ object JoinFinalizationAction extends RegisteredTypeFactory with FinalizationAct
 
     val rootManager = factory.createRootManager(client, emgr)
 
-    new JoinFinalizationAction(client, rootManager, tier, Key(karr), ptr)
+    new JoinFinalizationAction(client, txd, rootManager, tier, Key(karr), ptr)
   }
 
   def addToTransaction(mgr: RootManager,
