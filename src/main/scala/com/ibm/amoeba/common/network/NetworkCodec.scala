@@ -3,8 +3,7 @@ package com.ibm.amoeba.common.network
 import java.nio.charset.StandardCharsets
 import java.nio.{ByteBuffer, ByteOrder}
 import java.util.UUID
-
-import com.ibm.amoeba.common.network.{protocol => P}
+import com.ibm.amoeba.common.network.protocol as P
 import com.google.flatbuffers.FlatBufferBuilder
 import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp}
 import com.ibm.amoeba.common.ida.{IDA, ReedSolomon, Replication}
@@ -14,9 +13,10 @@ import com.ibm.amoeba.common.pool.PoolId
 import com.ibm.amoeba.common.store.{StoreId, StorePointer}
 import com.ibm.amoeba.common.transaction.KeyValueUpdate.{FullContentLock, KeyRevision}
 import com.ibm.amoeba.common.transaction.{DataUpdate, DataUpdateOperation, FinalizationActionId, KeyValueUpdate, LocalTimeRequirement, ObjectUpdate, PreTransactionOpportunisticRebuild, RefcountUpdate, RevisionLock, SerializedFinalizationAction, TransactionDescription, TransactionDisposition, TransactionId, TransactionRequirement, TransactionStatus, VersionBump}
+import org.apache.logging.log4j.scala.Logging
 
 
-object NetworkCodec {
+object NetworkCodec extends Logging {
   
   //-----------------------------------------------------------------------------------------------
   // Objects
@@ -898,9 +898,7 @@ object NetworkCodec {
     val toStore = encode(builder, o.toStore)
     val keyReq = o.revisionGuard match {
       case _: ObjectRevisionGuard => -1
-      case krg: KeyRevisionGuard =>
-        val rev = krg.keyRevision
-        encode(builder, KeyValueUpdate.KeyRevision(krg.key, rev))
+      case krg: KeyRevisionGuard => encode(builder, KeyValueUpdate.KeyObjectRevision(krg.key, krg.keyRevision))
     }
 
     val allocObj = encode(builder, o.revisionGuard.pointer)
@@ -942,8 +940,10 @@ object NetworkCodec {
       val allocatingObjectRevision = decode(n.allocatingObjectRevision())
       ObjectRevisionGuard(allocatingObject, allocatingObjectRevision)
     } else {
-      val kreq = decode(n.allocatingObjectKeyRequirement()).asInstanceOf[KeyValueUpdate.KeyRevision]
-      val rev = kreq.revision
+      val kreq = decode(n.allocatingObjectKeyRequirement())
+      val rev = kreq match
+        case kor: KeyValueUpdate.KeyObjectRevision => kor.revision
+        case _ => assert(false, "Only KeyObjectRevisions are allowed")
       KeyRevisionGuard(allocatingObject.asInstanceOf[KeyValueObjectPointer], kreq.key, rev)
     }
 
