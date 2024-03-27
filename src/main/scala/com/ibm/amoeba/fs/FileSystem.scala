@@ -155,8 +155,8 @@ trait FileSystem extends Logging {
 
   protected val fileFactory: FileFactory
 
-  def openFileHandle(file: File): FileHandle = ???
-  def closeFileHandle(fh: File): Unit = ???
+  def openFileHandle(file: File): FileHandle
+  def closeFileHandle(fh: FileHandle): Unit
 
   def defaultSegmentSize: Int
   def defaultFileIndexNodeSize(iter: Int): Int

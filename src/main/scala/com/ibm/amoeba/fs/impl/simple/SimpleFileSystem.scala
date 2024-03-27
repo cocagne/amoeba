@@ -2,7 +2,6 @@ package com.ibm.amoeba.fs.impl.simple
 
 import java.util.UUID
 import java.util.concurrent.{Executors, TimeUnit}
-
 import com.ibm.amoeba.client.internal.allocation.SinglePoolObjectAllocator
 import com.ibm.amoeba.client.tkvl.{KVObjectRootManager, NodeAllocator, Root, SinglePoolNodeAllocator}
 import com.ibm.amoeba.client.{AmoebaClient, ExponentialBackoffRetryStrategy, KeyValueObjectState, ObjectAllocator, ObjectAllocatorId, Transaction}
@@ -10,7 +9,7 @@ import com.ibm.amoeba.common.objects.{AllocationRevisionGuard, IntegerKeyOrderin
 import com.ibm.amoeba.common.util.{byte2uuid, uuid2byte}
 import com.ibm.amoeba.compute.TaskExecutor
 import com.ibm.amoeba.compute.impl.SimpleTaskExecutor
-import com.ibm.amoeba.fs.{DirectoryInode, DirectoryPointer, FileFactory, FileMode, FileSystem}
+import com.ibm.amoeba.fs.{DirectoryInode, DirectoryPointer, File, FileFactory, FileHandle, FileMode, FileSystem}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -109,6 +108,9 @@ class SimpleFileSystem(aclient: AmoebaClient,
 
   override private[fs] def inodeTable: com.ibm.amoeba.fs.InodeTable = new SimpleInodeTable(this, defaultAllocator,
     new KVObjectRootManager(client, InodeTableRootKey, fsRoot.pointer))
+  
+  override def openFileHandle(file: File): FileHandle = new SimpleFileHandle(file, 1024*1024)
+  override def closeFileHandle(fh: FileHandle): Unit = fh.flush()
 
   FileSystem.register(this)
 }

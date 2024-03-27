@@ -38,7 +38,7 @@ trait File extends BaseFile {
 
   private[amoeba] def close(fh: FileHandle): Unit =  {
     synchronized { openHandles -= fh }
-    fs.closeFileHandle(this)
+    fs.closeFileHandle(fh)
   }
 
   private[amoeba] def hasOpenHandles: Boolean = synchronized { openHandles.nonEmpty }
