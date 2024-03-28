@@ -246,15 +246,19 @@ class ZMQNetwork(val oclientId: Option[ClientId],
       while qmsg != null do
         qmsg match
           case SendClientRequest(msg) =>
+            logger.trace(s"Sending ${msg.getClass.getSimpleName} to ${msg.toStore}")
             peers(stores(msg.toStore)).dealer.send(MessageEncoder.encodeMessage(msg))
           case SendClientTransactionMessage(msg) =>
+            logger.trace(s"Sending ${msg.getClass.getSimpleName} to ${msg.to}")
             peers(stores(msg.to)).dealer.send(MessageEncoder.encodeMessage(msg))
           case SendClientResponse(msg) =>
+            logger.trace(s"Sending ${msg.getClass.getSimpleName} to ${msg.toClient}")
             clients.get(msg.toClient).foreach: zmqIdentity =>
               routerSocket.foreach: router =>
                 router.send(zmqIdentity, ZMQ.SNDMORE)
                 router.send(MessageEncoder.encodeMessage(msg))
           case SendServerTransactionMessage(msg) =>
+            logger.trace(s"Sending ${msg.getClass.getSimpleName} to ${msg.to}")
             peers(stores(msg.to)).dealer.send(MessageEncoder.encodeMessage(msg))
         qmsg = sendQueue.poll()
     }
@@ -330,7 +334,7 @@ class ZMQNetwork(val oclientId: Option[ClientId],
     }
     else if (p.read() != null) {
       val message = NetworkCodec.decode(p.read())
-      logger.trace(s"Read requestid ${message.readUUID} for object ${message.objectPointer.id} from ${message.fromClient}")
+      logger.trace(s"Got Read ${message.readUUID} for object ${message.objectPointer.id} from ${message.fromClient}")
       updateClientId(message.fromClient, from)
       onClientRequestReceived(message)
     }
@@ -383,66 +387,66 @@ class ZMQNetwork(val oclientId: Option[ClientId],
         (localUpdates, preTxRebuilds)
       }
       val message = NetworkCodec.decode(p.prepare(), updateContent._1, updateContent._2)
-      logger.trace(s"Tx ${message.txd.transactionId} Prepare message from ${message.from}")
+      logger.trace(s"Got Prepare ${message.txd.transactionId} from ${message.from}. ProposalId:${message.proposalId}")
       onTransactionMessageReceived(message)
     }
     else if (p.prepareResponse() != null) {
       //println("got prepareResponse")
       val message = NetworkCodec.decode(p.prepareResponse())
-      logger.trace(s"Tx ${message.transactionId} PrepareResponse from ${message.from}. Disposition ${message.disposition}")
+      logger.trace(s"Got PrepareResponse ${message.transactionId} from ${message.from}. ProposalId:${message.proposalId} Disposition ${message.disposition}")
       onTransactionMessageReceived(message)
     }
     else if (p.accept() != null) {
       //println("got accept")
       val message = NetworkCodec.decode(p.accept())
-      logger.trace(s"Tx ${message.transactionId} Accept from ${message.from}")
+      logger.trace(s"Got Accept ${message.transactionId} from ${message.from}. ProposalId:${message.proposalId}. ${message.value}")
       onTransactionMessageReceived(message)
     }
     else if (p.acceptResponse() != null) {
       //println("got acceptResponse")
       val message = NetworkCodec.decode(p.acceptResponse())
-      logger.trace(s"Tx ${message.transactionId} AcceptResponse from ${message.from}")
+      logger.trace(s"Got AcceptResponse ${message.transactionId} from ${message.from}. ProposalId:${message.proposalId} Response: ${message.response}")
       onTransactionMessageReceived(message)
     }
     else if (p.resolved() != null) {
       val message = NetworkCodec.decode(p.resolved())
-      logger.trace(s"Tx ${message.transactionId} Resolved from ${message.from}. Committed: ${message.committed}")
+      logger.trace(s"Got Resolved ${message.transactionId} from ${message.from}. Committed: ${message.committed}")
       //println(s"got resolved for txid ${message.transactionUUID} committed = ${message.committed}")
       onTransactionMessageReceived(message)
     }
     else if (p.committed() != null) {
       val message = NetworkCodec.decode(p.committed())
-      logger.trace(s"Tx ${message.transactionId} Committed from ${message.from}")
+      logger.trace(s"Got Committed ${message.transactionId} from ${message.from}")
       //println(s"got committed for txid ${message.transactionUUID}")
       onTransactionMessageReceived(message)
     }
     else if (p.finalized() != null) {
       //println("got finalized")
       val message = NetworkCodec.decode(p.finalized())
-      logger.trace(s"Tx ${message.transactionId} Finalized from ${message.from}")
+      logger.trace(s"Got Finalized ${message.transactionId} from ${message.from}. Committed: ${message.committed}")
       onTransactionMessageReceived(message)
     }
     else if (p.heartbeat() != null) {
       val message = NetworkCodec.decode(p.heartbeat())
-      logger.trace(s"Tx ${message.transactionId} Heartbeat from ${message.from}")
+      logger.trace(s"Got TxHeartbeat ${message.transactionId} from ${message.from}")
       onTransactionMessageReceived(message)
     }
     else if (p.allocate() != null) {
       //println(s"got allocate request. Receiver: $a")
       val message = NetworkCodec.decode(p.allocate())
-      logger.trace(s"Tx ${message.allocationTransactionId} Allocate ${message.newObjectId}")
+      logger.trace(s"Got Allocate ${message.allocationTransactionId} ${message.newObjectId}.")
       updateClientId(message.fromClient, from)
       onClientRequestReceived(message)
     }
     else if (p.opportunisticRebuild() != null) {
       val message = NetworkCodec.decode(p.opportunisticRebuild())
-      logger.trace(s"Tx ${message.pointer.id} OpportunisticRebuild")
+      logger.trace(s"Got OpportunisticRebuild for object ${message.pointer.id}")
       updateClientId(message.fromClient, from)
       onClientRequestReceived(message)
     }
     else if (p.transactionCompletionQuery() != null) {
       val message = NetworkCodec.decode(p.transactionCompletionQuery())
-      logger.trace(s"Tx ${message.transactionId} CompletionQuery")
+      logger.trace(s"Got CompletionQuery for transaction ${message.transactionId}")
       updateClientId(message.fromClient, from)
       onClientRequestReceived(message)
     }
