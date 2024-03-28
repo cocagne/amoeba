@@ -80,11 +80,6 @@ AllocationDriver
     - Detect stalled allocations and force commit failure
     - Recover from successful completions
 
-AllocationErrorHandling
-    - Crash between sending Allocate message and starting the allocation transaction will require
-      saving the guard (objectPointer, objectRevision) or (objectPointer, key, keyRevision).
-    - Recovering allocation manager can then version bump to force allocation failure
-
 FIXME - When setting Maximum on KeyValue object, we must check to ensure that no keys exceeding that
         maximum will be present when transaction ends. Must run through adds and deletes to local keys
         to determine this.
