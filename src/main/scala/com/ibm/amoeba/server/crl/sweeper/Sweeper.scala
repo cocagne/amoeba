@@ -364,20 +364,16 @@ class Sweeper(directory: Path,
     var fstate: Option[RecoveringState] = None
 
     boundary:
-      for (f <- rfiles) {
-        try {
+      for (f <- rfiles)
+        try
           fstate = Some(loadState(f))
           break()
-        } catch {
+        catch
           case e: CorruptedEntry => logger.warn(s"Corrupted CRL Entry: ${e.getMessage}")
-        }
-      }
 
-    fstate match {
-      case Some(f) => return f
-      case None =>
-    }
-    new RecoveringState
+    fstate match
+      case Some(f) => f
+      case None => new RecoveringState
   }
 
   private def loadState(lastFile: LogFile): RecoveringState = {
@@ -459,9 +455,16 @@ class Sweeper(directory: Path,
       }
     }
 
+    def keepAlloc(txid: TxId): Boolean =
+      state.allocations.get(txid) match
+        case None => true
+        case Some(lst) => lst.find(a => a.state.allocationTransactionId == txid.transactionId) match
+          case None => true
+          case Some(_) => false
+
     for (_ <- 0 until numAlloc) {
       val txid = getTxId(entry)
-      val keep = !state.allocations.contains(txid) && !state.deletedAlloc.contains(txid)
+      val keep = keepAlloc(txid) && !state.deletedAlloc.contains(txid)
       val spLen = entry.getInt()
       val sparr = new Array[Byte](spLen)
       entry.get(sparr)
