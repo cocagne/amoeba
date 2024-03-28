@@ -81,7 +81,9 @@ AllocationDriver
     - Recover from successful completions
 
 AllocationErrorHandling
-    - Fix sweeper bug
+    - Crash between sending Allocate message and starting the allocation transaction will require
+      saving the guard (objectPointer, objectRevision) or (objectPointer, key, keyRevision).
+    - Recovering allocation manager can then version bump to force allocation failure
 
 FIXME - When setting Maximum on KeyValue object, we must check to ensure that no keys exceeding that
         maximum will be present when transaction ends. Must run through adds and deletes to local keys
@@ -89,6 +91,4 @@ FIXME - When setting Maximum on KeyValue object, we must check to ensure that no
    |-> Prevents hole where KV additions are made after a read which results in a split. could leave
        behind keys with value > maximum
 
-FIXME - Sweeper impl can only handle 1 allocation per transaction. Major changes needed to fix this.
-FiXME   Will need to include the ObjectId into the TxId
 

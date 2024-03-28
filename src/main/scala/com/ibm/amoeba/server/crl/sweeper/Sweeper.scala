@@ -4,7 +4,6 @@ import java.nio.ByteBuffer
 import java.nio.file.Path
 import java.util.UUID
 import java.util.concurrent.{Executors, LinkedBlockingQueue, TimeUnit}
-
 import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp}
 import com.ibm.amoeba.common.objects.{ObjectId, ObjectRefcount, ObjectType}
 import com.ibm.amoeba.common.paxos.{PersistentState, ProposalId}
@@ -16,8 +15,9 @@ import org.apache.logging.log4j.scala.Logging
 
 import scala.annotation.tailrec
 import scala.collection.immutable.{HashMap, HashSet}
-
-import scala.util.boundary, boundary.break
+import scala.util.boundary
+import boundary.break
+import scala.::
 
 object Sweeper {
   def createLogFile(directory: Path, fileId: FileId, maxSize: Long): LogFile = {
@@ -26,7 +26,7 @@ object Sweeper {
 
   class RecoveringState {
     var transactions: HashMap[TxId, Tx] = new HashMap
-    var allocations: HashMap[TxId, Alloc] = new HashMap
+    var allocations: HashMap[TxId, List[Alloc]] = new HashMap
     var deletedTx: HashSet[TxId] = new HashSet()
     var deletedAlloc: HashSet[TxId] = new HashSet()
     var lastEntry: Option[(LogEntrySerialNumber, FileLocation)] = None
@@ -115,7 +115,7 @@ class Sweeper(directory: Path,
     val rs = recover()
     val (last, lastLoc) = rs.lastEntry.getOrElse((LogEntrySerialNumber(0), FileLocation.Null))
     val lastSerial = LogEntrySerialNumber(last.number + 1)
-    val ilc = rs.transactions.valuesIterator ++ rs.allocations.valuesIterator
+    val ilc = rs.transactions.valuesIterator ++ rs.allocations.valuesIterator.flatMap(lst => lst.iterator)
 
     ilc.toList.sorted.foreach { c => contentQueue.add(c) }
 
@@ -184,17 +184,15 @@ class Sweeper(directory: Path,
                 pruned = Left(tx) :: pruned
               }
             }
-            allocations.valuesIterator.foreach { a =>
-              val prune = a.dataLocation match {
-                case None => true
-                case Some(loc) => loc.fileId == fileId
-              }
+            allocations.valuesIterator.foreach: lst =>
+              lst.foreach: a =>
+                val prune = a.dataLocation match
+                  case None => true
+                  case Some(loc) => loc.fileId == fileId
 
-              if (prune) {
-                a.dataLocation = None
-                pruned = Right(a) :: pruned
-              }
-            }
+                if prune then
+                  a.dataLocation = None
+                  pruned = Right(a) :: pruned
           }
 
           while (!stream.entry.isFull && pruned.nonEmpty) {
@@ -297,8 +295,9 @@ class Sweeper(directory: Path,
     case a: AllocSave =>
       val txid = TxId(a.state.storeId, a.state.allocationTransactionId)
       val alloc = new Alloc(None, a.state, nextEntrySerialNumber)
-      if (entry.addAllocation(alloc, contentQueue, Some(a.client, txid)))
-        allocations += (txid -> alloc)
+      if entry.addAllocation(alloc, contentQueue, Some(a.client, txid)) then
+        val lst = alloc :: allocations.getOrElse(txid, Nil)
+        allocations += (txid -> lst)
       else
         nextRequest = Some(req)
 
@@ -322,7 +321,7 @@ class Sweeper(directory: Path,
 
     case f: GetFullStoreState =>
       val t = transactions.valuesIterator.filter(tx => tx.state.storeId == f.storeId).map(tx => tx.state).toList
-      val a = allocations.valuesIterator.filter(a => a.state.storeId == f.storeId).map(a => a.state).toList
+      val a = allocations.valuesIterator.flatMap(lst => lst.iterator).filter(a => a.state.storeId == f.storeId).map(a => a.state).toList
       f.response.put((t,a))
 
     case c: CreateCRL =>
@@ -490,7 +489,8 @@ class Sweeper(directory: Path,
 
         val alloc = new Alloc(Some(dataLoc), ars, LogEntrySerialNumber(serial))
 
-        state.allocations += (txid -> alloc)
+        val lst = alloc :: state.allocations.getOrElse(txid, Nil)
+        state.allocations += (txid -> lst)
       }
     }
 
