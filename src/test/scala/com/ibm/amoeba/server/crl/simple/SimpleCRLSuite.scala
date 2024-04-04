@@ -59,7 +59,7 @@ class SimpleCRLSuite extends FileBasedTests {
 
     val buffer = new Array[Byte](4096 * 5)
 
-    assert(a.dynamicDataSize == 2)
+    assert(a.dynamicDataSize == 0)
 
     a.writeStaticEntry(ByteBuffer.wrap(buffer))
 
@@ -107,7 +107,7 @@ class SimpleCRLSuite extends FileBasedTests {
 
     val buffer = new Array[Byte](4096 * 5)
 
-    assert(tx.dynamicDataSize == 3)
+    assert(tx.dynamicDataSize == 0)
 
     tx.writeStaticEntry(ByteBuffer.wrap(buffer))
 

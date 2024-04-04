@@ -15,8 +15,8 @@ sealed abstract class LogContent:
   
   def dynamicDataSize: Long
   
-  def staticEntrySize: Long
-  
+  def staticDataSize: Long
+
   // Sets all optional StreamLocations with matching StreamIds to None and returns
   // true if any matching streams are found
   def closeStream(id: StreamId): Boolean
@@ -107,13 +107,19 @@ class Tx(val id: TxId,
          var txdLocation: Option[StreamLocation] = None,
          var objectUpdateLocations: Option[List[(ObjectId, StreamLocation)]] = None,
          var keepObjectUpdates: Boolean = true) extends LogContent:
-  
-  override def dynamicDataSize: Long = if keepObjectUpdates then
-    state.objectUpdates.foldLeft(0)((sum, ou) => sum + ou.data.size)
-  else
-    0
 
-  override def staticEntrySize: Long =
+  override def dynamicDataSize: Long =
+    val updatesSize = if !keepObjectUpdates || objectUpdateLocations.nonEmpty then
+      0 // Dropped or already written to an active stream. No need to write them now
+    else
+      state.objectUpdates.foldLeft(0)((sum, ou) => sum + ou.data.size)
+
+    val txdSize = if txdLocation.nonEmpty then 0 else state.serializedTxd.size
+
+    updatesSize + txdSize
+
+
+  override def staticDataSize: Long =
     // Transaction Entry
     //     txid:  33 bytes - store id (16-bye pool id + 1 byte index) + 16 byte Transaction UUID
     //     serialized_transaction_description: FileLocation, 14
@@ -177,10 +183,10 @@ class Tx(val id: TxId,
       bb.putInt(0)
 
 
-  override def closeStream(id: StreamId): Boolean = 
+  override def closeStream(id: StreamId): Boolean =
     val txd = txdLocation match
       case None => false
-      case Some(loc) =>  
+      case Some(loc) =>
         if loc.streamId == id then
           txdLocation = None
           true
@@ -189,13 +195,13 @@ class Tx(val id: TxId,
 
     val ous = objectUpdateLocations match
       case None => false
-      case Some(lst) => 
+      case Some(lst) =>
         if lst.exists(_._2.streamId == id) then
           objectUpdateLocations = None
           true
         else
           false
-          
+
     txd || ous
 
 
@@ -240,9 +246,13 @@ object Alloc:
 class Alloc(var dataLocation: Option[StreamLocation],
             var state: AllocationRecoveryState) extends LogContent:
 
-  override def dynamicDataSize: Long = state.objectData.size
+  override def dynamicDataSize: Long =
+    if dataLocation.isEmpty then
+      state.objectData.size
+    else
+      0
 
-  override def staticEntrySize: Long =
+  override def staticDataSize: Long =
     // Allocation Entry
     //     txid: StoreId 17 + allocation_transaction_id 16
     //     store_pointer: StorePointer, 4 + nbytes
