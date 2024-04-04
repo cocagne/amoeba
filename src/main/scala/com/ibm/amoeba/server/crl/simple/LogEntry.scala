@@ -171,10 +171,14 @@ object LogEntry:
         rstate.allocations += (la.txid -> la)
 
     for (_ <- 0 until header.numDeletedTransactions)
-      rstate.txs -= LogContent.getTxId(bb)
+      val txid = LogContent.getTxId(bb)
+      rstate.txs -= txid
+      rstate.txDeletions += txid
 
     for (_ <- 0 until header.numDeletedAllocations)
-      rstate.allocations -= LogContent.getTxId(bb)
+      val txid = LogContent.getTxId(bb)
+      rstate.allocations -= txid
+      rstate.allocDeletions += txid
 
 
   def padTo4k(offset: Long): Int =

@@ -19,6 +19,8 @@ class Stream(val streamId: StreamId,
 
   // Writes entry to the stream and returns its location
   def writeEntry(entry: LogEntry): StreamLocation =
+    require(canWriteEntry(entry))
+    
     val entryLocation = StreamLocation(streamId, nextWriteOffset, entry.entrySize.toInt)
     val entrySize = entry.entrySize
 

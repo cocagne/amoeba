@@ -3,7 +3,7 @@ package com.ibm.amoeba.server.crl.simple
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
 import java.nio.file.{Path, StandardOpenOption}
-import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.LinkedBlockingQueue
 
 object WriterThread:
 
@@ -19,7 +19,8 @@ object WriterThread:
 class StreamWriter(val maxSizeInBytes: Long,
                    files: List[(StreamId, Path)],
                    onWriteComplete: () => Unit):
-  private val queue = new ConcurrentLinkedQueue[WriterThread.Command]()
+  
+  private val queue = new LinkedBlockingQueue[WriterThread.Command]()
   private val streams = files.map(t =>
     val channel = FileChannel.open(t._2,
       StandardOpenOption.CREATE,
@@ -41,7 +42,7 @@ class StreamWriter(val maxSizeInBytes: Long,
 
   private def writeThreadLoop(): Unit =
     while !exitLoop do
-      queue.poll() match
+      queue.take() match
         case w: WriterThread.Write =>
           streams.get(w.streamId).foreach: channel =>
             channel.position(w.offset)

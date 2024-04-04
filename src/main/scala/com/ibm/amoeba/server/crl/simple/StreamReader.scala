@@ -6,7 +6,7 @@ import java.nio.file.{Files, Path, StandardOpenOption}
 import java.util.UUID
 import scala.annotation.tailrec
 
-class StreamReader(filePath: Path):
+class StreamReader(val streamId: StreamId, val filePath: Path):
 
   private val ochannel =
     if Files.exists(filePath) then
@@ -14,7 +14,7 @@ class StreamReader(filePath: Path):
     else
       None
 
-  private val currentUUID = ochannel match
+  val currentUUID: UUID = ochannel match
     case Some(channel) =>
       readUUID(0)
     case None =>
@@ -32,7 +32,7 @@ class StreamReader(filePath: Path):
       LogContent.getUUID(buff)
 
 
-  def getHeadEntry(): Option[LogEntry.EntryHeader] = readEntry(0).map(_._2)
+  def headEntry: Option[LogEntry.EntryHeader] = readEntry(0).map(_._2)
 
 
   // Walks through each entry until the end of file is encountered or a corrupt entry is found.
