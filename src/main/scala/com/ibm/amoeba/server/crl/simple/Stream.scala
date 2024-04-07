@@ -26,7 +26,7 @@ class Stream(val streamId: StreamId,
 
     val buffers = entry.createEntryBuffers(nextWriteOffset, currentUUID, streamId)
 
-    streamWriter.write(streamId, nextWriteOffset, buffers)
+    streamWriter.write(streamId, nextWriteOffset, buffers, () => entry.runCompletionHandlers())
 
     nextWriteOffset += entrySize
     entryLocation

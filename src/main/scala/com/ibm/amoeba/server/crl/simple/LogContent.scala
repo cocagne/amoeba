@@ -139,6 +139,7 @@ class Tx(val id: TxId,
       require(state.objectUpdates.isEmpty || objectUpdateLocations.nonEmpty)
 
     LogContent.putTxId(bb, id)
+
     txdLocation.foreach(loc => LogContent.putStreamLocation(bb, loc))
 
     val encodedDisposition = state.disposition match
@@ -246,6 +247,8 @@ object Alloc:
 class Alloc(var dataLocation: Option[StreamLocation],
             var state: AllocationRecoveryState) extends LogContent:
 
+  def txid: TxId = TxId(state.storeId, state.allocationTransactionId)
+
   override def dynamicDataSize: Long =
     if dataLocation.isEmpty then
       state.objectData.size
@@ -264,7 +267,8 @@ class Alloc(var dataLocation: Option[StreamLocation],
     //     timestamp: HLCTimestamp, 8
     //     serialized_revision_guard: DataBuffer <== 4 + nbytes
     //
-    17 + 16 + 4 + 16 + 1 + 4 + StreamLocation.StaticSize + 8 + 8 + 4 + state.serializedRevisionGuard.size
+    17 + 16 + 4 + state.storePointer.data.length
+      + 16 + 1 + 4 + StreamLocation.StaticSize + 8 + 8 + 4 + state.serializedRevisionGuard.size
 
   override def writeStaticEntry(bb: ByteBuffer): Unit =
     require(dataLocation.nonEmpty)

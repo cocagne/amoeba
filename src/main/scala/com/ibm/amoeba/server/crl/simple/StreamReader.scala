@@ -65,11 +65,13 @@ class StreamReader(val streamId: StreamId, val filePath: Path):
         // Can easily happen if we're reading a corrupted header
         return None
 
+      //println(s"Reading tail at offset: ${h.trailingUUIDOffset}, Static offset: ${h.staticDataSize - 16}")
       val tailUUID = readUUID(entryOffset + h.trailingUUIDOffset)
 
       if h.streamUUID == currentUUID && tailUUID == currentUUID then
         Some((entryOffset + h.entrySize, h))
       else
+        //println(s"UUID MISMATCH Current:$currentUUID. Header:${h.streamUUID}. Tail:$tailUUID")
         None
 
   def read(offset: Long, length: Int): ByteBuffer = ochannel match

@@ -3,14 +3,17 @@ package com.ibm.amoeba.server.crl.simple
 import com.ibm.amoeba.common.DataBuffer
 import com.ibm.amoeba.common.transaction.{ObjectUpdate, TransactionStatus}
 import com.ibm.amoeba.server.crl.{AllocationRecoveryState, TransactionRecoveryState}
+import org.apache.logging.log4j.scala.Logging
 
 import java.nio.file.Path
+import java.util.UUID
 import scala.annotation.tailrec
 import scala.collection.immutable.HashMap
 
-object Recovery:
+object Recovery extends Logging:
 
   case class Result(activeStreamId: StreamId,
+                    currentStreamUUID: UUID,
                     initialNextEntryOffset: Long,
                     trsList: List[TransactionRecoveryState],
                     arsList: List[AllocationRecoveryState])
@@ -21,6 +24,7 @@ object Recovery:
     var highestHead: Option[(StreamId, LogEntry.EntryHeader)] = None
     var activeStreamId = StreamId(0)
     var initialNextEntryOffset: Long = 0
+    var currentStreamUUID = UUID.randomUUID()
 
     for idx <- files.indices do
       (highestHead, readers(idx).headEntry) match
@@ -30,7 +34,7 @@ object Recovery:
         case (Some(prev), Some(h)) =>
           if h.entrySerialNumber > prev._2.entrySerialNumber then
             highestHead = Some((StreamId(idx), h))
-
+    
     highestHead.foreach: (streamId, _) =>
       readers(streamId.number).findHighestEntry() match
         case None => assert(false, "Failed to find highest entry")
@@ -44,8 +48,11 @@ object Recovery:
             reader.readEntry(previousEntryLocation.offset) match
               case None => assert(false, "Failed to load a CRL entry")
               case Some((_, h)) =>
-                val bb = reader.read(previousEntryLocation.offset + h.dynamicDataSize, h.staticDataSize.toInt)
+                val bb = reader.read(
+                  previousEntryLocation.offset + LogEntry.StaticEntryHeaderSize + h.dynamicDataSize,
+                  h.staticDataSize.toInt)
                 LogEntry.loadStaticEntryContent(h, bb, rs)
+                currentStreamUUID = h.streamUUID
                 if h.entrySerialNumber != lastEntry.oldestEntryNeeded then
                   loadPrevious(h.previousEntryStreamLocation)
 
@@ -85,7 +92,7 @@ object Recovery:
         a.serializedRevisionGuard)
     ).toList
 
-    Result(activeStreamId, initialNextEntryOffset, trsList, arsLst)
+    Result(activeStreamId, currentStreamUUID, initialNextEntryOffset, trsList, arsLst)
 
 
 

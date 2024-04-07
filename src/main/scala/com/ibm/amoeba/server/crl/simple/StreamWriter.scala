@@ -11,14 +11,14 @@ object WriterThread:
 
   case class Write(streamId: StreamId,
                    offset: Long,
-                   buffers: Array[ByteBuffer]) extends Command
+                   buffers: Array[ByteBuffer],
+                   onWriteComplete: () => Unit) extends Command
 
   case class Shutdown() extends Command
 
 
 class StreamWriter(val maxSizeInBytes: Long,
-                   files: List[(StreamId, Path)],
-                   onWriteComplete: () => Unit):
+                   files: List[(StreamId, Path)]):
   
   private val queue = new LinkedBlockingQueue[WriterThread.Command]()
   private val streams = files.map(t =>
@@ -47,7 +47,7 @@ class StreamWriter(val maxSizeInBytes: Long,
           streams.get(w.streamId).foreach: channel =>
             channel.position(w.offset)
             channel.write(w.buffers)
-            onWriteComplete()
+            w.onWriteComplete()
             
         case _: WriterThread.Shutdown =>
           streams.valuesIterator.foreach(_.close)
@@ -55,5 +55,8 @@ class StreamWriter(val maxSizeInBytes: Long,
         
   def shutdown(): Unit = queue.add(WriterThread.Shutdown())
   
-  def write(streamId: StreamId, offset: Long, buffers: Array[ByteBuffer]): Unit =
-    queue.add(WriterThread.Write(streamId, offset, buffers))
+  def write(streamId: StreamId, 
+            offset: Long, 
+            buffers: Array[ByteBuffer],
+            completionHandler: () => Unit): Unit =
+    queue.add(WriterThread.Write(streamId, offset, buffers, completionHandler))

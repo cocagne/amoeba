@@ -1,36 +1,62 @@
 package com.ibm.amoeba.server.crl.simple
 
+import org.apache.logging.log4j.scala.Logging
+
 import java.nio.ByteBuffer
 import java.util.UUID
 import scala.collection.immutable.HashMap
 
 class LogEntry(val previousEntryLocation: StreamLocation,
                val entrySerialNumber: Long,
-               val oldestEntryNeeded: Long):
+               val oldestEntryNeeded: Long) extends Logging:
   import LogEntry._
 
   private var completionHandlers: List[() => Unit] = Nil
-  var txs: HashMap[TxId, Tx] = new HashMap()
-  var txDeletions: List[TxId] = Nil
-  var allocations: List[Alloc] = Nil
-  var allocDeletions: List[TxId] = Nil
+  private var txs: HashMap[TxId, Tx] = new HashMap()
+  private var txDeletions: List[TxId] = Nil
+  private var allocations: List[Alloc] = Nil
+  private var allocDeletions: List[TxId] = Nil
+  private var txDelSet: Set[TxId] = Set()
+  private var allocDelSet: Set[TxId] = Set()
+
 
   def staticDataSize: Long =
-    StaticEntryHeaderSize
+    txs.valuesIterator.foldLeft(0L)((s, tx) => s + tx.staticDataSize)
+    + allocations.foldLeft(0L)((s, a) => s + a.staticDataSize)
     + TxId.StaticSize * txDeletions.length
     + TxId.StaticSize * allocDeletions.length
-    + txs.valuesIterator.foldLeft(0L)((s, tx) => s + tx.staticDataSize)
-    + allocations.foldLeft(0L)((s, a) => s + a.staticDataSize)
     + 16 // Trailing file UUID. Must match header UUID during load process or corrupted entry
 
   def dynamicDataSize: Long =
-    allocations.foldLeft(0L)((s, a) => s + a.dynamicDataSize)
-    + txs.valuesIterator.foldLeft(0L)((s, t) => s + t.dynamicDataSize)
+    txs.valuesIterator.foldLeft(0L)((s, t) => s + t.dynamicDataSize)
+    + allocations.foldLeft(0L)((s, a) => s + a.dynamicDataSize)
 
   def entrySize: Long =
     val base = StaticEntryHeaderSize + dynamicDataSize + staticDataSize
     val nPadBytes = padTo4k(base)
     base + nPadBytes
+
+  def runCompletionHandlers(): Unit = completionHandlers.foreach(ch => ch())
+
+  def addTx(tx: Tx, completionHandler: () => Unit): Unit =
+    // Do not check if txs already contains the transaction. Allow the duplicate insert so we queue
+    // the oompletion handler for the subsequent insert attempts
+    if !txDelSet.contains(tx.id) then
+      txs += (tx.id -> tx)
+      completionHandlers = completionHandler :: completionHandlers
+
+  def addAllocation(alloc: Alloc, completionHandler: () => Unit): Unit =
+    if !allocDelSet.contains(alloc.txid) then
+      allocations = alloc :: allocations
+      completionHandlers = completionHandler :: completionHandlers
+
+  def deleteTx(txid: TxId): Unit =
+    txDeletions = txid :: txDeletions
+    txDelSet = txDelSet + txid
+
+  def deleteAllocation(txid: TxId): Unit =
+    allocDeletions = txid :: allocDeletions
+    allocDelSet = allocDelSet + txid
 
   def createEntryBuffers(startingOffset: Long,
                          streamUUID: UUID,
@@ -89,6 +115,8 @@ class LogEntry(val previousEntryLocation: StreamLocation,
     txDeletions.foreach(LogContent.putTxId(bb, _))
     allocDeletions.foreach(LogContent.putTxId(bb, _))
     LogContent.putUUID(bb, streamUUID)
+
+    assert(bb.position() == bb.limit)
 
     buffers = ByteBuffer.wrap(staticArr) :: buffers
 
