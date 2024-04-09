@@ -11,7 +11,8 @@ case class TransactionRecoveryState( storeId: StoreId,
                                      objectUpdates: List[ObjectUpdate],
                                      disposition: TransactionDisposition.Value,
                                      status: TransactionStatus.Value,
-                                     paxosAcceptorState: PersistentState)
+                                     paxosAcceptorState: PersistentState):
+  def txd: TransactionDescription = TransactionDescription.deserialize(serializedTxd)
 
 object TransactionRecoveryState {
   def initial(storeId: StoreId,

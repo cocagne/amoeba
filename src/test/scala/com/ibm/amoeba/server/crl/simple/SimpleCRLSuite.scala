@@ -1,12 +1,13 @@
 package com.ibm.amoeba.server.crl.simple
 
 import com.ibm.amoeba.FileBasedTests
+import com.ibm.amoeba.common.ida.Replication
 import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp}
-import com.ibm.amoeba.common.objects.{ObjectId, ObjectRefcount, ObjectType}
+import com.ibm.amoeba.common.objects.{DataObjectPointer, ObjectId, ObjectRefcount, ObjectRevision, ObjectType}
 import com.ibm.amoeba.common.paxos.{PersistentState, ProposalId}
 import com.ibm.amoeba.common.pool.PoolId
 import com.ibm.amoeba.common.store.{StoreId, StorePointer}
-import com.ibm.amoeba.common.transaction.{ObjectUpdate, TransactionDisposition, TransactionId, TransactionStatus}
+import com.ibm.amoeba.common.transaction.{DataUpdate, DataUpdateOperation, ObjectUpdate, TransactionDescription, TransactionDisposition, TransactionId, TransactionStatus}
 import com.ibm.amoeba.server.crl.{AllocationRecoveryState, TransactionRecoveryState}
 
 import java.nio.ByteBuffer
@@ -24,7 +25,7 @@ object SimpleCRLSuite:
   val txid = TxId(storeId, transactionId)
   val txid2 = TxId(storeId2, transactionId2)
 
-  val txd = DataBuffer(Array[Byte](1, 2))
+  val txdata = DataBuffer(Array[Byte](1, 2))
   val oud1 = DataBuffer(Array[Byte](3, 4))
   val oud2 = DataBuffer(Array[Byte](4))
   val ou1 = ObjectUpdate(ObjectId(new UUID(0, 3)), oud1)
@@ -47,8 +48,8 @@ object SimpleCRLSuite:
   val serializedRevisionGuard = DataBuffer(Array[Byte](0,1,2,3,4))
   val allocDataLocation = StreamLocation(StreamId(0), 5, 4)
 
-  val trs = TransactionRecoveryState(storeId, txd, List(ou1, ou2), disp, status, pax)
-  val trs2 = TransactionRecoveryState(storeId2, txd, Nil, disp, status, pax)
+  val trs = TransactionRecoveryState(storeId, txdata, List(ou1, ou2), disp, status, pax)
+  val trs2 = TransactionRecoveryState(storeId2, txdata, Nil, disp, status, pax)
 
   val ars = AllocationRecoveryState(storeId, storePointerData, objectId, ObjectType.Data,
     Some(objectSize), objectData, refcount, timestamp , transactionId, serializedRevisionGuard)
@@ -65,6 +66,13 @@ object SimpleCRLSuite:
   val stream1 = StreamId(1)
   val stream2 = StreamId(2)
 
+  val oid1 = ObjectId(new UUID(0, 2))
+  val op1 = new DataObjectPointer(oid1, poolId, None, Replication(3, 2), Array(storePointerEmpty))
+  val txd = TransactionDescription(transactionId, timestamp, op1, 1.toByte,
+    List(DataUpdate(op1, ObjectRevision(transactionId), DataUpdateOperation.Overwrite)),
+    List(), None, List(), List())
+  val trsValidTxd = TransactionRecoveryState(storeId, txd.serialize(), List(ou1, ou2), disp, status, pax)
+
 
 
 class SimpleCRLSuite extends FileBasedTests {
@@ -76,7 +84,235 @@ class SimpleCRLSuite extends FileBasedTests {
       lst = (StreamId(i), tdir.toPath.resolve(f"$i.log")) :: lst
     lst.reverse
 
-  test("Save & Recover with Tx in Multiple Log Entries Foo") {
+
+  test("SimpleCRL Drop Transaction Data Foo") {
+    val queue = new LinkedBlockingQueue[String]()
+
+    def completionHandler(): Unit = queue.put("")
+
+    val i = SimpleCRL(tdir.toPath, 3, 1024 * 1024)
+
+    i.crl.saveTransaction(transactionId, trsValidTxd, completionHandler)
+
+    queue.take() // Block till completion handlers are run
+
+    i.crl.dropTransactionObjectData(storeId, transactionId)
+    i.crl.saveTransaction(transactionId, trsValidTxd, completionHandler)
+    queue.take()
+
+    i.crl.shutdown()
+
+    val i2 = SimpleCRL(tdir.toPath, 3, 1024 * 1024)
+
+    assert(i2.trsList.length == 1)
+    assert(i2.arsList.length == 0)
+
+    assert(i2.trsList.head.storeId == txid.storeId)
+    assert(i2.trsList.head.disposition == disp)
+    assert(i2.trsList.head.serializedTxd == trsValidTxd.serializedTxd)
+    assert(i2.trsList.head.objectUpdates == List())
+    assert(i2.trsList.head.paxosAcceptorState == pax)
+  }
+
+  test("SimpleCRL Recycle Streams") {
+    val queue = new LinkedBlockingQueue[String]()
+
+    def completionHandler(): Unit = queue.put("")
+
+    val i = SimpleCRL(tdir.toPath, 3, 4096 * 3)
+
+    i.crl.saveTransaction(transactionId, trsValidTxd, completionHandler)
+
+    queue.take() // Block till completion handlers are run
+    assert(i.crl.currentStreamNumber == 0)
+
+    i.crl.saveTransaction(transactionId, trsValidTxd, completionHandler)
+
+    queue.take()
+    assert(i.crl.currentStreamNumber == 0)
+
+    i.crl.saveTransaction(transactionId, trsValidTxd, completionHandler)
+
+    queue.take()
+    assert(i.crl.currentStreamNumber == 0)
+
+    i.crl.saveTransaction(transactionId, trsValidTxd, completionHandler)
+
+    queue.take()
+    assert(i.crl.currentStreamNumber == 1)
+
+    i.crl.saveTransaction(transactionId2, trsValidTxd, completionHandler)
+
+    queue.take()
+    assert(i.crl.currentStreamNumber == 1)
+
+    i.crl.saveTransaction(transactionId2, trsValidTxd, completionHandler)
+    queue.take()
+    assert(i.crl.currentStreamNumber == 1)
+
+    i.crl.saveTransaction(transactionId2, trsValidTxd, completionHandler)
+    queue.take()
+    assert(i.crl.currentStreamNumber == 2)
+
+    i.crl.saveTransaction(transactionId2, trsValidTxd, completionHandler)
+    queue.take()
+    assert(i.crl.currentStreamNumber == 2)
+
+    i.crl.saveTransaction(transactionId2, trsValidTxd, completionHandler)
+    queue.take()
+    assert(i.crl.currentStreamNumber == 2)
+
+    i.crl.saveTransaction(transactionId2, trsValidTxd, completionHandler)
+    i.crl.deleteTransaction(storeId, transactionId2)
+    queue.take()
+    assert(i.crl.currentStreamNumber == 0)
+
+    i.crl.shutdown()
+
+    val i2 = SimpleCRL(tdir.toPath, 3, 4096 * 3)
+
+    assert(i2.trsList.length == 1)
+    assert(i2.arsList.length == 0)
+
+    assert(i2.trsList.head.storeId == txid.storeId)
+    assert(i2.trsList.head.disposition == disp)
+    assert(i2.trsList.head.txd.transactionId == transactionId)
+    assert(i2.trsList.head.serializedTxd == trsValidTxd.serializedTxd)
+    assert(i2.trsList.head.objectUpdates == trsValidTxd.objectUpdates)
+    assert(i2.trsList.head.paxosAcceptorState == pax)
+  }
+
+  test("SimpleCRL Recovery From Multiple Streams") {
+    val queue = new LinkedBlockingQueue[String]()
+
+    def completionHandler(): Unit = queue.put("")
+
+    val i = SimpleCRL(tdir.toPath, 3, 4096 * 3)
+
+    i.crl.saveTransaction(transactionId, trsValidTxd, completionHandler)
+
+    queue.take() // Block till completion handlers are run
+    assert(i.crl.currentStreamNumber == 0)
+
+    i.crl.saveTransaction(transactionId, trsValidTxd, completionHandler)
+
+    queue.take()
+    assert(i.crl.currentStreamNumber == 0)
+
+    i.crl.saveTransaction(transactionId, trsValidTxd, completionHandler)
+
+    queue.take()
+    assert(i.crl.currentStreamNumber == 0)
+
+    i.crl.saveTransaction(transactionId, trsValidTxd, completionHandler)
+
+    queue.take()
+    assert(i.crl.currentStreamNumber == 1)
+
+    i.crl.saveTransaction(transactionId2, trsValidTxd, completionHandler)
+
+    queue.take()
+    assert(i.crl.currentStreamNumber == 1)
+
+    i.crl.deleteTransaction(storeId, transactionId2)
+    i.crl.saveTransaction(transactionId, trsValidTxd, completionHandler)
+
+    queue.take()
+    assert(i.crl.currentStreamNumber == 2)
+
+    i.crl.shutdown()
+
+    val i2 = SimpleCRL(tdir.toPath, 3, 4096 * 3)
+
+    i.crl.saveTransaction(transactionId2, trsValidTxd, completionHandler)
+
+    assert(i.crl.currentStreamNumber == 2)
+
+    assert(i2.trsList.length == 1)
+    assert(i2.arsList.length == 0)
+
+    assert(i2.trsList.head.storeId == txid.storeId)
+    assert(i2.trsList.head.disposition == disp)
+    assert(i2.trsList.head.serializedTxd == trsValidTxd.serializedTxd)
+    assert(i2.trsList.head.objectUpdates == trsValidTxd.objectUpdates)
+    assert(i2.trsList.head.paxosAcceptorState == pax)
+  }
+
+  test("SimpleCRL Switch Streams") {
+    val queue = new LinkedBlockingQueue[String]()
+
+    def completionHandler(): Unit = queue.put("")
+
+    val i = SimpleCRL(tdir.toPath, 3, 4096*3)
+
+    i.crl.saveTransaction(transactionId, trsValidTxd, completionHandler)
+
+    queue.take() // Block till completion handlers are run
+    assert(i.crl.currentStreamNumber == 0)
+
+    i.crl.saveTransaction(transactionId, trsValidTxd, completionHandler)
+
+    queue.take()
+    assert(i.crl.currentStreamNumber == 0)
+
+    i.crl.saveTransaction(transactionId, trsValidTxd, completionHandler)
+
+    queue.take()
+    assert(i.crl.currentStreamNumber == 0)
+
+    i.crl.saveTransaction(transactionId, trsValidTxd, completionHandler)
+
+    queue.take()
+    assert(i.crl.currentStreamNumber == 1)
+
+    i.crl.shutdown()
+
+    val i2 = SimpleCRL(tdir.toPath, 3, 4096*3)
+
+    i.crl.saveTransaction(transactionId2, trsValidTxd, completionHandler)
+
+    assert(i.crl.currentStreamNumber == 1)
+
+    assert(i2.trsList.length == 1)
+    assert(i2.arsList.length == 0)
+
+    assert(i2.trsList.head.storeId == txid.storeId)
+    assert(i2.trsList.head.disposition == disp)
+    assert(i2.trsList.head.serializedTxd == trsValidTxd.serializedTxd)
+    assert(i2.trsList.head.objectUpdates == trsValidTxd.objectUpdates)
+    assert(i2.trsList.head.paxosAcceptorState == pax)
+  }
+
+  test("SimpleCRL Basic Functionality") {
+    val queue = new LinkedBlockingQueue[String]()
+
+    def completionHandler(): Unit = queue.put("")
+
+    val i = SimpleCRL(tdir.toPath, 3, 1024*1024)
+
+    i.crl.saveTransaction(transactionId, trsValidTxd, completionHandler)
+
+    queue.take() // Block till completion handlers are run
+
+    assert(i.crl.currentEntrySerialNumber == 1)
+
+    i.crl.shutdown()
+
+    val i2 = SimpleCRL(tdir.toPath, 3, 1024*1024)
+
+    assert(i2.crl.currentEntrySerialNumber == 2)
+
+    assert(i2.trsList.length == 1)
+    assert(i2.arsList.length == 0)
+
+    assert(i2.trsList.head.storeId == txid.storeId)
+    assert(i2.trsList.head.disposition == disp)
+    assert(i2.trsList.head.serializedTxd == trsValidTxd.serializedTxd)
+    assert(i2.trsList.head.objectUpdates == trsValidTxd.objectUpdates)
+    assert(i2.trsList.head.paxosAcceptorState == pax)
+  }
+
+  test("Save & Recover with Tx in Multiple Log Entries") {
     val queue = new LinkedBlockingQueue[String]()
 
     def completionHandler(): Unit = queue.put("")
@@ -90,13 +326,13 @@ class SimpleCRLSuite extends FileBasedTests {
 
     le.addTx(tx, completionHandler)
 
-    val entry1Location = stream.writeEntry(le)
+    val entry1Location = stream.writeEntry(le, () => ())
 
     val le2 = LogEntry(entry1Location, 1, 0)
 
     le2.addTx(tx, completionHandler)
 
-    val entry2Location = stream.writeEntry(le2)
+    val entry2Location = stream.writeEntry(le2, () => ())
 
     queue.take() // Block till completion handlers are run
 
@@ -132,7 +368,7 @@ class SimpleCRLSuite extends FileBasedTests {
     le.addTx(tx, completionHandler)
     le.addAllocation(alloc, completionHandler)
 
-    val entry1Location = stream.writeEntry(le)
+    val entry1Location = stream.writeEntry(le, () => ())
 
     val le2 = LogEntry(entry1Location, 1, 0)
 
@@ -141,7 +377,7 @@ class SimpleCRLSuite extends FileBasedTests {
     le2.addTx(tx2, completionHandler)
     le2.addAllocation(alloc2, completionHandler)
 
-    val entry2Location = stream.writeEntry(le2)
+    val entry2Location = stream.writeEntry(le2, () => ())
 
     queue.take() // Block till completion handlers are run
 
@@ -191,7 +427,7 @@ class SimpleCRLSuite extends FileBasedTests {
     le.addTx(tx2, completionHandler)
     le.addAllocation(alloc2, completionHandler)
 
-    val entryLocation = stream.writeEntry(le)
+    val entryLocation = stream.writeEntry(le, () => ())
 
     queue.take() // Block till completion handlers are run
 
@@ -251,7 +487,7 @@ class SimpleCRLSuite extends FileBasedTests {
 
     le.addAllocation(alloc, completionHandler)
 
-    val entryLocation = stream.writeEntry(le)
+    val entryLocation = stream.writeEntry(le, () => ())
 
     assert(entryLocation.streamId == stream0)
     assert(entryLocation.offset == 0)
@@ -290,7 +526,7 @@ class SimpleCRLSuite extends FileBasedTests {
 
     le.addTx(tx, completionHandler)
 
-    val entryLocation = stream.writeEntry(le)
+    val entryLocation = stream.writeEntry(le, () => ())
 
     assert(entryLocation.streamId == stream0)
     assert(entryLocation.offset == 0)

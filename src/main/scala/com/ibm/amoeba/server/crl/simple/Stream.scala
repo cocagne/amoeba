@@ -14,19 +14,23 @@ class Stream(val streamId: StreamId,
     currentUUID = UUID.randomUUID()
 
 
-  def canWriteEntry(entry: LogEntry): Boolean = nextWriteOffset + entry.entrySize <= streamWriter.maxSizeInBytes
+  def canWriteEntry(entry: LogEntry): Boolean =
+    nextWriteOffset + entry.entrySize <= streamWriter.maxSizeInBytes
 
 
   // Writes entry to the stream and returns its location
-  def writeEntry(entry: LogEntry): StreamLocation =
+  def writeEntry(entry: LogEntry, onWriteComplete: () => Unit): StreamLocation =
     require(canWriteEntry(entry))
-    
+
     val entryLocation = StreamLocation(streamId, nextWriteOffset, entry.entrySize.toInt)
     val entrySize = entry.entrySize
 
     val buffers = entry.createEntryBuffers(nextWriteOffset, currentUUID, streamId)
 
-    streamWriter.write(streamId, nextWriteOffset, buffers, () => entry.runCompletionHandlers())
+    streamWriter.write(streamId, nextWriteOffset, buffers, () =>
+      entry.runCompletionHandlers()
+      onWriteComplete()
+    )
 
     nextWriteOffset += entrySize
     entryLocation

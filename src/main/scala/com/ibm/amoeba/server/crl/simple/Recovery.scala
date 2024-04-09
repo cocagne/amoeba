@@ -14,7 +14,10 @@ object Recovery extends Logging:
 
   case class Result(activeStreamId: StreamId,
                     currentStreamUUID: UUID,
+                    initialNextEntrySerialNumber: Long,
                     initialNextEntryOffset: Long,
+                    initialOldestEntryNeeded: Long,
+                    initialPreviousEntryLocation: StreamLocation,
                     trsList: List[TransactionRecoveryState],
                     arsList: List[AllocationRecoveryState])
 
@@ -23,7 +26,10 @@ object Recovery extends Logging:
     val rs = LogEntry.RecoveringState(HashMap(), Set(), HashMap(), Set())
     var highestHead: Option[(StreamId, LogEntry.EntryHeader)] = None
     var activeStreamId = StreamId(0)
+    var initialNextEntrySerialNumber: Long = 0
     var initialNextEntryOffset: Long = 0
+    var initialOldestEntryNeeded: Long = 0
+    var initialPreviousEntryLocation: StreamLocation = StreamLocation.Null
     var currentStreamUUID = UUID.randomUUID()
 
     for idx <- files.indices do
@@ -34,13 +40,16 @@ object Recovery extends Logging:
         case (Some(prev), Some(h)) =>
           if h.entrySerialNumber > prev._2.entrySerialNumber then
             highestHead = Some((StreamId(idx), h))
-    
+
     highestHead.foreach: (streamId, _) =>
       readers(streamId.number).findHighestEntry() match
         case None => assert(false, "Failed to find highest entry")
         case Some((nextWriteEntryOffset, lastEntry)) =>
           activeStreamId = streamId
           initialNextEntryOffset = nextWriteEntryOffset
+          initialPreviousEntryLocation = lastEntry.previousEntryStreamLocation
+          initialNextEntrySerialNumber = lastEntry.entrySerialNumber + 1
+          initialOldestEntryNeeded = lastEntry.oldestEntryNeeded
 
           @tailrec
           def loadPrevious(previousEntryLocation: StreamLocation): Unit =
@@ -92,7 +101,15 @@ object Recovery extends Logging:
         a.serializedRevisionGuard)
     ).toList
 
-    Result(activeStreamId, currentStreamUUID, initialNextEntryOffset, trsList, arsLst)
+    Result(
+      activeStreamId,
+      currentStreamUUID,
+      initialNextEntrySerialNumber,
+      initialNextEntryOffset,
+      initialOldestEntryNeeded,
+      initialPreviousEntryLocation,
+      trsList,
+      arsLst)
 
 
 

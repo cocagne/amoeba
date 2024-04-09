@@ -20,6 +20,13 @@ class LogEntry(val previousEntryLocation: StreamLocation,
   private var allocDelSet: Set[TxId] = Set()
 
 
+  def isEmpty: Boolean =
+    txs.isEmpty
+      && allocations.isEmpty
+      && txDeletions.isEmpty
+      && allocDeletions.isEmpty
+
+
   def staticDataSize: Long =
     txs.valuesIterator.foldLeft(0L)((s, tx) => s + tx.staticDataSize)
     + allocations.foldLeft(0L)((s, a) => s + a.staticDataSize)
@@ -96,7 +103,7 @@ class LogEntry(val previousEntryLocation: StreamLocation,
       if tx.txdLocation.isEmpty then
         tx.txdLocation = Some(allocate(tx.state.serializedTxd.asReadOnlyBuffer()))
 
-      if tx.objectUpdateLocations.isEmpty then
+      if tx.keepObjectUpdates && tx.objectUpdateLocations.isEmpty then
         tx.objectUpdateLocations = Some(tx.state.objectUpdates.map: ou =>
           (ou.objectId, allocate(ou.data.asReadOnlyBuffer()))
         )
@@ -190,12 +197,12 @@ object LogEntry:
 
     for (_ <- 0 until header.numTransactions)
       val ltx = Tx.loadTx(bb)
-      if !rstate.txDeletions.contains(ltx.id) then
+      if !rstate.txDeletions.contains(ltx.id) && !rstate.txs.contains(ltx.id) then
         rstate.txs += (ltx.id -> ltx)
 
     for (_ <- 0 until header.numAllocations)
       val la = Alloc.loadAlloc(bb)
-      if !rstate.allocDeletions.contains(la.txid) then
+      if !rstate.allocDeletions.contains(la.txid) && !rstate.allocations.contains(la.txid) then
         rstate.allocations += (la.txid -> la)
 
     for (_ <- 0 until header.numDeletedTransactions)

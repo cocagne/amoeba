@@ -12,7 +12,13 @@ import java.nio.ByteBuffer
 import java.util.UUID
 
 sealed abstract class LogContent:
-  
+
+  var next: Option[LogContent] = None
+  var prev: Option[LogContent] = None
+  var entrySerialNumber: Long = 0
+
+  def clearDynamicData(): Unit
+
   def dynamicDataSize: Long
   
   def staticDataSize: Long
@@ -108,6 +114,10 @@ class Tx(val id: TxId,
          var objectUpdateLocations: Option[List[(ObjectId, StreamLocation)]] = None,
          var keepObjectUpdates: Boolean = true) extends LogContent:
 
+  override def clearDynamicData(): Unit =
+    txdLocation = None
+    objectUpdateLocations = None
+
   override def dynamicDataSize: Long =
     val updatesSize = if !keepObjectUpdates || objectUpdateLocations.nonEmpty then
       0 // Dropped or already written to an active stream. No need to write them now
@@ -130,8 +140,12 @@ class Tx(val id: TxId,
     //         bit 2 - accepted boolean value (only valid if bit 1 is set)
     //     object_updates: 4-byte-count, num_updates * (16:objuuid + FileLocation))
     //
-    TxId.StaticSize + StreamLocation.StaticSize + 1 + 11 + 4
-      + state.objectUpdates.size * (16 + StreamLocation.StaticSize)
+    val base = TxId.StaticSize + StreamLocation.StaticSize + 1 + 11 + 4
+
+    if keepObjectUpdates then
+      base + state.objectUpdates.size * (16 + StreamLocation.StaticSize)
+    else
+      base
 
   override def writeStaticEntry(bb: ByteBuffer): Unit =
     require(txdLocation.nonEmpty) // Must be set
@@ -205,6 +219,10 @@ class Tx(val id: TxId,
 
     txd || ous
 
+  def dropTransactionObjectData(): Unit =
+    keepObjectUpdates = false
+    objectUpdateLocations = None
+
 
 object Alloc:
   case class LoadingAlloc( txid: TxId,
@@ -248,6 +266,9 @@ class Alloc(var dataLocation: Option[StreamLocation],
             var state: AllocationRecoveryState) extends LogContent:
 
   def txid: TxId = TxId(state.storeId, state.allocationTransactionId)
+
+  override def clearDynamicData(): Unit =
+    dataLocation = None
 
   override def dynamicDataSize: Long =
     if dataLocation.isEmpty then
