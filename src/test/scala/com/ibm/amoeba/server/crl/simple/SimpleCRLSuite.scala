@@ -92,12 +92,12 @@ class SimpleCRLSuite extends FileBasedTests {
 
     val i = SimpleCRL(tdir.toPath, 3, 1024 * 1024)
 
-    i.crl.saveTransaction(transactionId, trsValidTxd, completionHandler)
+    i.crl.save(transactionId, trsValidTxd, completionHandler)
 
     queue.take() // Block till completion handlers are run
 
     i.crl.dropTransactionObjectData(storeId, transactionId)
-    i.crl.saveTransaction(transactionId, trsValidTxd, completionHandler)
+    i.crl.save(transactionId, trsValidTxd, completionHandler)
     queue.take()
 
     i.crl.shutdown()
@@ -121,48 +121,48 @@ class SimpleCRLSuite extends FileBasedTests {
 
     val i = SimpleCRL(tdir.toPath, 3, 4096 * 3)
 
-    i.crl.saveTransaction(transactionId, trsValidTxd, completionHandler)
+    i.crl.save(transactionId, trsValidTxd, completionHandler)
 
     queue.take() // Block till completion handlers are run
     assert(i.crl.currentStreamNumber == 0)
 
-    i.crl.saveTransaction(transactionId, trsValidTxd, completionHandler)
+    i.crl.save(transactionId, trsValidTxd, completionHandler)
 
     queue.take()
     assert(i.crl.currentStreamNumber == 0)
 
-    i.crl.saveTransaction(transactionId, trsValidTxd, completionHandler)
+    i.crl.save(transactionId, trsValidTxd, completionHandler)
 
     queue.take()
     assert(i.crl.currentStreamNumber == 0)
 
-    i.crl.saveTransaction(transactionId, trsValidTxd, completionHandler)
+    i.crl.save(transactionId, trsValidTxd, completionHandler)
 
     queue.take()
     assert(i.crl.currentStreamNumber == 1)
 
-    i.crl.saveTransaction(transactionId2, trsValidTxd, completionHandler)
+    i.crl.save(transactionId2, trsValidTxd, completionHandler)
 
     queue.take()
     assert(i.crl.currentStreamNumber == 1)
 
-    i.crl.saveTransaction(transactionId2, trsValidTxd, completionHandler)
+    i.crl.save(transactionId2, trsValidTxd, completionHandler)
     queue.take()
     assert(i.crl.currentStreamNumber == 1)
 
-    i.crl.saveTransaction(transactionId2, trsValidTxd, completionHandler)
+    i.crl.save(transactionId2, trsValidTxd, completionHandler)
     queue.take()
     assert(i.crl.currentStreamNumber == 2)
 
-    i.crl.saveTransaction(transactionId2, trsValidTxd, completionHandler)
+    i.crl.save(transactionId2, trsValidTxd, completionHandler)
     queue.take()
     assert(i.crl.currentStreamNumber == 2)
 
-    i.crl.saveTransaction(transactionId2, trsValidTxd, completionHandler)
+    i.crl.save(transactionId2, trsValidTxd, completionHandler)
     queue.take()
     assert(i.crl.currentStreamNumber == 2)
 
-    i.crl.saveTransaction(transactionId2, trsValidTxd, completionHandler)
+    i.crl.save(transactionId2, trsValidTxd, completionHandler)
     i.crl.deleteTransaction(storeId, transactionId2)
     queue.take()
     assert(i.crl.currentStreamNumber == 0)
@@ -189,33 +189,33 @@ class SimpleCRLSuite extends FileBasedTests {
 
     val i = SimpleCRL(tdir.toPath, 3, 4096 * 3)
 
-    i.crl.saveTransaction(transactionId, trsValidTxd, completionHandler)
+    i.crl.save(transactionId, trsValidTxd, completionHandler)
 
     queue.take() // Block till completion handlers are run
     assert(i.crl.currentStreamNumber == 0)
 
-    i.crl.saveTransaction(transactionId, trsValidTxd, completionHandler)
+    i.crl.save(transactionId, trsValidTxd, completionHandler)
 
     queue.take()
     assert(i.crl.currentStreamNumber == 0)
 
-    i.crl.saveTransaction(transactionId, trsValidTxd, completionHandler)
+    i.crl.save(transactionId, trsValidTxd, completionHandler)
 
     queue.take()
     assert(i.crl.currentStreamNumber == 0)
 
-    i.crl.saveTransaction(transactionId, trsValidTxd, completionHandler)
+    i.crl.save(transactionId, trsValidTxd, completionHandler)
 
     queue.take()
     assert(i.crl.currentStreamNumber == 1)
 
-    i.crl.saveTransaction(transactionId2, trsValidTxd, completionHandler)
+    i.crl.save(transactionId2, trsValidTxd, completionHandler)
 
     queue.take()
     assert(i.crl.currentStreamNumber == 1)
 
     i.crl.deleteTransaction(storeId, transactionId2)
-    i.crl.saveTransaction(transactionId, trsValidTxd, completionHandler)
+    i.crl.save(transactionId, trsValidTxd, completionHandler)
 
     queue.take()
     assert(i.crl.currentStreamNumber == 2)
@@ -224,7 +224,7 @@ class SimpleCRLSuite extends FileBasedTests {
 
     val i2 = SimpleCRL(tdir.toPath, 3, 4096 * 3)
 
-    i.crl.saveTransaction(transactionId2, trsValidTxd, completionHandler)
+    i.crl.save(transactionId2, trsValidTxd, completionHandler)
 
     assert(i.crl.currentStreamNumber == 2)
 
@@ -245,22 +245,22 @@ class SimpleCRLSuite extends FileBasedTests {
 
     val i = SimpleCRL(tdir.toPath, 3, 4096*3)
 
-    i.crl.saveTransaction(transactionId, trsValidTxd, completionHandler)
+    i.crl.save(transactionId, trsValidTxd, completionHandler)
 
     queue.take() // Block till completion handlers are run
     assert(i.crl.currentStreamNumber == 0)
 
-    i.crl.saveTransaction(transactionId, trsValidTxd, completionHandler)
+    i.crl.save(transactionId, trsValidTxd, completionHandler)
 
     queue.take()
     assert(i.crl.currentStreamNumber == 0)
 
-    i.crl.saveTransaction(transactionId, trsValidTxd, completionHandler)
+    i.crl.save(transactionId, trsValidTxd, completionHandler)
 
     queue.take()
     assert(i.crl.currentStreamNumber == 0)
 
-    i.crl.saveTransaction(transactionId, trsValidTxd, completionHandler)
+    i.crl.save(transactionId, trsValidTxd, completionHandler)
 
     queue.take()
     assert(i.crl.currentStreamNumber == 1)
@@ -269,7 +269,7 @@ class SimpleCRLSuite extends FileBasedTests {
 
     val i2 = SimpleCRL(tdir.toPath, 3, 4096*3)
 
-    i.crl.saveTransaction(transactionId2, trsValidTxd, completionHandler)
+    i.crl.save(transactionId2, trsValidTxd, completionHandler)
 
     assert(i.crl.currentStreamNumber == 1)
 
@@ -290,7 +290,7 @@ class SimpleCRLSuite extends FileBasedTests {
 
     val i = SimpleCRL(tdir.toPath, 3, 1024*1024)
 
-    i.crl.saveTransaction(transactionId, trsValidTxd, completionHandler)
+    i.crl.save(transactionId, trsValidTxd, completionHandler)
 
     queue.take() // Block till completion handlers are run
 

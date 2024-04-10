@@ -2,7 +2,7 @@ package com.ibm.amoeba.server.crl.simple
 
 import com.ibm.amoeba.common.store.StoreId
 import com.ibm.amoeba.common.transaction.TransactionId
-import com.ibm.amoeba.server.crl.{AllocationRecoveryState, TransactionRecoveryState}
+import com.ibm.amoeba.server.crl.{AllocationRecoveryState, CrashRecoveryLog, CrashRecoveryLogFactory, TransactionRecoveryState}
 
 import java.nio.file.Path
 import java.util.UUID
@@ -33,6 +33,13 @@ object SimpleCRL:
   case class InitialCRLState(crl: SimpleCRL,
                              trsList: List[TransactionRecoveryState],
                              arsList: List[AllocationRecoveryState])
+  
+  case class Factory(streamsDir: Path, 
+                     numStreams: Int, 
+                     maxSizeInBytes: Long) extends CrashRecoveryLogFactory:
+    def createCRL(): CrashRecoveryLog =
+      SimpleCRL(streamsDir, numStreams, maxSizeInBytes).crl
+    
 
 
   def apply(streamsDir: Path, numStreams: Int, maxSizeInBytes: Long): InitialCRLState =
@@ -53,7 +60,7 @@ object SimpleCRL:
 
 class SimpleCRL private (val maxSizeInBytes: Long,
                          files: List[(StreamId, Path)],
-                         r: Recovery.Result):
+                         r: Recovery.Result) extends CrashRecoveryLog:
 
   import SimpleCRL._
 
@@ -240,13 +247,16 @@ class SimpleCRL private (val maxSizeInBytes: Long,
     // state write or propagation
     transactions.get(TxId(storeId, transactionid)).foreach(_.dropTransactionObjectData())
 
-  def saveTransaction(transactionId: TransactionId,
-                      state: TransactionRecoveryState,
-                      completionHandler: () => Unit): Unit =
+  def getFullRecoveryState(storeId: StoreId): (List[TransactionRecoveryState], List[AllocationRecoveryState]) =
+    (r.trsList.filter(_.storeId == storeId), r.arsList.filter(_.storeId == storeId))
+    
+  def save(transactionId: TransactionId, 
+           state: TransactionRecoveryState, 
+           completionHandler: () => Unit): Unit =
     ioQueue.put(SaveTransaction(transactionId, state, completionHandler))
 
-  def saveAllocation(ars: AllocationRecoveryState,
-                     completionHandler: () => Unit): Unit =
+  def save(ars: AllocationRecoveryState,
+           completionHandler: () => Unit): Unit =
     ioQueue.put(SaveAllocation(ars, completionHandler))
 
   def deleteTransaction(storeId: StoreId, transactionid: TransactionId): Unit =

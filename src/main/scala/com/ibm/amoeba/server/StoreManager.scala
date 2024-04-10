@@ -6,7 +6,7 @@ import com.ibm.amoeba.common.network._
 import com.ibm.amoeba.common.store.StoreId
 import com.ibm.amoeba.common.transaction.TransactionStatus
 import com.ibm.amoeba.common.util.BackgroundTask
-import com.ibm.amoeba.server.crl.{CrashRecoveryLogFactory, SaveCompletion, SaveCompletionHandler}
+import com.ibm.amoeba.server.crl.CrashRecoveryLogFactory
 import com.ibm.amoeba.server.network.Messenger
 import com.ibm.amoeba.server.store.backend.{Backend, Completion, CompletionHandler}
 import com.ibm.amoeba.server.store.cache.ObjectCache
@@ -21,7 +21,6 @@ object StoreManager {
   sealed abstract class Event
 
   case class IOCompletion(op: Completion) extends Event
-  case class CRLCompletion(op: SaveCompletion) extends Event
   case class TransactionMessage(msg: TxMessage) extends Event
   case class ClientReq(msg: ClientRequest) extends Event
   case class LoadStore(backend: Backend) extends Event
@@ -34,12 +33,7 @@ object StoreManager {
       mgr.events.add(IOCompletion(op))
     }
   }
-
-  class CRLHandler(mgr: StoreManager) extends SaveCompletionHandler {
-    override def saveComplete(op: SaveCompletion): Unit = {
-      mgr.events.add(CRLCompletion(op))
-    }
-  }
+  
 }
 
 class StoreManager(val objectCacheFactory: () => ObjectCache,
@@ -55,11 +49,10 @@ class StoreManager(val objectCacheFactory: () => ObjectCache,
   private val events = new LinkedBlockingQueue[Event]()
 
   private val ioHandler = new IOHandler(this)
-  private val crlHandler = new CRLHandler(this)
 
   private val txStatusCache = new TransactionStatusCache()
 
-  private val crl = crlFactory.createCRL(crlHandler)
+  private val crl = crlFactory.createCRL()
 
   private val threadPool = Executors.newFixedThreadPool(1)
 
@@ -149,10 +142,6 @@ class StoreManager(val objectCacheFactory: () => ObjectCache,
 
       case IOCompletion(op) => stores.get(op.storeId).foreach { store =>
         store.frontend.backendOperationComplete(op)
-      }
-
-      case CRLCompletion(op) => stores.get(op.storeId).foreach { store =>
-        store.frontend.crlSaveComplete(op)
       }
 
       case TransactionMessage(msg) =>

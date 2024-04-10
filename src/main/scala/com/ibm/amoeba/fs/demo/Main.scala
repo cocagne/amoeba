@@ -18,8 +18,8 @@ import com.ibm.amoeba.fs.FileSystem
 import com.ibm.amoeba.fs.demo.network.ZMQNetwork
 import com.ibm.amoeba.fs.impl.simple.SimpleFileSystem
 import com.ibm.amoeba.fs.nfs.AmoebaNFS
+import com.ibm.amoeba.server.crl.simple.SimpleCRL
 import com.ibm.amoeba.server.{RegisteredTransactionFinalizerFactory, SimpleDriverRecoveryMixin, StoreManager}
-import com.ibm.amoeba.server.crl.sweeper.Sweeper
 import com.ibm.amoeba.server.store.Bootstrap
 import com.ibm.amoeba.server.store.backend.RocksDBBackend
 import com.ibm.amoeba.server.store.cache.SimpleLRUObjectCache
@@ -392,11 +392,10 @@ object Main {
 
     setLog4jConfigFile(node.log4jConfigFile)
 
-    val sweeper = node.crl match {
-      case b: ConfigFile.Sweeper =>
-        new Sweeper(Paths.get(b.path), b.numStreams, b.fileSizeMb * 1024, b.windowSize)
+    val simpleCrl = node.crl match {
+      case b: ConfigFile.SimpleCRL => SimpleCRL.Factory(Paths.get(b.path), b.numStreams, b.fileSizeMb * 1024)
     }
-
+    
     val stores = node.stores.map { s =>
       val storeId = StoreId(PoolId(cfg.pools(s.pool).uuid), s.store.asInstanceOf[Byte])
 
@@ -431,7 +430,7 @@ object Main {
       objectCacheFactory,
       nodeNet,
       new BackgroundTaskPool,
-      sweeper,
+      simpleCrl,
       txFinalizerFactory,
       SimpleTransactionDriver.factory(txRetryDelay, txRetryCap),
       txHeartbeatPeriod,
@@ -482,7 +481,7 @@ object Main {
 
     cfg.nodes.values.foreach { n =>
       n.crl match {
-        case s: ConfigFile.Sweeper => mkdirectory(Paths.get(s.path))
+        case s: ConfigFile.SimpleCRL => mkdirectory(Paths.get(s.path))
       }
     }
 

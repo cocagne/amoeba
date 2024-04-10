@@ -7,7 +7,7 @@ import com.ibm.amoeba.common.network.{Allocate, AllocateResponse, ClientId, Oppo
 import com.ibm.amoeba.common.objects.{Metadata, ObjectId, ObjectRevision, ReadError}
 import com.ibm.amoeba.common.store.{ReadState, StoreId, StorePointer}
 import com.ibm.amoeba.common.transaction.{TransactionDescription, TransactionId}
-import com.ibm.amoeba.server.crl.{AllocSaveComplete, AllocationRecoveryState, CrashRecoveryLog, SaveCompletion, TransactionRecoveryState, TxSaveComplete}
+import com.ibm.amoeba.server.crl.{AllocationRecoveryState, CrashRecoveryLog, TransactionRecoveryState}
 import com.ibm.amoeba.server.network.Messenger
 import com.ibm.amoeba.server.store.backend.{Backend, Commit, CommitState, Completion, Read}
 import com.ibm.amoeba.server.store.cache.ObjectCache
@@ -256,21 +256,6 @@ class Frontend(val storeId: StoreId,
     pendingReads -= objectId
   }
 
-  def crlSaveComplete(c: SaveCompletion): Unit = c match {
-    case t: TxSaveComplete =>
-      transactions.get(t.transactionId).foreach { tx =>
-        tx.crlSaveComplete(t.saveId)
-      }
-
-    case a: AllocSaveComplete =>
-      pendingAllocations.get(a.transactionId).foreach { lst =>
-        lst.foreach(msg => {
-          logger.trace(s"CRL Save Completed for Allocation of object ${msg.newObjectId}")
-          net.sendClientResponse(msg)
-        })
-      }
-  }
-
   def allocateObject(msg: Allocate): Unit = {
     // Check to see if we've already received an allocation request for this object
     pendingAllocations.get(msg.allocationTransactionId) match {
@@ -292,14 +277,13 @@ class Frontend(val storeId: StoreId,
 
       case Left(storePointer) =>
         logger.trace(s"Backend allocated new object ${msg.newObjectId}. Saving in CRL")
-        val r = AllocateResponse(msg.fromClient, msg.toStore, msg.allocationTransactionId, msg.newObjectId,
+        val rmsg = AllocateResponse(msg.fromClient, msg.toStore, msg.allocationTransactionId, msg.newObjectId,
           Some(storePointer))
 
-        val arList = pendingAllocations.get(msg.allocationTransactionId) match {
-          case Some(lst) => r :: lst
-          case None => r :: Nil
-        }
-
+        val arList = pendingAllocations.get(msg.allocationTransactionId) match
+          case Some(lst) => rmsg :: lst
+          case None => rmsg :: Nil
+          
         pendingAllocations += (msg.allocationTransactionId -> arList)
 
         val os = new ObjectState(msg.newObjectId, storePointer, metadata, msg.objectType, msg.objectData,
@@ -323,7 +307,10 @@ class Frontend(val storeId: StoreId,
           msg.revisionGuard.serialize()
         )
 
-        crl.save(ars)
+        crl.save(ars, () =>
+          logger.trace(s"CRL Save Completed for Allocation of object ${msg.newObjectId}")
+          net.sendClientResponse(rmsg)
+        )
     }
   }
 }

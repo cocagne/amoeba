@@ -20,7 +20,7 @@ import com.ibm.amoeba.common.store.StoreId
 import com.ibm.amoeba.common.transaction.{TransactionDescription, TransactionId}
 import com.ibm.amoeba.common.util.{BackgroundTask, BackgroundTaskPool}
 import com.ibm.amoeba.server.{StoreManager, transaction}
-import com.ibm.amoeba.server.crl.{AllocSaveComplete, AllocationRecoveryState, CrashRecoveryLog, CrashRecoveryLogClient, CrashRecoveryLogFactory, SaveCompletionHandler, TransactionRecoveryState, TxSaveComplete, TxSaveId}
+import com.ibm.amoeba.server.crl.{AllocationRecoveryState, CrashRecoveryLog, CrashRecoveryLogFactory, TransactionRecoveryState}
 import com.ibm.amoeba.server.network.{Messenger => ServerMessenger}
 import com.ibm.amoeba.server.store.Bootstrap
 import com.ibm.amoeba.server.store.backend.MapBackend
@@ -28,21 +28,22 @@ import com.ibm.amoeba.server.store.cache.SimpleLRUObjectCache
 import com.ibm.amoeba.server.transaction.{TransactionDriver, TransactionFinalizer}
 
 import scala.concurrent.duration.{Duration, MILLISECONDS, SECONDS}
-import scala.concurrent.{Await, ExecutionContext, Future, Promise}
+import scala.concurrent.{ExecutionContext, Future, Promise}
 
 
 object TestNetwork {
-  val crlClientId = CrashRecoveryLogClient(0)
 
-  class TestCRL(val completionHandler: SaveCompletionHandler) extends CrashRecoveryLog {
+  class TestCRL extends CrashRecoveryLog {
     override def getFullRecoveryState(storeId: StoreId): (List[TransactionRecoveryState], List[AllocationRecoveryState]) = (Nil, Nil)
 
-    override def save(txid: TransactionId, state: TransactionRecoveryState, saveId: TxSaveId): Unit = {
-      completionHandler.saveComplete(TxSaveComplete(crlClientId, state.storeId, txid, saveId))
+    override def save(txid: TransactionId,
+                      state: TransactionRecoveryState,
+                      completionHandler: () => Unit): Unit = {
+      completionHandler()
     }
 
-    override def save(state: AllocationRecoveryState): Unit = {
-      completionHandler.saveComplete(AllocSaveComplete(crlClientId, state.allocationTransactionId, state.storeId, state.newObjectId))
+    override def save(state: AllocationRecoveryState, completionHandler: () => Unit): Unit = {
+      completionHandler()
     }
 
     override def dropTransactionObjectData(storeId: StoreId, txid: TransactionId): Unit = ()
@@ -53,7 +54,7 @@ object TestNetwork {
   }
 
   object TestCRL extends CrashRecoveryLogFactory {
-    override def createCRL(completionHandler: SaveCompletionHandler): CrashRecoveryLog = new TestCRL(completionHandler)
+    override def createCRL(): CrashRecoveryLog = new TestCRL()
   }
 
   /*

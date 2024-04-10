@@ -10,7 +10,7 @@ import com.ibm.amoeba.common.paxos.ProposalId
 import com.ibm.amoeba.common.pool.PoolId
 import com.ibm.amoeba.common.store.{StoreId, StorePointer}
 import com.ibm.amoeba.common.transaction.{DataUpdate, DataUpdateOperation, ObjectUpdate, TransactionDescription, TransactionId}
-import com.ibm.amoeba.server.crl.{AllocSaveComplete, AllocationRecoveryState, CrashRecoveryLog, CrashRecoveryLogClient, TransactionRecoveryState, TxSaveId}
+import com.ibm.amoeba.server.crl.{AllocationRecoveryState, CrashRecoveryLog, TransactionRecoveryState}
 import com.ibm.amoeba.server.network.Messenger
 import com.ibm.amoeba.server.store.backend.MapBackend
 import com.ibm.amoeba.server.store.cache.SimpleLRUObjectCache
@@ -30,7 +30,6 @@ object FrontendSuite {
   val rev0 = new ObjectRevision(new UUID(0, 7))
   val sp1 = StorePointer(0, Array[Byte]())
   val op1 = new DataObjectPointer(oid1, poolId, None, Replication(3,2), Array(sp1))
-  val crlClient = CrashRecoveryLogClient(1)
 
   class TestNet extends Messenger {
 
@@ -66,9 +65,15 @@ object FrontendSuite {
 
     override def getFullRecoveryState(storeId: StoreId): (List[TransactionRecoveryState], List[AllocationRecoveryState]) = (Nil, Nil)
 
-    override def save(txid: TransactionId, state: TransactionRecoveryState, saveId: TxSaveId): Unit = txSaved = true
+    override def save(txid: TransactionId, 
+                      state: TransactionRecoveryState,
+                      completionHandler: () => Unit): Unit = 
+      txSaved = true
+      completionHandler()
 
-    override def save(state: AllocationRecoveryState): Unit = aSaved = true
+    override def save(state: AllocationRecoveryState, completionHandler: () => Unit): Unit = 
+      aSaved = true
+      completionHandler()
 
     override def dropTransactionObjectData(storeId: StoreId, txid: TransactionId): Unit = aDrop = true
 
@@ -115,7 +120,7 @@ class FrontendSuite extends AnyFunSuite with Matchers {
     assert(cache.get(oid1).nonEmpty)
     assert(backend.get(oid1).isEmpty)
 
-    f.crlSaveComplete(AllocSaveComplete(crlClient, txid1, storeId, oid1))
+    //f.crlSaveComplete(AllocSaveComplete(crlClient, txid1, storeId, oid1))
 
     assert(net.cr.nonEmpty)
 
@@ -164,7 +169,7 @@ class FrontendSuite extends AnyFunSuite with Matchers {
 
     f.allocateObject(ma)
 
-    f.crlSaveComplete(AllocSaveComplete(crlClient, txid1, storeId, oid1))
+    //f.crlSaveComplete(AllocSaveComplete(crlClient, txid1, storeId, oid1))
 
     assert(backend.get(oid1).isEmpty)
 

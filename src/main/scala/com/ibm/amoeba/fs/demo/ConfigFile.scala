@@ -193,23 +193,20 @@ object ConfigFile {
 
   sealed abstract class CRLBackend
 
-  case class Sweeper(path: String,
-                     numStreams: Int,
-                     fileSizeMb: Int,
-                     windowSize: Int) extends CRLBackend
+  case class SimpleCRL(path: String,
+                       numStreams: Int,
+                       fileSizeMb: Int) extends CRLBackend
 
-  object Sweeper extends YObject[Sweeper] {
+  object SimpleCRL extends YObject[SimpleCRL] {
     val path: Required[String]      = Required("path", YString)
     val numStreams: Optional[Int]   = Optional("num-streams", YInt)
     val fileSize: Optional[Int]     = Optional("max-file-size-mb", YInt)
-    val windowSize: Optional[Int]   = Optional("window-size", YInt)
-    val attrs: List[Attr] = path :: numStreams :: fileSize :: windowSize :: Nil
+    val attrs: List[Attr] = path :: numStreams :: fileSize :: Nil
 
-    def create(o: Object): Sweeper = Sweeper(
+    def create(o: Object): SimpleCRL = SimpleCRL(
       path.get(o),
       numStreams.get(o).getOrElse(3),
-      fileSize.get(o).getOrElse(100),
-      windowSize.get(o).getOrElse(50))
+      fileSize.get(o).getOrElse(100))
   }
 
   case class DataStore(pool: String, store: Int, backend: StorageBackend)
@@ -242,7 +239,7 @@ object ConfigFile {
     val uuid: Required[UUID]              = Required("uuid",         YUUID)
     val endpoint: Required[Endpoint]      = Required("endpoint",     Endpoint)
     val log4jConf: Required[File]         = Required("log4j-config", YFile)
-    val crl: Required[Sweeper]            = Required("crl",          Choice("storage-engine", Map("sweeper" -> Sweeper)))
+    val crl: Required[SimpleCRL]          = Required("crl",          Choice("storage-engine", Map("simple-crl" -> SimpleCRL)))
     val stores: Required[List[DataStore]] = Required("stores",       YList(DataStore))
 
     val attrs: List[Attr] = name :: uuid :: endpoint :: log4jConf :: crl :: stores :: Nil

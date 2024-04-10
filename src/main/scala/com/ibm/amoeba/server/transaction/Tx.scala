@@ -5,7 +5,7 @@ import com.ibm.amoeba.common.objects.{ObjectId, ReadError}
 import com.ibm.amoeba.common.paxos.{Accept, Acceptor, Prepare}
 import com.ibm.amoeba.common.store.StoreId
 import com.ibm.amoeba.common.transaction.{ObjectUpdate, PreTransactionOpportunisticRebuild, RequirementError, TransactionCollision, TransactionDescription, TransactionDisposition, TransactionId, TransactionStatus}
-import com.ibm.amoeba.server.crl.{CrashRecoveryLog, TransactionRecoveryState, TxSaveId}
+import com.ibm.amoeba.server.crl.{CrashRecoveryLog, TransactionRecoveryState}
 import com.ibm.amoeba.server.network.Messenger
 import com.ibm.amoeba.server.store.backend.{Backend, CommitError, CommitState}
 import com.ibm.amoeba.server.store.{Locater, ObjectState, RequirementsApplyer, RequirementsChecker, RequirementsLocker}
@@ -13,17 +13,6 @@ import org.apache.logging.log4j.scala.Logging
 
 import scala.concurrent.duration._
 
-object Tx {
-  class DelayedPrepareResponse {
-    var response: Option[TxPrepareResponse] = None
-    var saveId: TxSaveId = TxSaveId(0)
-  }
-
-  class DelayedAcceptResponse {
-    var response: Option[TxAcceptResponse] = None
-    var saveId: TxSaveId = TxSaveId(0)
-  }
-}
 
 class Tx( trs: TransactionRecoveryState,
           val txd: TransactionDescription,
@@ -33,8 +22,6 @@ class Tx( trs: TransactionRecoveryState,
           private val statusCache: TransactionStatusCache,
           private val preTxRebuilds: List[PreTransactionOpportunisticRebuild],
           private val objectLocaters: List[Locater]) extends Logging {
-
-  import Tx._
 
   val transactionId: TransactionId = txd.transactionId
 
@@ -49,13 +36,11 @@ class Tx( trs: TransactionRecoveryState,
   private var objects: Map[ObjectId, ObjectState] = Map()
   private var pendingObjectLoads: Int = objectLocaters.size
   private var pendingObjectCommits: Int = 0
+  private var delayedPrepare: Option[TxPrepareResponse] = None
 
   private val acceptor = new Acceptor(storeId.poolIndex, trs.paxosAcceptorState)
-  private val delayedPrepare = new DelayedPrepareResponse
-  private val delayedAccept = new DelayedAcceptResponse
   private var lastEvent: Long = System.nanoTime()
   private var saveObjectUpdates: Boolean = true
-  private var nextCrlSave: TxSaveId = TxSaveId(1)
   private var committed: Boolean = false
   private var committing: Boolean = false
   private var locked: Boolean = false
@@ -71,12 +56,6 @@ class Tx( trs: TransactionRecoveryState,
   def lastEventTime: Long = lastEvent
 
   def durationSinceLastEvent: Duration = Duration(System.nanoTime() - lastEvent, NANOSECONDS)
-
-  private def nextCrlSaveId(): TxSaveId = {
-    val id = nextCrlSave
-    nextCrlSave = TxSaveId(id.number + 1)
-    id
-  }
 
   private def unlock(): Unit = if (locked) {
     locked = false
@@ -152,13 +131,15 @@ class Tx( trs: TransactionRecoveryState,
     // Case received prepare before the objects are loaded. This will always be true for the first prepare
     // message as the receivePrepare() method is called immediately after transaction creation.
 
-    delayedPrepare.response.foreach { response =>
+    delayedPrepare.foreach { response =>
       val r = response.copy(disposition=disposition, collisions=collisions)
-      delayedPrepare.response = Some(r)
-      delayedPrepare.saveId = nextCrlSaveId()
+      delayedPrepare = None
       val state = TransactionRecoveryState(storeId, serializedTxd, trsObjectUpdates,
         disposition, status, acceptor.persistentState)
-      crl.save(txd.transactionId, state, delayedPrepare.saveId)
+      crl.save(txd.transactionId, state, () =>
+        logger.trace(s"AllObjectsLoaded. Sending PrepareResponse for tx ${transactionId}")
+        net.sendTransactionMessage(r)
+      )
     }
   }
 
@@ -232,14 +213,16 @@ class Tx( trs: TransactionRecoveryState,
 
     val txr = TxPrepareResponse(m.from, storeId, transactionId, result, m.proposalId, disposition, collisions)
     logger.trace(s"*** PrepareResponse: ${m.transactionId}, Disposition:$disposition. All Objects Loaded: $allObjectsLoaded")
-    delayedPrepare.response = Some(txr)
 
-    if (allObjectsLoaded) {
-      delayedPrepare.saveId = nextCrlSaveId()
+    if allObjectsLoaded then
       val state = TransactionRecoveryState(storeId, serializedTxd, trsObjectUpdates,
         disposition, status, acceptor.persistentState)
-      crl.save(txd.transactionId, state, delayedPrepare.saveId)
-    }
+      crl.save(txd.transactionId, state, () =>
+        logger.trace(s"CRL Transaction save complete. Sending PrepareResponse: ${m.transactionId}")
+        net.sendTransactionMessage(txr)
+      )
+    else
+      delayedPrepare = Some(txr)
   }
 
   def receiveAccept(m: TxAccept): Unit = {
@@ -249,11 +232,14 @@ class Tx( trs: TransactionRecoveryState,
       case Right(a) => Right(TxAcceptResponse.Accepted(a.proposalValue))
       case Left(n) => Left(TxAcceptResponse.Nack(n.promisedProposalId))
     }
-    delayedAccept.response = Some(TxAcceptResponse(m.from, storeId, transactionId, m.proposalId, result))
-    delayedAccept.saveId = nextCrlSaveId()
+    val tar = TxAcceptResponse(m.from, storeId, transactionId, m.proposalId, result)
     val state = TransactionRecoveryState(storeId, serializedTxd, trsObjectUpdates,
       disposition, status, acceptor.persistentState)
-    crl.save(txd.transactionId, state, delayedAccept.saveId)
+
+    crl.save(txd.transactionId, state, () =>
+      logger.trace(s"CRL Accept save completed for tx: ${tar.transactionId}. Sending AcceptResponse")
+      net.sendTransactionMessage(tar)
+    )
   }
 
   def receiveResolved(m: TxResolved): Unit = {
@@ -278,22 +264,6 @@ class Tx( trs: TransactionRecoveryState,
     val r = TxStatusResponse(m.from, storeId, transactionId, m.requestUUID,
       Some(TxStatusResponse.TxStatus(status, ofinalized.nonEmpty)))
     net.sendTransactionMessage(r)
-  }
-
-  def crlSaveComplete(saveId: TxSaveId): Unit = {
-    if (saveId == delayedPrepare.saveId) {
-      delayedPrepare.response.foreach { m =>
-        net.sendTransactionMessage(m)
-        delayedPrepare.response = None
-      }
-    }
-
-    if (saveId == delayedAccept.saveId) {
-      delayedAccept.response.foreach { m =>
-        net.sendTransactionMessage(m)
-        delayedAccept.response = None
-      }
-    }
   }
 
   def commitComplete(objectId: ObjectId, result: Either[Unit, CommitError.Value]): Unit = {

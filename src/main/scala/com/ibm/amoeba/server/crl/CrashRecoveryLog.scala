@@ -6,9 +6,9 @@ import com.ibm.amoeba.common.transaction.TransactionId
 trait CrashRecoveryLog {
   def getFullRecoveryState(storeId: StoreId): (List[TransactionRecoveryState], List[AllocationRecoveryState])
 
-  def save(txid: TransactionId, state: TransactionRecoveryState, saveId: TxSaveId): Unit
+  def save(txid: TransactionId, state: TransactionRecoveryState, completionHandler: () => Unit): Unit
 
-  def save(state: AllocationRecoveryState): Unit
+  def save(state: AllocationRecoveryState, completionHandler: () => Unit): Unit
 
   def dropTransactionObjectData(storeId: StoreId, txid: TransactionId): Unit
 
