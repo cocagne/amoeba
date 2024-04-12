@@ -393,9 +393,9 @@ object Main {
     setLog4jConfigFile(node.log4jConfigFile)
 
     val simpleCrl = node.crl match {
-      case b: ConfigFile.SimpleCRL => SimpleCRL.Factory(Paths.get(b.path), b.numStreams, b.fileSizeMb * 1024)
+      case b: ConfigFile.SimpleCRL => SimpleCRL.Factory(Paths.get(b.path), b.numStreams, b.fileSizeMb * 1024 * 1024)
     }
-    
+
     val stores = node.stores.map { s =>
       val storeId = StoreId(PoolId(cfg.pools(s.pool).uuid), s.store.asInstanceOf[Byte])
 

@@ -271,19 +271,20 @@ class Frontend(val storeId: StoreId,
     val either = backend.allocate(msg.newObjectId, msg.objectType, metadata, msg.objectData, msg.objectSize)
 
     either match {
-      case Right(_) =>
+      case Right(err) =>
         val r = AllocateResponse(msg.fromClient, msg.toStore, msg.allocationTransactionId, msg.newObjectId, None)
+        logger.debug(s"Failed to allocate object ${msg.newObjectId} for tx ${msg.allocationTransactionId}. Error: $err")
         net.sendClientResponse(r)
 
       case Left(storePointer) =>
-        logger.trace(s"Backend allocated new object ${msg.newObjectId}. Saving in CRL")
+        logger.trace(s"Backend allocated new object ${msg.newObjectId}. Saving in CRL. tx ${msg.allocationTransactionId}")
         val rmsg = AllocateResponse(msg.fromClient, msg.toStore, msg.allocationTransactionId, msg.newObjectId,
           Some(storePointer))
 
         val arList = pendingAllocations.get(msg.allocationTransactionId) match
           case Some(lst) => rmsg :: lst
           case None => rmsg :: Nil
-          
+
         pendingAllocations += (msg.allocationTransactionId -> arList)
 
         val os = new ObjectState(msg.newObjectId, storePointer, metadata, msg.objectType, msg.objectData,
@@ -306,9 +307,9 @@ class Frontend(val storeId: StoreId,
           msg.allocationTransactionId,
           msg.revisionGuard.serialize()
         )
-
+        
         crl.save(ars, () =>
-          logger.trace(s"CRL Save Completed for Allocation of object ${msg.newObjectId}")
+          logger.trace(s"CRL Save Completed for Allocation of object ${msg.newObjectId} tx ${msg.allocationTransactionId}")
           net.sendClientResponse(rmsg)
         )
     }

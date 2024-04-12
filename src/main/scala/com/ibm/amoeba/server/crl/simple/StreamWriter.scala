@@ -1,5 +1,7 @@
 package com.ibm.amoeba.server.crl.simple
 
+import org.apache.logging.log4j.scala.Logging
+
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
 import java.nio.file.{Path, StandardOpenOption}
@@ -18,7 +20,7 @@ object WriterThread:
 
 
 class StreamWriter(val maxSizeInBytes: Long,
-                   files: List[(StreamId, Path)]):
+                   files: List[(StreamId, Path)]) extends Logging:
   
   private val queue = new LinkedBlockingQueue[WriterThread.Command]()
   private val streams = files.map(t =>

@@ -45,14 +45,12 @@ object ZMQNetwork {
 
   class CliMessenger(net: ZMQNetwork) extends ClientMessenger with Logging {
     def sendClientRequest(msg: ClientRequest): Unit = synchronized {
-      msg match
-        case rr: Read => logger.trace(s"Sending ${msg.getClass.getSimpleName} ${rr.readUUID} to ${msg.toStore}")
-        case _ => logger.trace(s"Sending ${msg.getClass.getSimpleName} to ${msg.toStore}")
+      //logger.trace(s"Sending $msg")
       net.queueMessageForSend(SendClientRequest(msg))
     }
 
     def sendTransactionMessage(msg: TxMessage): Unit = synchronized {
-      logger.trace(s"Sending TxId ${msg.transactionId} ${msg.getClass.getSimpleName} to ${msg.to}")
+      //logger.trace(s"Sending $msg")
       net.queueMessageForSend(SendClientTransactionMessage(msg))
     }
 
@@ -65,15 +63,12 @@ object ZMQNetwork {
         case Some(zmqIdentity) => String(zmqIdentity)
         case None => "UNKNOWN!"
 
-      msg match
-        case rr: ReadResponse => logger.trace(s"Sending ReadResponse for read ${rr.readUUID} to ${msg.toClient}. ZAddr: $zaddr")
-        case _ => logger.trace(s"Sending ${msg.getClass.getSimpleName} to ${msg.toClient}. ZAddr: $zaddr")
-
+      //logger.trace(s"Sending $msg")
       net.queueMessageForSend(SendClientResponse(msg))
     }
 
     def sendTransactionMessage(msg: TxMessage): Unit = synchronized {
-      logger.trace(s"Sending TxId ${msg.transactionId} ${msg.getClass.getSimpleName} to ${msg.to}")
+      //logger.trace(s"Sending $msg")
       net.queueMessageForSend(SendServerTransactionMessage(msg))
     }
 
@@ -246,19 +241,19 @@ class ZMQNetwork(val oclientId: Option[ClientId],
       while qmsg != null do
         qmsg match
           case SendClientRequest(msg) =>
-            logger.trace(s"Sending ${msg.getClass.getSimpleName} to ${msg.toStore}")
+            logger.trace(s"Sending $msg")
             peers(stores(msg.toStore)).dealer.send(MessageEncoder.encodeMessage(msg))
           case SendClientTransactionMessage(msg) =>
-            logger.trace(s"Sending ${msg.getClass.getSimpleName} to ${msg.to}")
+            logger.trace(s"Sending $msg")
             peers(stores(msg.to)).dealer.send(MessageEncoder.encodeMessage(msg))
           case SendClientResponse(msg) =>
-            logger.trace(s"Sending ${msg.getClass.getSimpleName} to ${msg.toClient}")
+            logger.trace(s"Sending $msg")
             clients.get(msg.toClient).foreach: zmqIdentity =>
               routerSocket.foreach: router =>
                 router.send(zmqIdentity, ZMQ.SNDMORE)
                 router.send(MessageEncoder.encodeMessage(msg))
           case SendServerTransactionMessage(msg) =>
-            logger.trace(s"Sending ${msg.getClass.getSimpleName} to ${msg.to}")
+            logger.trace(s"Sending $msg")
             peers(stores(msg.to)).dealer.send(MessageEncoder.encodeMessage(msg))
         qmsg = sendQueue.poll()
     }
@@ -278,22 +273,22 @@ class ZMQNetwork(val oclientId: Option[ClientId],
 
     if (p.readResponse() != null) {
       val message = NetworkCodec.decode(p.readResponse())
-      logger.trace(s"Got ReadResponse for read ${message.readUUID} from store ${message.fromStore}")
+      logger.trace(s"Got $message")
       onClientResponseReceived(message)
     }
     else if (p.txResolved() != null) {
       val message = NetworkCodec.decode(p.txResolved())
-      logger.trace(s"Got TxResolved for TxId ${message.transactionId} from store ${message.fromStore}. Committed: ${message.committed}")
+      logger.trace(s"Got $message")
       onClientResponseReceived(message)
     }
     else if (p.txFinalized() != null) {
       val message = NetworkCodec.decode(p.txFinalized())
-      logger.trace(s"Got TxFinalized for TxId ${message.transactionId} from store ${message.fromStore}. Committed: ${message.committed}")
+      logger.trace(s"Got $message")
       onClientResponseReceived(message)
     }
     else if (p.allocateResponse() != null) {
       val message = NetworkCodec.decode(p.allocateResponse())
-      logger.trace(s"Got AllocateResponse from ${message.fromStore} obj ${message.newObjectId}")
+      logger.trace(s"Got $message")
       onClientResponseReceived(message)
     }
   }
@@ -323,7 +318,7 @@ class ZMQNetwork(val oclientId: Option[ClientId],
 
     if (p.nodeHeartbeat() != null) {
       val msg = NetworkCodec.decode(p.nodeHeartbeat())
-      logger.trace(s"Got heartbeat from node ${msg.nodeName}")
+      logger.trace(s"Got $msg")
       nodeStates.get(msg.nodeName) match {
         case None =>
           val ns = new NodeState(msg.nodeName,0, false)
@@ -334,7 +329,7 @@ class ZMQNetwork(val oclientId: Option[ClientId],
     }
     else if (p.read() != null) {
       val message = NetworkCodec.decode(p.read())
-      logger.trace(s"Got Read ${message.readUUID} for object ${message.objectPointer.id} from ${message.fromClient}")
+      logger.trace(s"Got $message")
       updateClientId(message.fromClient, from)
       onClientRequestReceived(message)
     }
@@ -387,66 +382,63 @@ class ZMQNetwork(val oclientId: Option[ClientId],
         (localUpdates, preTxRebuilds)
       }
       val message = NetworkCodec.decode(p.prepare(), updateContent._1, updateContent._2)
-      logger.trace(s"Got Prepare ${message.txd.transactionId} from ${message.from}. ProposalId:${message.proposalId}")
+      logger.trace(s"Got $message")
       onTransactionMessageReceived(message)
     }
     else if (p.prepareResponse() != null) {
       //println("got prepareResponse")
       val message = NetworkCodec.decode(p.prepareResponse())
-      logger.trace(s"Got PrepareResponse ${message.transactionId} from ${message.from}. ProposalId:${message.proposalId} Disposition ${message.disposition}")
+      logger.trace(s"Got $message")
       onTransactionMessageReceived(message)
     }
     else if (p.accept() != null) {
       //println("got accept")
       val message = NetworkCodec.decode(p.accept())
-      logger.trace(s"Got Accept ${message.transactionId} from ${message.from}. ProposalId:${message.proposalId}. ${message.value}")
+      logger.trace(s"Got $message")
       onTransactionMessageReceived(message)
     }
     else if (p.acceptResponse() != null) {
-      //println("got acceptResponse")
       val message = NetworkCodec.decode(p.acceptResponse())
-      logger.trace(s"Got AcceptResponse ${message.transactionId} from ${message.from}. ProposalId:${message.proposalId} Response: ${message.response}")
+      logger.trace(s"Got $message")
       onTransactionMessageReceived(message)
     }
     else if (p.resolved() != null) {
       val message = NetworkCodec.decode(p.resolved())
-      logger.trace(s"Got Resolved ${message.transactionId} from ${message.from}. Committed: ${message.committed}")
-      //println(s"got resolved for txid ${message.transactionUUID} committed = ${message.committed}")
+      logger.trace(s"Got $message")
       onTransactionMessageReceived(message)
     }
     else if (p.committed() != null) {
       val message = NetworkCodec.decode(p.committed())
-      logger.trace(s"Got Committed ${message.transactionId} from ${message.from}")
-      //println(s"got committed for txid ${message.transactionUUID}")
+      logger.trace(s"Got $message")
       onTransactionMessageReceived(message)
     }
     else if (p.finalized() != null) {
       //println("got finalized")
       val message = NetworkCodec.decode(p.finalized())
-      logger.trace(s"Got Finalized ${message.transactionId} from ${message.from}. Committed: ${message.committed}")
+      logger.trace(s"Got $message")
       onTransactionMessageReceived(message)
     }
     else if (p.heartbeat() != null) {
       val message = NetworkCodec.decode(p.heartbeat())
-      logger.trace(s"Got TxHeartbeat ${message.transactionId} from ${message.from}")
+      logger.trace(s"Got $message")
       onTransactionMessageReceived(message)
     }
     else if (p.allocate() != null) {
       //println(s"got allocate request. Receiver: $a")
       val message = NetworkCodec.decode(p.allocate())
-      logger.trace(s"Got Allocate ${message.allocationTransactionId} ${message.newObjectId}.")
+      logger.trace(s"Got $message")
       updateClientId(message.fromClient, from)
       onClientRequestReceived(message)
     }
     else if (p.opportunisticRebuild() != null) {
       val message = NetworkCodec.decode(p.opportunisticRebuild())
-      logger.trace(s"Got OpportunisticRebuild for object ${message.pointer.id}")
+      logger.trace(s"Got $message")
       updateClientId(message.fromClient, from)
       onClientRequestReceived(message)
     }
     else if (p.transactionCompletionQuery() != null) {
       val message = NetworkCodec.decode(p.transactionCompletionQuery())
-      logger.trace(s"Got CompletionQuery for transaction ${message.transactionId}")
+      logger.trace(s"Got $message")
       updateClientId(message.fromClient, from)
       onClientRequestReceived(message)
     }

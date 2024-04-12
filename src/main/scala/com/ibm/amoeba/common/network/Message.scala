@@ -49,26 +49,31 @@ final case class Allocate(
       revisionGuard == rhs.revisionGuard
     case _ => false
   }
+
+  override def toString: String = f"Allocate from $fromClient to $toStore type $objectType objectId $newObjectId allocationTx $allocationTransactionId"
 }
 
 final case class AllocateResponse( toClient: ClientId,
                                    fromStore: StoreId,
                                    allocationTransactionId: TransactionId,
                                    newObjectId: ObjectId,
-                                   result: Option[StorePointer]) extends ClientResponse
+                                   result: Option[StorePointer]) extends ClientResponse:
+  override def toString: String = f"AllocateResponse from $fromStore to $toClient tx $allocationTransactionId objId $newObjectId"
 
 final case class Read(
                        toStore: StoreId,
                        fromClient: ClientId,
                        readUUID: UUID,
                        objectPointer: ObjectPointer,
-                       readType: ReadType) extends ClientRequest
+                       readType: ReadType) extends ClientRequest:
+  override def toString: String = f"Read toStore $toStore from $fromClient uuid $readUUID object ${objectPointer.id}"
 
 final case class ReadResponse( toClient: ClientId,
                                fromStore: StoreId,
                                readUUID: UUID,
                                readTime: HLCTimestamp,
-                               result: Either[ReadError.Value, ReadResponse.CurrentState]) extends ClientResponse
+                               result: Either[ReadError.Value, ReadResponse.CurrentState]) extends ClientResponse:
+  override def toString: String = f"ReadResponse toClient $toClient from $fromStore uuid $readUUID"
 
 object ReadResponse {
   case class CurrentState(
@@ -102,31 +107,36 @@ final case class OpportunisticRebuild(
                                        revision: ObjectRevision,
                                        refcount: ObjectRefcount,
                                        timestamp: HLCTimestamp,
-                                       data: DataBuffer) extends ClientRequest
+                                       data: DataBuffer) extends ClientRequest:
+  override def toString: String = f"OpportunisticRebuild to $toStore from $fromClient object ${pointer.id}"
 
 final case class TransactionCompletionQuery(
                                              toStore: StoreId,
                                              fromClient: ClientId,
                                              queryUUID: UUID,
-                                             transactionId: TransactionId) extends ClientRequest
+                                             transactionId: TransactionId) extends ClientRequest:
+  override def toString: String = f"TransactionCompletionQuery to $toStore from $fromClient query $queryUUID tx $transactionId"
 
 final case class TransactionCompletionResponse(
                                                 toClient: ClientId,
                                                 fromStore: StoreId,
                                                 queryUUID: UUID,
-                                                isComplete: Boolean) extends ClientResponse
+                                                isComplete: Boolean) extends ClientResponse:
+  override def toString: String = f"TransactionCompletionResponse to $toClient from $fromStore query $queryUUID isComplete $isComplete"
 
 final case class TransactionResolved(
                                       toClient: ClientId,
                                       fromStore: StoreId,
                                       transactionId: TransactionId,
-                                      committed: Boolean) extends ClientResponse
+                                      committed: Boolean) extends ClientResponse:
+  override def toString: String = f"TransactionResolved to $toClient from $fromStore tx $transactionId committed $committed"
 
 final case class TransactionFinalized(
                                        toClient: ClientId,
                                        fromStore: StoreId,
                                        transactionId: TransactionId,
-                                       committed: Boolean) extends ClientResponse
+                                       committed: Boolean) extends ClientResponse:
+  override def toString: String = f"TransactionFinalized to $toClient from $fromStore tx $transactionId committed $committed"
 
 
 final case class TxPrepare(
@@ -135,9 +145,12 @@ final case class TxPrepare(
                             txd: TransactionDescription,
                             proposalId: ProposalId,
                             objectUpdates: List[ObjectUpdate],
-                            preTxRebuilds: List[PreTransactionOpportunisticRebuild]) extends TxMessage {
+                            preTxRebuilds: List[PreTransactionOpportunisticRebuild]) extends TxMessage:
+
   override val transactionId: TransactionId = txd.transactionId
-}
+
+  override def toString: String = f"TxPrepare to $to from $from tx $transactionId proposalId $proposalId"
+
 
 final case class TxPrepareResponse(
                                     to: StoreId,
@@ -146,7 +159,8 @@ final case class TxPrepareResponse(
                                     response: Either[TxPrepareResponse.Nack, TxPrepareResponse.Promise],
                                     proposalId: ProposalId,
                                     disposition: TransactionDisposition.Value,
-                                    collisions: List[TransactionId]) extends TxMessage
+                                    collisions: List[TransactionId]) extends TxMessage:
+  override def toString: String = f"TxPrepareResponse to $to from $from tx $transactionId proposalId $proposalId disposition $disposition response $response"
 
 object TxPrepareResponse {
   case class Nack(promisedId: ProposalId)
@@ -158,14 +172,16 @@ final case class TxAccept(
                            from: StoreId,
                            transactionId: TransactionId,
                            proposalId: ProposalId,
-                           value: Boolean) extends TxMessage
+                           value: Boolean) extends TxMessage:
+  override def toString: String = f"TxAccept to $to from $from tx $transactionId proposalId $proposalId value $value"
 
 final case class TxAcceptResponse(
                                    to: StoreId,
                                    from: StoreId,
                                    transactionId: TransactionId,
                                    proposalId: ProposalId,
-                                   response: Either[TxAcceptResponse.Nack, TxAcceptResponse.Accepted]) extends TxMessage
+                                   response: Either[TxAcceptResponse.Nack, TxAcceptResponse.Accepted]) extends TxMessage:
+  override def toString: String = f"TxAcceptResponse to $to from $from tx $transactionId proposalId $proposalId response $response"
 
 object TxAcceptResponse {
   case class Nack(promisedId: ProposalId)
@@ -176,38 +192,44 @@ final case class TxResolved(
                              to: StoreId,
                              from: StoreId,
                              transactionId: TransactionId,
-                             committed: Boolean) extends TxMessage
+                             committed: Boolean) extends TxMessage:
+  override def toString: String = f"TxResolved to $to from $from tx $transactionId committed $committed"
 
 final case class TxCommitted(
                               to: StoreId,
                               from: StoreId,
                               transactionId: TransactionId,
                               // List of object UUIDs that could not be committed due to transaction requirement errors
-                              objectCommitErrors: List[ObjectId]) extends TxMessage
+                              objectCommitErrors: List[ObjectId]) extends TxMessage:
+  override def toString: String = f"TxCommitted to $to from $from tx $transactionId errors $objectCommitErrors"
 
 final case class TxFinalized(
                               to: StoreId,
                               from: StoreId,
                               transactionId: TransactionId,
-                              committed: Boolean) extends TxMessage
+                              committed: Boolean) extends TxMessage:
+  override def toString: String = f"TxFinalized to $to from $from tx $transactionId committed $committed"
 
 final case class TxHeartbeat(
                               to: StoreId,
                               from: StoreId,
-                              transactionId: TransactionId) extends TxMessage
+                              transactionId: TransactionId) extends TxMessage:
+  override def toString: String = f"TxHeartbeat to $to from $from tx $transactionId"
 
 final case class TxStatusRequest(
                                   to: StoreId,
                                   from: StoreId,
                                   transactionId: TransactionId,
-                                  requestUUID: UUID) extends TxMessage
+                                  requestUUID: UUID) extends TxMessage:
+  override def toString: String = f"TxStatusRequest to $to from $from tx $transactionId request $requestUUID"
 
 final case class TxStatusResponse(
                                    to: StoreId,
                                    from: StoreId,
                                    transactionId: TransactionId,
                                    requestUUID: UUID,
-                                   status: Option[TxStatusResponse.TxStatus]) extends TxMessage
+                                   status: Option[TxStatusResponse.TxStatus]) extends TxMessage:
+  override def toString: String = f"TxStatusResponse to $to from $from tx $transactionId request $requestUUID status $status"
 
 object TxStatusResponse {
   case class TxStatus(status: TransactionStatus.Value, finalized: Boolean)

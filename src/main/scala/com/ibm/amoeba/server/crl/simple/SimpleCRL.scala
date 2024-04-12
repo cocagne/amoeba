@@ -3,6 +3,7 @@ package com.ibm.amoeba.server.crl.simple
 import com.ibm.amoeba.common.store.StoreId
 import com.ibm.amoeba.common.transaction.TransactionId
 import com.ibm.amoeba.server.crl.{AllocationRecoveryState, CrashRecoveryLog, CrashRecoveryLogFactory, TransactionRecoveryState}
+import org.apache.logging.log4j.scala.Logging
 
 import java.nio.file.Path
 import java.util.UUID
@@ -33,13 +34,13 @@ object SimpleCRL:
   case class InitialCRLState(crl: SimpleCRL,
                              trsList: List[TransactionRecoveryState],
                              arsList: List[AllocationRecoveryState])
-  
-  case class Factory(streamsDir: Path, 
-                     numStreams: Int, 
+
+  case class Factory(streamsDir: Path,
+                     numStreams: Int,
                      maxSizeInBytes: Long) extends CrashRecoveryLogFactory:
     def createCRL(): CrashRecoveryLog =
       SimpleCRL(streamsDir, numStreams, maxSizeInBytes).crl
-    
+
 
 
   def apply(streamsDir: Path, numStreams: Int, maxSizeInBytes: Long): InitialCRLState =
@@ -60,7 +61,7 @@ object SimpleCRL:
 
 class SimpleCRL private (val maxSizeInBytes: Long,
                          files: List[(StreamId, Path)],
-                         r: Recovery.Result) extends CrashRecoveryLog:
+                         r: Recovery.Result) extends CrashRecoveryLog with Logging:
 
   import SimpleCRL._
 
@@ -139,6 +140,7 @@ class SimpleCRL private (val maxSizeInBytes: Long,
             currentLogEntry.addAllocation(a, () => ())
 
     writeInProgress = true
+    logger.trace(s"CRL beginning write for entry ${currentLogEntry.entrySerialNumber}")
     val location = streams(currentStream).writeEntry(currentLogEntry, () => ioQueue.put(WriteComplete()))
     val nextEntrySerialNumber = currentLogEntry.entrySerialNumber+1
     currentLogEntry = new LogEntry(location, nextEntrySerialNumber, oldestEntryNeeded)
@@ -225,6 +227,7 @@ class SimpleCRL private (val maxSizeInBytes: Long,
     val lst: List[Alloc] = alloc :: allocs
     allocations += (txid -> lst)
 
+    logger.trace(s"CRL adding allocation to log entry ${currentLogEntry.entrySerialNumber}")
     currentLogEntry.addAllocation(alloc, completionHandler)
     startWrite()
 
@@ -249,9 +252,9 @@ class SimpleCRL private (val maxSizeInBytes: Long,
 
   def getFullRecoveryState(storeId: StoreId): (List[TransactionRecoveryState], List[AllocationRecoveryState]) =
     (r.trsList.filter(_.storeId == storeId), r.arsList.filter(_.storeId == storeId))
-    
-  def save(transactionId: TransactionId, 
-           state: TransactionRecoveryState, 
+
+  def save(transactionId: TransactionId,
+           state: TransactionRecoveryState,
            completionHandler: () => Unit): Unit =
     ioQueue.put(SaveTransaction(transactionId, state, completionHandler))
 
