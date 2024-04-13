@@ -266,7 +266,7 @@ object Main {
         val guard = ObjectRevisionGuard(kvos.pointer, kvos.revision)
         client.getStoragePool(kvos.pointer.poolId).flatMap { pool =>
           val allocator = new SinglePoolObjectAllocator(client, pool, kvos.pointer.ida, None)
-          SimpleFileSystem.bootstrap(client, guard, allocator)
+          SimpleFileSystem.bootstrap(client, guard, allocator, kvos.pointer, AmoebafsKey)
         }
     }
 

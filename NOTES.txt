@@ -22,8 +22,7 @@ sudo launchctl start com.apple.rpcbind
 # run "sbt pack"
 # then invoke ./target/pack/bin/demo
 
-sbt compile && rm -r local/nodes/* && rm local/*log
-./t bootstrap local/t.yaml
+sbt compile && rm -r local/node_* && ./t bootstrap local/cfg.yaml
 
 ./t node local/t.yaml node_a
 
@@ -79,6 +78,14 @@ Transaction Finalizers
 AllocationDriver
     - Detect stalled allocations and force commit failure
     - Recover from successful completions
+
+SimpleCRL
+    Problem if LogEntry exceeds the Maximum stream size. Can modify LogEntry to skip writes until its size
+    is once again less than the size of a log file. Need to allow tx/alloc deletes to remove entries from
+    the LogEntry.
+    - Move completionHandler into the LogContent base class
+    - Iterate over all Tx and Alloc to call completion handlers
+    - Modify LogEntry to remove Tx and Alloc instances when deletions are made
 
 FIXME - When setting Maximum on KeyValue object, we must check to ensure that no keys exceeding that
         maximum will be present when transaction ends. Must run through adds and deletes to local keys

@@ -5,7 +5,8 @@ import java.util.concurrent.{Executors, TimeUnit}
 import com.ibm.amoeba.client.internal.allocation.SinglePoolObjectAllocator
 import com.ibm.amoeba.client.tkvl.{KVObjectRootManager, NodeAllocator, Root, SinglePoolNodeAllocator}
 import com.ibm.amoeba.client.{AmoebaClient, ExponentialBackoffRetryStrategy, KeyValueObjectState, ObjectAllocator, ObjectAllocatorId, Transaction}
-import com.ibm.amoeba.common.objects.{AllocationRevisionGuard, IntegerKeyOrdering, Key, KeyValueObjectPointer, LexicalKeyOrdering, Value}
+import com.ibm.amoeba.common.objects.{AllocationRevisionGuard, Insert, IntegerKeyOrdering, Key, KeyValueObjectPointer, KeyValueOperation, LexicalKeyOrdering, Value}
+import com.ibm.amoeba.common.transaction.KeyValueUpdate
 import com.ibm.amoeba.common.util.{byte2uuid, uuid2byte}
 import com.ibm.amoeba.compute.TaskExecutor
 import com.ibm.amoeba.compute.impl.SimpleTaskExecutor
@@ -21,7 +22,9 @@ object SimpleFileSystem {
 
   def bootstrap(client: AmoebaClient,
                 guard: AllocationRevisionGuard,
-                allocator: ObjectAllocator): Future[FileSystem] = {
+                allocator: ObjectAllocator,
+                hostingObject: KeyValueObjectPointer,
+                amoebafsKey: Key): Future[FileSystem] = {
 
     implicit val ec: ExecutionContext = client.clientContext
     implicit val tx: Transaction = client.newTransaction()
@@ -43,6 +46,11 @@ object SimpleFileSystem {
         InodeTableRootKey -> Value(inodeTableRoot.encode()))
       fsRootPointer <- allocator.allocateKeyValueObject(guard, content)
       _=tx.overwrite(rootDirectory, tx.revision, rootDirInode.toArray) // ensure Tx has an object to modify
+      _=tx.update(hostingObject,
+        None,
+        None,
+        List(KeyValueUpdate.DoesNotExist(amoebafsKey)),
+        List(Insert(amoebafsKey, fsRootPointer.toArray)))
       _ <- tx.commit()
       fs <- load(client, fsRootPointer, numContextThreads = 4)
     } yield {
