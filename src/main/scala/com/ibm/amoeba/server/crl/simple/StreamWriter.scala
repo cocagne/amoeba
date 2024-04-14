@@ -16,7 +16,7 @@ object WriterThread:
                    buffers: Array[ByteBuffer],
                    onWriteComplete: () => Unit) extends Command
 
-  case class Shutdown() extends Command
+  case class Shutdown(completionHandler: () => Unit) extends Command
 
 
 class StreamWriter(val maxSizeInBytes: Long,
@@ -51,11 +51,12 @@ class StreamWriter(val maxSizeInBytes: Long,
             channel.write(w.buffers)
             w.onWriteComplete()
             
-        case _: WriterThread.Shutdown =>
+        case WriterThread.Shutdown(completionHandler) =>
           streams.valuesIterator.foreach(_.close)
           exitLoop = true
+          completionHandler()
         
-  def shutdown(): Unit = queue.add(WriterThread.Shutdown())
+  def shutdown(completionHandler: () => Unit = () => ()): Unit = queue.add(WriterThread.Shutdown(completionHandler))
   
   def write(streamId: StreamId, 
             offset: Long, 

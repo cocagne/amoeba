@@ -28,7 +28,7 @@ object SimpleCRL:
 
   case class WriteComplete() extends ActionRequest
 
-  case class Shutdown() extends ActionRequest
+  case class Shutdown(completionHandler: () => Unit) extends ActionRequest
 
 
   case class InitialCRLState(crl: SimpleCRL,
@@ -162,8 +162,8 @@ class SimpleCRL private (val maxSizeInBytes: Long,
           writeInProgress = false
           startWrite()
 
-        case Shutdown() =>
-          writer.shutdown()
+        case Shutdown(completionHandler) =>
+          writer.shutdown(completionHandler)
           return
 
   private def moveToQueueHead(lc: LogContent): Unit =
@@ -271,6 +271,9 @@ class SimpleCRL private (val maxSizeInBytes: Long,
   def dropTransactionObjectData(storeId: StoreId, transactionid: TransactionId): Unit =
     ioQueue.put(DropTransactionData(storeId, transactionid))
 
-  def shutdown(): Unit = ioQueue.put(Shutdown())
+  def shutdown(): Unit = 
+    val q = new LinkedBlockingQueue[String]()
+    ioQueue.put(Shutdown(() => q.put("")))
+    q.take()
 
 
