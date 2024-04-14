@@ -294,6 +294,12 @@ class SimpleCRLSuite extends FileBasedTests {
 
     queue.take() // Block till completion handlers are run
 
+    // There's a race condition here where the currentLogEntry variable is updated after
+    // the completion callback is executed. It's possible for the take() operation to complete
+    // before this happens which causes the currentEntrySerialNumber to still be zero when it
+    // should be 1. Add a short sleep to reduce the likelihood of this happening
+    Thread.sleep(50)
+    
     assert(i.crl.currentEntrySerialNumber == 1)
 
     i.crl.shutdown()
