@@ -35,19 +35,15 @@ lazy val root = (project in file(".")).
       "com.github.blemale"               %% "scaffeine"               % "5.2.1" % "compile",
       "org.rocksdb"                      %  "rocksdbjni"              % "8.11.3",
       "com.github.scopt"                 %% "scopt"                   % "4.1.0",
-      //"io.netty"                         %  "netty-all"               % "4.1.43.Final",
       "org.apache.logging.log4j"         %  "log4j-api"               % "2.22.0",
       "org.apache.logging.log4j"         %  "log4j-core"              % "2.22.0",
       "org.apache.logging.log4j"         %% "log4j-api-scala"         % "13.1.0",
       "org.slf4j"                        %  "slf4j-log4j12"           % "2.0.12",
-      //"com.fasterxml.jackson.core"       %  "jackson-core"            % "2.9.4",
-      //"com.fasterxml.jackson.core"       %  "jackson-databind"        % "2.9.4",
-      //"com.fasterxml.jackson.dataformat" %  "jackson-dataformat-yaml" % "2.9.4",
-      //"com.lmax"                         %  "disruptor"               % "3.3.7",
       "org.dcache"                       %  "nfs4j-core"              % "0.24.0",
       "org.yaml"                         %  "snakeyaml"               % "1.25",
       "org.zeromq"                       %  "jeromq"                  % "0.6.0",
       "com.google.flatbuffers"           %  "flatbuffers-java"        % "1.12.0",
+      "com.google.protobuf"              %  "protobuf-java"           % "3.13.0" % "protobuf",
     )
   )
   
@@ -78,4 +74,8 @@ lazy val root = (project in file(".")).
   }
   
   net_out_dir.listFiles().toSeq
-}.taskValue
+ }.taskValue
+
+ Compile / PB.targets := Seq(
+  PB.gens.java -> (Compile / sourceManaged).value
+ )
