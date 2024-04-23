@@ -4,12 +4,6 @@ package com.ibm.amoeba.codec;
 
 option java_multiple_files = true;
 
-message SearchRequest {
-  string query = 1;
-  int32 page_number = 2;
-  int32 results_per_page = 3;
-}
-
 //---------------------------------------------------------------------------
 //- Object
 //---------------------------------------------------------------------------
@@ -31,7 +25,7 @@ message Replication {
 
 message ReedSolomon {
   uint32 width = 1;
-  uint32 read_threshold = 2;
+  uint32 restore_threshold = 2;
   uint32 write_threshold = 3;
 }
 
@@ -184,7 +178,7 @@ message TransactionDescription {
 //---------------------------------------------------------------------------
 //- Transaction Messages
 //---------------------------------------------------------------------------
-message ProposalID {
+message ProposalId {
   uint32 number = 1;
   uint32 uid = 2;
 }
@@ -203,7 +197,7 @@ message TxPrepare {
   StoreId to = 1;
   StoreId from = 2;
   TransactionDescription txd = 3;
-  ProposalID proposal_id = 4;
+  ProposalId proposal_id = 4;
 }
 
 message TxPrepareResponse {
@@ -211,9 +205,9 @@ message TxPrepareResponse {
   StoreId from = 2;
   UUID transaction_uuid = 3;
   TxPrepareResponseType response_type = 4;
-  ProposalID proposal_id = 5;
-  ProposalID promised_id = 6;      // Valid for Nack responses
-  ProposalID last_accepted_id = 7; // Valid for Promise responses
+  ProposalId proposal_id = 5;
+  ProposalId promised_id = 6;      // Valid for Nack responses
+  ProposalId last_accepted_id = 7; // Valid for Promise responses
   bool last_accepted_value = 8;    // Valid for Promise responses
   TransactionDisposition disposition = 9;
   bytes transaction_collisions = 10; // sequence of 16-byte transaction UUIDs
@@ -223,7 +217,7 @@ message TxAccept {
   StoreId to = 1;
   StoreId from = 2;
   UUID transaction_uuid = 3;
-  ProposalID proposal_id = 4;
+  ProposalId proposal_id = 4;
   bool value = 5;
 }
 
@@ -231,9 +225,9 @@ message TxAcceptResponse {
   StoreId to = 1;
   StoreId from = 2;
   UUID transaction_uuid = 3;
-  ProposalID proposal_id = 4;
+  ProposalId proposal_id = 4;
   bool is_nack = 5;
-  ProposalID promised_id = 6;      // Valid for Nack responses
+  ProposalId promised_id = 6;      // Valid for Nack responses
   bool value = 7;                  // Valid for Accepted responses
 }
 
