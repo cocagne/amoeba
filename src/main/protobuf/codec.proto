@@ -141,6 +141,7 @@ message KeyValueUpdate {
 enum LocalTimeRequirementEnum {
   LOCAL_TIME_REQUIREMENT_ENUM_LESS_THAN = 0;
   LOCAL_TIME_REQUIREMENT_ENUM_GREATER_THAN = 1;
+  LOCAL_TIME_REQUIREMENT_ENUM_EQUALS = 2;
 }
 
 
@@ -172,7 +173,7 @@ message TransactionDescription {
   repeated SerializedFinalizationAction finalization_actions = 6;
   UUID originating_client = 7;
   repeated StoreId notify_on_resolution = 8;
-  bytes notes = 9;
+  repeated string notes = 9;
 }
 
 //---------------------------------------------------------------------------
@@ -283,13 +284,6 @@ enum ObjectReadError {
   OBJECT_READ_ERROR_OBJECT_NOT_FOUND = 1;
   OBJECT_READ_ERROR_STORE_NOT_FOUND = 2;
   OBJECT_READ_ERROR_CORRUPTED_OBJECT = 3;
-}
-
-enum LockType {
-  LOCK_TYPE_REVISION_WRITE_LOCK = 0;
-  LOCK_TYPE_REVISION_READ_LOCK = 1;
-  LOCK_TYPE_REFCOUNT_WRITE_LOCK = 2;
-  LOCK_TYPE_REFCOUNT_READ_LOCK = 3;
 }
 
 enum ReadType {
