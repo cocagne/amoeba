@@ -1,14 +1,15 @@
 package com.ibm.amoeba.common.transaction
 
+import com.ibm.amoeba.codec
 import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp}
-import com.ibm.amoeba.common.network.{ClientId, NetworkCodec}
+import com.ibm.amoeba.common.network.{ClientId, Codec}
 import com.ibm.amoeba.common.objects.ObjectPointer
 import com.ibm.amoeba.common.store.StoreId
 import com.ibm.amoeba.server.store.Locater
 
 object TransactionDescription {
   def deserialize(db: DataBuffer): TransactionDescription = {
-    NetworkCodec.decode(db)
+    Codec.decode(codec.TransactionDescription.parseFrom(db.asReadOnlyBuffer()))
   }
 }
 
@@ -104,5 +105,5 @@ final case class TransactionDescription (
     sb.toString
   }
 
-  def serialize(): DataBuffer = NetworkCodec.encode(this)
+  def serialize(): DataBuffer = Codec.encode(this).toByteArray
 }

@@ -428,5 +428,7 @@ message Message {
     TransactionResolved tx_resolved = 16;
     TransactionFinalized tx_finalized = 17;
     NodeHeartbeat node_heartbeat = 18;
+    TxStatusRequest status_request = 19;
+    TxStatusResponse status_response = 20;
   }
 }

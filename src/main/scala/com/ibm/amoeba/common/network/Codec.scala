@@ -14,7 +14,6 @@ import com.ibm.amoeba.common.transaction.KeyValueUpdate.KeyRevision
 import com.ibm.amoeba.common.transaction.{DataUpdate, DataUpdateOperation, FinalizationActionId, KeyValueUpdate, LocalTimeRequirement, ObjectUpdate, PreTransactionOpportunisticRebuild, RefcountUpdate, RevisionLock, SerializedFinalizationAction, TransactionDescription, TransactionDisposition, TransactionId, TransactionRequirement, TransactionStatus, VersionBump}
 
 import java.nio.{ByteBuffer, ByteOrder}
-import java.nio.charset.StandardCharsets
 import scala.jdk.CollectionConverters.*
 import java.util.UUID
 
@@ -831,7 +830,7 @@ object Codec extends Logging:
       .setTransactionUuid(encodeUUID(o.transactionId.uuid))
       .build
 
-  def deocde(m: codec.TransactionCompletionQuery): TransactionCompletionQuery =
+  def decode(m: codec.TransactionCompletionQuery): TransactionCompletionQuery =
     val toStore = decode(m.getToStore)
     val fromClient = ClientId(decodeUUID(m.getFromClient))
     val queryUuid = decodeUUID(m.getQueryUuid)
@@ -847,7 +846,7 @@ object Codec extends Logging:
       .setIsComplete(o.isComplete)
       .build
 
-  def deocde(m: codec.TransactionCompletionResponse): TransactionCompletionResponse =
+  def decode(m: codec.TransactionCompletionResponse): TransactionCompletionResponse =
     val fromStore = decode(m.getFromStore)
     val toClient = ClientId(decodeUUID(m.getToClient))
     val queryUuid = decodeUUID(m.getQueryUuid)
@@ -863,7 +862,7 @@ object Codec extends Logging:
       .setCommitted(o.committed)
       .build
 
-  def deocde(m: codec.TransactionResolved): TransactionResolved =
+  def decode(m: codec.TransactionResolved): TransactionResolved =
     val fromStore = decode(m.getFromStore)
     val toClient = ClientId(decodeUUID(m.getToClient))
     val transactionId = TransactionId(decodeUUID(m.getTransactionUuid))
@@ -879,7 +878,7 @@ object Codec extends Logging:
       .setCommitted(o.committed)
       .build
 
-  def deocde(m: codec.TransactionFinalized): TransactionFinalized =
+  def decode(m: codec.TransactionFinalized): TransactionFinalized =
     val fromStore = decode(m.getFromStore)
     val toClient = ClientId(decodeUUID(m.getToClient))
     val transactionId = TransactionId(decodeUUID(m.getTransactionUuid))
@@ -944,7 +943,7 @@ object Codec extends Logging:
 
     builder.build
 
-  def deocde(m: codec.AllocateResponse): AllocateResponse =
+  def decode(m: codec.AllocateResponse): AllocateResponse =
     val toClient = ClientId(decodeUUID(m.getToClient))
     val fromStore = decode(m.getFromStore)
     val allocTxId = TransactionId(decodeUUID(m.getAllocationTransactionUuid))

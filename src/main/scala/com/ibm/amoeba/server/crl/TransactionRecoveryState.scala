@@ -1,7 +1,6 @@
 package com.ibm.amoeba.server.crl
 
 import com.ibm.amoeba.common.DataBuffer
-import com.ibm.amoeba.common.network.NetworkCodec
 import com.ibm.amoeba.common.paxos.PersistentState
 import com.ibm.amoeba.common.store.StoreId
 import com.ibm.amoeba.common.transaction.{ObjectUpdate, TransactionDescription, TransactionDisposition, TransactionStatus}
@@ -20,7 +19,7 @@ object TransactionRecoveryState {
               objectUpdates: List[ObjectUpdate]): TransactionRecoveryState = {
 
 
-    val stxd = NetworkCodec.encode(txd)
+    val stxd = txd.serialize()
 
     TransactionRecoveryState(storeId, stxd, objectUpdates, TransactionDisposition.Undetermined,
       TransactionStatus.Unresolved, PersistentState.initial)

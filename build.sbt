@@ -53,6 +53,7 @@ lazy val root = (project in file(".")).
 
  enablePlugins(PackPlugin)
 
+/*
  Compile / sourceGenerators += Def.task {
   val base = (Compile / sourceManaged).value
 
@@ -75,7 +76,7 @@ lazy val root = (project in file(".")).
   
   net_out_dir.listFiles().toSeq
  }.taskValue
-
+*/
  Compile / PB.targets := Seq(
   PB.gens.java -> (Compile / sourceManaged).value
  )

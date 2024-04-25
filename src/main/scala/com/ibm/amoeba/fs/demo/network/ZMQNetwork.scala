@@ -3,11 +3,12 @@ package com.ibm.amoeba.fs.demo.network
 import java.nio.{ByteBuffer, ByteOrder}
 import java.util.UUID
 import com.ibm.amoeba.client.internal.network.Messenger as ClientMessenger
+import com.ibm.amoeba.codec
+import com.ibm.amoeba.common.network.Codec
 import com.ibm.amoeba.server.network.Messenger as ServerMessenger
 import com.ibm.amoeba.common.DataBuffer
-import com.ibm.amoeba.common.network.{ClientId, ClientRequest, ClientResponse, NetworkCodec, NodeHeartbeat, Read, ReadResponse, TxMessage}
+import com.ibm.amoeba.common.network.{ClientId, ClientRequest, ClientResponse, NodeHeartbeat, TxMessage}
 import com.ibm.amoeba.common.store.StoreId
-import com.ibm.amoeba.common.network.protocol.Message as PMessage
 import com.ibm.amoeba.common.objects.{Metadata, ObjectId}
 import com.ibm.amoeba.common.transaction.{ObjectUpdate, PreTransactionOpportunisticRebuild}
 import org.apache.logging.log4j.scala.Logging
@@ -120,7 +121,7 @@ class ZMQNetwork(val oclientId: Option[ClientId],
 
   private val heartbeatMessage = storageNode.map { t =>
     val (nodeName, _, _) = t
-    MessageEncoder.encodeMessage(NodeHeartbeat(nodeName))
+    ProtobufMessageEncoder.encodeMessage(NodeHeartbeat(nodeName))
   }
 
   case class Peer(nodeName: String, dealer: ZMQ.Socket, pollItem: PollItem)
@@ -242,19 +243,19 @@ class ZMQNetwork(val oclientId: Option[ClientId],
         qmsg match
           case SendClientRequest(msg) =>
             logger.trace(s"Sending $msg")
-            peers(stores(msg.toStore)).dealer.send(MessageEncoder.encodeMessage(msg))
+            peers(stores(msg.toStore)).dealer.send(ProtobufMessageEncoder.encodeMessage(msg))
           case SendClientTransactionMessage(msg) =>
             logger.trace(s"Sending $msg")
-            peers(stores(msg.to)).dealer.send(MessageEncoder.encodeMessage(msg))
+            peers(stores(msg.to)).dealer.send(ProtobufMessageEncoder.encodeMessage(msg))
           case SendClientResponse(msg) =>
             logger.trace(s"Sending $msg")
             clients.get(msg.toClient).foreach: zmqIdentity =>
               routerSocket.foreach: router =>
                 router.send(zmqIdentity, ZMQ.SNDMORE)
-                router.send(MessageEncoder.encodeMessage(msg))
+                router.send(ProtobufMessageEncoder.encodeMessage(msg))
           case SendServerTransactionMessage(msg) =>
             logger.trace(s"Sending $msg")
-            peers(stores(msg.to)).dealer.send(MessageEncoder.encodeMessage(msg))
+            peers(stores(msg.to)).dealer.send(ProtobufMessageEncoder.encodeMessage(msg))
         qmsg = sendQueue.poll()
     }
 
@@ -263,34 +264,34 @@ class ZMQNetwork(val oclientId: Option[ClientId],
 
   private def onDealerMessageReceived(msg: Array[Byte]): Unit = {
     val bb = ByteBuffer.wrap(msg)
+    bb.order(ByteOrder.BIG_ENDIAN)
 
     val msgLen = bb.getInt()
 
-    val p = try PMessage.getRootAsMessage(bb.asReadOnlyBuffer()) catch
+    val m = try codec.Message.parseFrom(bb) catch
       case t: Throwable =>
         logger.error(s"******* PARSE DEALER MESSAGE ERROR: $t", t)
         throw t
 
-    if (p.readResponse() != null) {
-      val message = NetworkCodec.decode(p.readResponse())
+    if m.hasReadResponse then
+      val message = Codec.decode(m.getReadResponse)
       logger.trace(s"Got $message")
       onClientResponseReceived(message)
-    }
-    else if (p.txResolved() != null) {
-      val message = NetworkCodec.decode(p.txResolved())
+
+    else if m.hasTxResolved then
+      val message = Codec.decode(m.getTxResolved)
       logger.trace(s"Got $message")
       onClientResponseReceived(message)
-    }
-    else if (p.txFinalized() != null) {
-      val message = NetworkCodec.decode(p.txFinalized())
+
+    else if m.hasTxFinalized then
+      val message = Codec.decode(m.getTxFinalized)
       logger.trace(s"Got $message")
       onClientResponseReceived(message)
-    }
-    else if (p.allocateResponse() != null) {
-      val message = NetworkCodec.decode(p.allocateResponse())
+
+    else if m.hasAllocateResponse then
+      val message = Codec.decode(m.getAllocateResponse)
       logger.trace(s"Got $message")
       onClientResponseReceived(message)
-    }
   }
 
   private def updateClientId(clientId: ClientId, routerAddress: Array[Byte]): Unit = {
@@ -311,13 +312,13 @@ class ZMQNetwork(val oclientId: Option[ClientId],
     val msgLen = bb.getInt()
 
     // Must pass a read-only copy to the following method. It'll corrupt the rest of the buffer otherwise
-    val p = try PMessage.getRootAsMessage(bb.asReadOnlyBuffer()) catch
+    val m = try codec.Message.parseFrom(bb) catch
       case t: Throwable =>
         logger.error(s"******* PARSE ROUTER MESSAGE ERROR: $t", t)
         throw t
 
-    if (p.nodeHeartbeat() != null) {
-      val msg = NetworkCodec.decode(p.nodeHeartbeat())
+    if m.hasNodeHeartbeat then
+      val msg = Codec.decode(m.getNodeHeartbeat)
       logger.trace(s"Got $msg")
       nodeStates.get(msg.nodeName) match {
         case None =>
@@ -326,14 +327,13 @@ class ZMQNetwork(val oclientId: Option[ClientId],
           nodeStates += msg.nodeName -> ns
         case Some(ns) => ns.heartbeatReceived()
       }
-    }
-    else if (p.read() != null) {
-      val message = NetworkCodec.decode(p.read())
+    else if m.hasRead then
+      val message = Codec.decode(m.getRead)
       logger.trace(s"Got $message")
       updateClientId(message.fromClient, from)
       onClientRequestReceived(message)
-    }
-    else if (p.prepare() != null) {
+
+    else if m.hasPrepare then
       bb.position(4 + msgLen)
       val contentSize = bb.getInt()
       val preTxSize = bb.getInt()
@@ -381,69 +381,67 @@ class ZMQNetwork(val oclientId: Option[ClientId],
 
         (localUpdates, preTxRebuilds)
       }
-      val message = NetworkCodec.decode(p.prepare(), updateContent._1, updateContent._2)
+      val message = Codec.decode(m.getPrepare, updateContent._1, updateContent._2)
       logger.trace(s"Got $message")
       onTransactionMessageReceived(message)
-    }
-    else if (p.prepareResponse() != null) {
+
+    else if m.hasPrepareResponse then
       //println("got prepareResponse")
-      val message = NetworkCodec.decode(p.prepareResponse())
+      val message = Codec.decode(m.getPrepareResponse)
       logger.trace(s"Got $message")
       onTransactionMessageReceived(message)
-    }
-    else if (p.accept() != null) {
+
+    else if m.hasAccept then
       //println("got accept")
-      val message = NetworkCodec.decode(p.accept())
+      val message = Codec.decode(m.getAccept)
       logger.trace(s"Got $message")
       onTransactionMessageReceived(message)
-    }
-    else if (p.acceptResponse() != null) {
-      val message = NetworkCodec.decode(p.acceptResponse())
+
+    else if m.hasAcceptResponse then
+      val message = Codec.decode(m.getAcceptResponse)
       logger.trace(s"Got $message")
       onTransactionMessageReceived(message)
-    }
-    else if (p.resolved() != null) {
-      val message = NetworkCodec.decode(p.resolved())
+
+    else if m.hasResolved then
+      val message = Codec.decode(m.getResolved)
       logger.trace(s"Got $message")
       onTransactionMessageReceived(message)
-    }
-    else if (p.committed() != null) {
-      val message = NetworkCodec.decode(p.committed())
+
+    else if m.hasCommitted then
+      val message = Codec.decode(m.getCommitted)
       logger.trace(s"Got $message")
       onTransactionMessageReceived(message)
-    }
-    else if (p.finalized() != null) {
-      //println("got finalized")
-      val message = NetworkCodec.decode(p.finalized())
+
+    else if m.hasFinalized then
+      val message = Codec.decode(m.getFinalized)
       logger.trace(s"Got $message")
       onTransactionMessageReceived(message)
-    }
-    else if (p.heartbeat() != null) {
-      val message = NetworkCodec.decode(p.heartbeat())
+
+    else if m.hasHeartbeat then
+      val message = Codec.decode(m.getHeartbeat)
       logger.trace(s"Got $message")
       onTransactionMessageReceived(message)
-    }
-    else if (p.allocate() != null) {
+
+    else if m.hasAllocate then
       //println(s"got allocate request. Receiver: $a")
-      val message = NetworkCodec.decode(p.allocate())
+      val message = Codec.decode(m.getAllocate)
       logger.trace(s"Got $message")
       updateClientId(message.fromClient, from)
       onClientRequestReceived(message)
-    }
-    else if (p.opportunisticRebuild() != null) {
-      val message = NetworkCodec.decode(p.opportunisticRebuild())
+
+    else if m.hasOpportunisticRebuild then
+      val message = Codec.decode(m.getOpportunisticRebuild)
       logger.trace(s"Got $message")
       updateClientId(message.fromClient, from)
       onClientRequestReceived(message)
-    }
-    else if (p.transactionCompletionQuery() != null) {
-      val message = NetworkCodec.decode(p.transactionCompletionQuery())
+
+    else if m.hasTransactionCompletionQuery then
+      val message = Codec.decode(m.getTransactionCompletionQuery)
       logger.trace(s"Got $message")
       updateClientId(message.fromClient, from)
       onClientRequestReceived(message)
-    }
-    else {
+
+    else
       logger.error("Unknown Message!")
-    }
   }
 }
