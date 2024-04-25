@@ -310,6 +310,7 @@ class ZMQNetwork(val oclientId: Option[ClientId],
     lastRouterMessageReceived = System.nanoTime()
 
     val msgLen = bb.getInt()
+    bb.limit(4 + msgLen)
 
     // Must pass a read-only copy to the following method. It'll corrupt the rest of the buffer otherwise
     val m = try codec.Message.parseFrom(bb) catch
@@ -320,13 +321,13 @@ class ZMQNetwork(val oclientId: Option[ClientId],
     if m.hasNodeHeartbeat then
       val msg = Codec.decode(m.getNodeHeartbeat)
       logger.trace(s"Got $msg")
-      nodeStates.get(msg.nodeName) match {
+      nodeStates.get(msg.nodeName) match
         case None =>
           val ns = new NodeState(msg.nodeName,0, false)
           ns.heartbeatReceived()
           nodeStates += msg.nodeName -> ns
         case Some(ns) => ns.heartbeatReceived()
-      }
+
     else if m.hasRead then
       val message = Codec.decode(m.getRead)
       logger.trace(s"Got $message")
@@ -334,6 +335,7 @@ class ZMQNetwork(val oclientId: Option[ClientId],
       onClientRequestReceived(message)
 
     else if m.hasPrepare then
+      bb.limit(msg.length)
       bb.position(4 + msgLen)
       val contentSize = bb.getInt()
       val preTxSize = bb.getInt()

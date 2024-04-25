@@ -460,6 +460,7 @@ object Codec extends Logging:
     builder.setTo(encode(o.to))
     builder.setFrom(encode(o.from))
     builder.setTransactionUuid(encodeUUID(o.transactionId.uuid))
+    builder.setProposalId(encode(o.proposalId))
     val prt = o.response match
       case Left(nack) =>
         builder.setPromisedId(encode(nack.promisedId))

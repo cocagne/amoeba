@@ -57,24 +57,20 @@ object ProtobufMessageEncoder:
     bb.putInt(contentSize)
     bb.putInt(preTxSize)
 
-    updateContent.foreach { td =>
+    updateContent.foreach: td =>
 
-      td.localUpdates.foreach { lu =>
+      td.localUpdates.foreach: lu =>
         bb.putLong(lu.objectId.uuid.getMostSignificantBits)
         bb.putLong(lu.objectId.uuid.getLeastSignificantBits)
         bb.putInt(lu.data.size)
         bb.put(lu.data.asReadOnlyBuffer())
-      }
 
-      td.preTransactionRebuilds.foreach { pt =>
+      td.preTransactionRebuilds.foreach: pt =>
         bb.putLong(pt.objectId.uuid.getMostSignificantBits)
         bb.putLong(pt.objectId.uuid.getLeastSignificantBits)
         pt.requiredMetadata.encodeInto(bb)
         bb.putInt(pt.data.size)
         bb.put(pt.data.asReadOnlyBuffer())
-      }
-    }
-
     msg
   }
 

@@ -39,6 +39,7 @@ lazy val root = (project in file(".")).
       "org.apache.logging.log4j"         %  "log4j-core"              % "2.22.0",
       "org.apache.logging.log4j"         %% "log4j-api-scala"         % "13.1.0",
       "org.slf4j"                        %  "slf4j-log4j12"           % "2.0.12",
+      "com.lmax"                         %  "disruptor"               % "3.3.7",
       "org.dcache"                       %  "nfs4j-core"              % "0.24.0",
       "org.yaml"                         %  "snakeyaml"               % "1.25",
       "org.zeromq"                       %  "jeromq"                  % "0.6.0",
