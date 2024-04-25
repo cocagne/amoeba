@@ -4,9 +4,9 @@ import com.google.protobuf.ByteString
 import org.apache.logging.log4j.scala.Logging
 import com.ibm.amoeba.codec
 import com.ibm.amoeba.codec.ObjectReadError
-import com.ibm.amoeba.common.HLCTimestamp
+import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp}
 import com.ibm.amoeba.common.ida.{IDA, ReedSolomon, Replication}
-import com.ibm.amoeba.common.objects.{ByteArrayKeyOrdering, ByteRange, DataObjectPointer, FullObject, IntegerKeyOrdering, Key, KeyOrdering, KeyRange, KeyValueObjectPointer, LargestKeyLessThan, LargestKeyLessThanOrEqualTo, LexicalKeyOrdering, MetadataOnly, ObjectId, ObjectPointer, ObjectRefcount, ObjectRevision, ObjectType, ReadError, SingleKey}
+import com.ibm.amoeba.common.objects.{ByteArrayKeyOrdering, ByteRange, DataObjectPointer, FullObject, IntegerKeyOrdering, Key, KeyOrdering, KeyRange, KeyRevisionGuard, KeyValueObjectPointer, LargestKeyLessThan, LargestKeyLessThanOrEqualTo, LexicalKeyOrdering, MetadataOnly, ObjectId, ObjectPointer, ObjectRefcount, ObjectRevision, ObjectRevisionGuard, ObjectType, ReadError, SingleKey}
 import com.ibm.amoeba.common.paxos.ProposalId
 import com.ibm.amoeba.common.pool.PoolId
 import com.ibm.amoeba.common.store.{StoreId, StorePointer}
@@ -735,3 +735,229 @@ object Codec extends Logging:
       case f => throw new EncodingError(f"Invalid Read Type: $f")
 
     Read(toStore, from, readUuid, objPtr, readType)
+
+
+  def encode(o: ReadResponse): codec.ReadResponse =
+    val builder = codec.ReadResponse.newBuilder()
+    builder.setFromStore(encode(o.fromStore))
+    builder.setReadUuid(encodeUUID(o.readUUID))
+    builder.setReadTime(o.readTime.asLong)
+
+    o.result match
+      case Left(err) =>
+        builder.setHaveData(false)
+        builder.setReadError(encodeReadError(err))
+
+      case Right(r) =>
+        builder.setHaveData(true)
+        builder.setRevision(encode(r.revision))
+        builder.setRefcount(encode(r.refcount))
+        builder.setSizeOnStore(r.sizeOnStore)
+        builder.setTimestamp(r.timestamp.asLong)
+
+        r.objectData.foreach: data =>
+          builder.setObjectData(ByteString.copyFrom(data.asReadOnlyBuffer()))
+
+        val arr = new Array[Byte](r.lockedWriteTransactions.size * 16)
+        val bb = ByteBuffer.wrap(arr)
+        bb.order(ByteOrder.BIG_ENDIAN)
+        r.lockedWriteTransactions.foreach: id =>
+          bb.putLong(id.uuid.getMostSignificantBits)
+          bb.putLong(id.uuid.getLeastSignificantBits)
+
+        builder.setLockedWriteTransactions(ByteString.copyFrom(arr))
+
+    builder.build
+
+  def decode(m: codec.ReadResponse): ReadResponse =
+    val fromStore = decode(m.getFromStore)
+    val toClient = ClientId(decodeUUID(m.getToClient))
+    val readUuid = decodeUUID(m.getReadUuid)
+    val readTime = HLCTimestamp(m.getReadTime)
+    val result = if ! m.getHaveData then
+      Left(decodeReadError(m.getReadError))
+    else
+      val revision = decode(m.getRevision)
+      val refcount = decode(m.getRefcount)
+      val timestamp = HLCTimestamp(m.getTimestamp)
+      val sizeOnStore = m.getSizeOnStore
+      val data = if m.getObjectData.size == 0 then
+        None
+      else
+        Some(DataBuffer(m.getObjectData.toByteArray))
+
+      var lockedTx = List[TransactionId]()
+
+      val bb = m.getLockedWriteTransactions.asReadOnlyByteBuffer()
+      bb.order(ByteOrder.BIG_ENDIAN)
+      while (bb.remaining() != 0) {
+        val msb = bb.getLong()
+        val lsb = bb.getLong()
+        lockedTx = TransactionId(new UUID(msb, lsb)) :: lockedTx
+      }
+
+      Right(ReadResponse.CurrentState(revision, refcount, timestamp, sizeOnStore, data, lockedTx.toSet))
+
+    ReadResponse(toClient, fromStore, readUuid, readTime, result)
+
+
+  def encode(o: OpportunisticRebuild): codec.OpportunisticRebuild =
+    codec.OpportunisticRebuild.newBuilder()
+      .setToStore(encode(o.toStore))
+      .setFromClient(encodeUUID(o.fromClient.uuid))
+      .setPointer(encode(o.pointer))
+      .setRevision(encode(o.revision))
+      .setRefcount(encode(o.refcount))
+      .setTimestamp(o.timestamp.asLong)
+      .setData(ByteString.copyFrom(o.data.asReadOnlyBuffer()))
+      .build
+
+  def decode(m: codec.OpportunisticRebuild): OpportunisticRebuild =
+    val toStore = decode(m.getToStore)
+    val fromClient = ClientId(decodeUUID(m.getFromClient))
+    val pointer = decode(m.getPointer)
+    val revision = decode(m.getRevision)
+    val refcount = decode(m.getRefcount)
+    val timestamp = HLCTimestamp(m.getTimestamp)
+    val data = DataBuffer(m.getData.toByteArray)
+    OpportunisticRebuild(toStore, fromClient, pointer, revision, refcount, timestamp, data)
+
+
+  def encode(o: TransactionCompletionQuery): codec.TransactionCompletionQuery =
+    codec.TransactionCompletionQuery.newBuilder()
+      .setToStore(encode(o.toStore))
+      .setFromClient(encodeUUID(o.fromClient.uuid))
+      .setQueryUuid(encodeUUID(o.queryUUID))
+      .setTransactionUuid(encodeUUID(o.transactionId.uuid))
+      .build
+
+  def deocde(m: codec.TransactionCompletionQuery): TransactionCompletionQuery =
+    val toStore = decode(m.getToStore)
+    val fromClient = ClientId(decodeUUID(m.getFromClient))
+    val queryUuid = decodeUUID(m.getQueryUuid)
+    val txid = TransactionId(decodeUUID(m.getTransactionUuid))
+    TransactionCompletionQuery(toStore, fromClient, queryUuid, txid)
+
+
+  def encode(o: TransactionCompletionResponse): codec.TransactionCompletionResponse =
+    codec.TransactionCompletionResponse.newBuilder()
+      .setToClient(encodeUUID(o.toClient.uuid))
+      .setFromStore(encode(o.fromStore))
+      .setQueryUuid(encodeUUID(o.queryUUID))
+      .setIsComplete(o.isComplete)
+      .build
+
+  def deocde(m: codec.TransactionCompletionResponse): TransactionCompletionResponse =
+    val fromStore = decode(m.getFromStore)
+    val toClient = ClientId(decodeUUID(m.getToClient))
+    val queryUuid = decodeUUID(m.getQueryUuid)
+    val isComplete = m.getIsComplete
+    TransactionCompletionResponse(toClient, fromStore, queryUuid, isComplete)
+
+
+  def encode(o: TransactionResolved): codec.TransactionResolved =
+    codec.TransactionResolved.newBuilder()
+      .setToClient(encodeUUID(o.toClient.uuid))
+      .setFromStore(encode(o.fromStore))
+      .setTransactionUuid(encodeUUID(o.transactionId.uuid))
+      .setCommitted(o.committed)
+      .build
+
+  def deocde(m: codec.TransactionResolved): TransactionResolved =
+    val fromStore = decode(m.getFromStore)
+    val toClient = ClientId(decodeUUID(m.getToClient))
+    val transactionId = TransactionId(decodeUUID(m.getTransactionUuid))
+    val committed = m.getCommitted
+    TransactionResolved(toClient, fromStore, transactionId, committed)
+
+
+  def encode(o: TransactionFinalized): codec.TransactionFinalized =
+    codec.TransactionFinalized.newBuilder()
+      .setToClient(encodeUUID(o.toClient.uuid))
+      .setFromStore(encode(o.fromStore))
+      .setTransactionUuid(encodeUUID(o.transactionId.uuid))
+      .setCommitted(o.committed)
+      .build
+
+  def deocde(m: codec.TransactionFinalized): TransactionFinalized =
+    val fromStore = decode(m.getFromStore)
+    val toClient = ClientId(decodeUUID(m.getToClient))
+    val transactionId = TransactionId(decodeUUID(m.getTransactionUuid))
+    val committed = m.getCommitted
+    TransactionFinalized(toClient, fromStore, transactionId, committed)
+
+
+  def encode(o: Allocate): codec.Allocate =
+    val builder = codec.Allocate.newBuilder()
+      .setToStore(encode(o.toStore))
+      .setFromClient(encodeUUID(o.fromClient.uuid))
+      .setNewObjectUuid(encodeUUID(o.newObjectId.uuid))
+      .setObjectType(encodeObjectType(o.objectType))
+      .setObjectSize(o.objectSize.getOrElse(0))
+      .setInitialRefcount(encode(o.initialRefcount))
+      .setObjectData(ByteString.copyFrom(o.objectData.asReadOnlyBuffer()))
+      .setTimestamp(o.timestamp.asLong)
+      .setAllocationTransactionUuid(encodeUUID(o.allocationTransactionId.uuid))
+      .setAllocatingObject(encode(o.revisionGuard.pointer))
+
+    o.revisionGuard match
+      case g: ObjectRevisionGuard => builder.setAllocatingObjectRevision(encode(g.requiredRevision))
+      case g: KeyRevisionGuard =>
+        val kvreq = KeyValueUpdate.KeyObjectRevision(g.key, g.keyRevision)
+        builder.setAllocatingObjectKeyRequirement(encode(kvreq))
+
+    builder.build
+
+  def decode(m: codec.Allocate): Allocate =
+    val toStore = decode(m.getToStore)
+    val fromClient = ClientId(decodeUUID(m.getFromClient))
+    val newObjectId = ObjectId(decodeUUID(m.getNewObjectUuid))
+    val objectType = decodeObjectType(m.getObjectType)
+    val objectSize = if m.getObjectSize == 0 then None else Some(m.getObjectSize)
+    val initialRefcount = decode(m.getInitialRefcount)
+    val objectData = DataBuffer(m.getObjectData.toByteArray)
+    val timestamp = HLCTimestamp(m.getTimestamp)
+    val allocTxId = TransactionId(decodeUUID(m.getAllocationTransactionUuid))
+    val allocObj = decode(m.getAllocatingObject)
+    val revisionGuard = if m.hasAllocatingObjectRevision then
+      ObjectRevisionGuard(allocObj, decode(m.getAllocatingObjectRevision))
+    else
+      val kvreq = decode(m.getAllocatingObjectKeyRequirement)
+      val rev = kvreq match
+        case kor: KeyValueUpdate.KeyObjectRevision => kor.revision
+        case _ => throw new EncodingError("Only KeyObjectRevisions are allowed")
+      KeyRevisionGuard(allocObj.asInstanceOf[KeyValueObjectPointer], kvreq.key, rev)
+
+    Allocate(toStore, fromClient, newObjectId, objectType, objectSize, initialRefcount,
+      objectData, timestamp, allocTxId, revisionGuard)
+
+
+  def encode(o: AllocateResponse): codec.AllocateResponse =
+    val builder = codec.AllocateResponse.newBuilder()
+      .setToClient(encodeUUID(o.toClient.uuid))
+      .setFromStore(encode(o.fromStore))
+      .setAllocationTransactionUuid(encodeUUID(o.allocationTransactionId.uuid))
+      .setNewObjectUuid(encodeUUID(o.newObjectId.uuid))
+
+    o.result.foreach: ptr =>
+      builder.setAllocateStorePointer(encode(ptr))
+
+    builder.build
+
+  def deocde(m: codec.AllocateResponse): AllocateResponse =
+    val toClient = ClientId(decodeUUID(m.getToClient))
+    val fromStore = decode(m.getFromStore)
+    val allocTxId = TransactionId(decodeUUID(m.getAllocationTransactionUuid))
+    val newObjId = ObjectId(decodeUUID(m.getNewObjectUuid))
+    val storePointer = if m.hasAllocateStorePointer then Some(decode(m.getAllocateStorePointer)) else None
+
+    AllocateResponse(toClient, fromStore, allocTxId, newObjId, storePointer)
+
+
+  def encode(o: NodeHeartbeat): codec.NodeHeartbeat =
+    codec.NodeHeartbeat.newBuilder()
+      .setFrom(o.nodeName)
+      .build
+
+  def decode(m: codec.NodeHeartbeat): NodeHeartbeat =
+    NodeHeartbeat(m.getFrom)

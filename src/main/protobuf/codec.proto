@@ -343,8 +343,8 @@ message TransactionCompletionQuery {
 }
 
 message TransactionCompletionResponse {
-  StoreId to_store = 1;
-  UUID from_client = 2;
+  StoreId from_store = 1;
+  UUID to_client = 2;
   UUID query_uuid = 3;
   bool is_complete = 4;
 }
@@ -384,10 +384,6 @@ message Allocate {
 
 enum AllocationError {
   ALLOCATION_ERROR_INSUFFICIENT_SPACE = 0;
-}
-
-message AllocateResponseAllocated {
-  StorePointer store_pointer = 1;
 }
 
 message AllocateResponse {

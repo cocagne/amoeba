@@ -65,6 +65,10 @@ exec java -cp $CLASSPATH com.ibm.aspen.demo.Main "$@"
 
 ---------------------------------------------------------------------------
 - TODO
+AllocateResponse
+    - Add error string to message on failure
+    - Handle allocation failure
+    
 KeyRevisionGuard
     - Add Zeroed DoesNotExist variable
     - Test for zeroed UUID in Tx, use this for does not exist requirement
