@@ -9,7 +9,6 @@ import com.ibm.amoeba.common.transaction.KeyValueUpdate.{DoesNotExist, FullConte
 import com.ibm.amoeba.server.store.KVObjectState
 import org.apache.logging.log4j.scala.Logging
 
-import scala.annotation.tailrec
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
 
