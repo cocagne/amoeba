@@ -9,6 +9,7 @@ import com.ibm.amoeba.common.transaction.KeyValueUpdate.{DoesNotExist, FullConte
 import com.ibm.amoeba.server.store.KVObjectState
 import org.apache.logging.log4j.scala.Logging
 
+import scala.annotation.tailrec
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
 
@@ -131,6 +132,69 @@ class KeyValueListNode(val reader: ObjectReader,
 
     p.future
   }
+
+  def foreach(fn: (KeyValueListNode, Key, ValueState) => Unit): Future[Unit] = {
+    val p = Promise[Unit]()
+
+    def recurse(node: KeyValueListNode): Unit = {
+
+      node.contents.foreach: tpl =>
+        fn(node, tpl._1, tpl._2)
+
+      node.tail match {
+        case None => p.success(())
+
+        case Some(nodeTail) => reader.read(nodeTail.pointer, s"foreach() KVListNode node ${pointer.id}. Minimum: $minimum.") onComplete {
+
+          case Failure(err) => p.failure(err)
+
+          case Success(kvos) =>
+            val nextNode = new KeyValueListNode(reader, kvos.pointer, ordering, nodeTail.minimum,
+              kvos.revision, kvos.refcount, kvos.contents,
+              kvos.right.map(v => KeyValueListPointer(v.bytes)))
+
+            recurse(nextNode)
+        }
+      }
+    }
+
+    recurse(this)
+
+    p.future
+  }
+
+  def foreachInRange(minKey: Key,
+                     maxKey: Key,
+                     fn: (KeyValueListNode, Key, ValueState) => Unit): Future[Unit] =
+    val p = Promise[Unit]()
+    
+    def recurse(node: KeyValueListNode): Unit = {
+      node.contents.filter:
+        tpl => ordering.compare(tpl._1, minKey) >= 0 && ordering.compare(tpl._1, maxKey) < 0
+      .foreach: tpl =>
+        fn(node, tpl._1, tpl._2)
+
+      node.tail match
+        case None => p.success(())
+
+        case Some(nodeTail) =>
+          if ordering.compare(maxKey, minimum) < 0 then
+            p.success(())
+            return
+
+          reader.read(nodeTail.pointer, s"foreachInRange() KVListNode node ${pointer.id}. Minimum: $minimum. minKey: $minKey maxKey: $maxKey") onComplete {
+            case Failure(err) => p.failure(err)
+
+            case Success(kvos) =>
+              val nextNode = new KeyValueListNode(reader, kvos.pointer, ordering, nodeTail.minimum,
+                kvos.revision, kvos.refcount, kvos.contents,
+                kvos.right.map(v => KeyValueListPointer(v.bytes)))
+
+              recurse(nextNode)
+          }
+    }
+    recurse(this)
+    p.future
 }
 
 object KeyValueListNode {

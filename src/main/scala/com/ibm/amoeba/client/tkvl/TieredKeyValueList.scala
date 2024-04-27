@@ -133,6 +133,44 @@ class TieredKeyValueList(val client: AmoebaClient,
       }
     }
   }
+
+  def foreach(fn: (KeyValueListNode, Key, ValueState) => Unit): Future[Unit] =
+
+    def nonEmpty(tier: Int, ordering: KeyOrdering, root: KeyValueListNode): Future[Unit] =
+      for
+        e <- fetchContainingNode(client, tier, 0, ordering, Key.AbsoluteMinimum, root, Set())
+        node = e match
+          case Left(_) => throw new BrokenTree()
+          case Right(n) => n
+        _ <- node.foreach(fn)
+      yield
+        ()
+
+    rootManager.getRootNode().flatMap: t =>
+      val (tier, ordering, oroot) = t
+      oroot match
+        case None => Future.successful(())
+        case Some(root) => nonEmpty(tier, ordering, root)
+
+  def foreachInRange(minKey: Key,
+                     maxKey: Key,
+                     fn: (KeyValueListNode, Key, ValueState) => Unit): Future[Unit] =
+
+    def nonEmpty(tier: Int, ordering: KeyOrdering, root: KeyValueListNode): Future[Unit] =
+      for
+        e <- fetchContainingNode(client, tier, 0, ordering, minKey, root, Set())
+        node = e match
+          case Left(_) => throw new BrokenTree()
+          case Right(n) => n
+        _ <- node.foreachInRange(minKey, maxKey, fn)
+      yield
+        ()
+
+    rootManager.getRootNode().flatMap: t =>
+      val (tier, ordering, oroot) = t
+      oroot match
+        case None => Future.successful(())
+        case Some(root) => nonEmpty(tier, ordering, root)
 }
 
 object TieredKeyValueList {
