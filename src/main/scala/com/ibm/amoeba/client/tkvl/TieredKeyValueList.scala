@@ -134,7 +134,7 @@ class TieredKeyValueList(val client: AmoebaClient,
     }
   }
 
-  def foreach(fn: (KeyValueListNode, Key, ValueState) => Unit): Future[Unit] =
+  def foreach(fn: (KeyValueListNode, Key, ValueState) => Future[Unit]): Future[Unit] =
 
     def nonEmpty(tier: Int, ordering: KeyOrdering, root: KeyValueListNode): Future[Unit] =
       for
@@ -154,7 +154,7 @@ class TieredKeyValueList(val client: AmoebaClient,
 
   def foreachInRange(minKey: Key,
                      maxKey: Key,
-                     fn: (KeyValueListNode, Key, ValueState) => Unit): Future[Unit] =
+                     fn: (KeyValueListNode, Key, ValueState) => Future[Unit]): Future[Unit] =
 
     def nonEmpty(tier: Int, ordering: KeyOrdering, root: KeyValueListNode): Future[Unit] =
       for
