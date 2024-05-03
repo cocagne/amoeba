@@ -23,6 +23,18 @@ trait Backend extends Logging {
   /** Bootstrap-only overwrite method. It cannot fail and must return after the data is committed to disk */
   def bootstrapOverwrite(objectId: ObjectId, pointer: StorePointer, data:DataBuffer): Unit
 
+  /** Fast write objects to the store during a rebuild operation. This method may return before the
+   * object is written out to stable storage.
+   * */
+  def rebuildWrite(objectId: ObjectId,
+                   objectType: ObjectType.Value,
+                   metadata: Metadata,
+                   pointer: StorePointer,
+                   data:DataBuffer): Unit
+
+  /** Force all cached/in-memory data to stable storage before returning */
+  def rebuildFlush(): Unit
+
   def allocate(objectId: ObjectId,
                objectType: ObjectType.Value,
                metadata: Metadata,

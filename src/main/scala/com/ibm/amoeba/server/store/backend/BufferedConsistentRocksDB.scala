@@ -1,9 +1,8 @@
 package com.ibm.amoeba.server.store.backend
 
-import org.rocksdb.{Options, RocksDB, WriteBatch, WriteOptions}
+import org.rocksdb.{FlushOptions, Options, RocksDB, WriteBatch, WriteOptions}
 
 import scala.concurrent.{Await, ExecutionContext, Future, Promise}
-
 import scala.concurrent.duration.*
 
 object BufferedConsistentRocksDB {
@@ -94,6 +93,18 @@ class BufferedConsistentRocksDB(
   }
   def bootstrapGet(key: Array[Byte]): Array[Byte] = synchronized {
     db.get(key)
+  }
+
+
+  def rebuildWrite(key: Array[Byte], value: Array[Byte]): Unit = synchronized {
+    db.put(key, value)
+  }
+
+  def rebuildFlush(): Unit = synchronized {
+    val flushOptions = new FlushOptions()
+    flushOptions.setWaitForFlush(true)
+    flushOptions.setAllowWriteStall(true)
+    db.flush(flushOptions)
   }
 
   def put(key: Array[Byte], value: Array[Byte]): Future[Unit] = synchronized {

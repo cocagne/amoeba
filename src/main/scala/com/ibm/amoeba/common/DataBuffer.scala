@@ -84,6 +84,8 @@ object DataBuffer {
   implicit def apply(arr: Array[Byte]): DataBuffer = new DataBuffer(ByteBuffer.wrap(arr))
   implicit def db2bb(db: DataBuffer): ByteBuffer = db.asReadOnlyBuffer()
 
+  def apply(): DataBuffer = Empty
+
   def zeroed(nbytes: Int): DataBuffer = if (nbytes == 0) Empty else DataBuffer(ByteBuffer.allocate(nbytes))
 
   def zeroed(nbytes: Long): DataBuffer = zeroed(nbytes.asInstanceOf[Int])

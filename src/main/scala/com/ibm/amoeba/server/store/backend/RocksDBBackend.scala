@@ -84,6 +84,17 @@ class RocksDBBackend(dbPath:String,
     StorePointer(storeId.poolIndex, Array())
   }
 
+  override def rebuildWrite(objectId: ObjectId,
+                            objectType: ObjectType.Value,
+                            metadata: Metadata,
+                            pointer: StorePointer, 
+                            data: DataBuffer): Unit =
+    val key = tokey(objectId)
+    val value = encodeDBValue(objectType, metadata, data)
+    db.rebuildWrite(key, value)
+
+  override def rebuildFlush(): Unit = db.rebuildFlush()
+
   override def allocate(objectId: ObjectId,
                         objectType: ObjectType.Value,
                         metadata: Metadata,

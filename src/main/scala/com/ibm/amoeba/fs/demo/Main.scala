@@ -4,13 +4,15 @@ import java.io.{File, StringReader}
 import java.nio.file.{Files, Path, Paths}
 import java.util.concurrent.Executors
 import com.ibm.amoeba.AmoebaError
-import com.ibm.amoeba.client.{AmoebaClient, KeyValueObjectState}
+import com.ibm.amoeba.client.KeyValueObjectState.ValueState
+import com.ibm.amoeba.client.{AmoebaClient, DataObjectState, KeyValueObjectState, MetadataObjectState, ObjectState}
 import com.ibm.amoeba.client.internal.SimpleAmoebaClient
 import com.ibm.amoeba.client.internal.allocation.SinglePoolObjectAllocator
-import com.ibm.amoeba.client.tkvl.{KVObjectRootManager, Root, SinglePoolNodeAllocator, TieredKeyValueList}
+import com.ibm.amoeba.client.tkvl.{KVObjectRootManager, KeyValueListNode, Root, SinglePoolNodeAllocator, TieredKeyValueList}
+import com.ibm.amoeba.common.DataBuffer
 import com.ibm.amoeba.common.ida.{ReedSolomon, Replication}
 import com.ibm.amoeba.common.network.{ClientId, ClientRequest, ClientResponse, TxMessage}
-import com.ibm.amoeba.common.objects.{ByteArrayKeyOrdering, Key, KeyValueObjectPointer, LexicalKeyOrdering, ObjectRevisionGuard, Value}
+import com.ibm.amoeba.common.objects.{ByteArrayKeyOrdering, DataObjectPointer, Key, KeyValueObjectPointer, LexicalKeyOrdering, Metadata, ObjectId, ObjectPointer, ObjectRevisionGuard, ObjectType, Value}
 import com.ibm.amoeba.common.pool.PoolId
 import com.ibm.amoeba.common.store.StoreId
 import com.ibm.amoeba.common.util.{BackgroundTaskPool, YamlFormat}
@@ -21,7 +23,7 @@ import com.ibm.amoeba.fs.nfs.AmoebaNFS
 import com.ibm.amoeba.server.crl.simple.SimpleCRL
 import com.ibm.amoeba.server.{RegisteredTransactionFinalizerFactory, SimpleDriverRecoveryMixin, StoreManager}
 import com.ibm.amoeba.server.store.Bootstrap
-import com.ibm.amoeba.server.store.backend.RocksDBBackend
+import com.ibm.amoeba.server.store.backend.{Backend, RocksDBBackend}
 import com.ibm.amoeba.server.store.cache.SimpleLRUObjectCache
 import com.ibm.amoeba.server.transaction.SimpleTransactionDriver
 import org.dcache.nfs.ExportFile
@@ -33,6 +35,7 @@ import org.dcache.nfs.vfs.VirtualFileSystem
 import org.dcache.oncrpc4j.rpc.{OncRpcProgram, OncRpcSvcBuilder}
 import org.apache.logging.log4j.scala.Logging
 
+import java.util.UUID
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration.{Duration, MILLISECONDS, SECONDS}
 
@@ -82,6 +85,7 @@ object Main {
                   configFile:File=null,
                   log4jConfigFile: File=null,
                   nodeName:String="",
+                  storeName:String="",
                   host:String="",
                   port:Int=0)
 
@@ -158,12 +162,16 @@ object Main {
       cmd("rebuild").text("Rebuilds a store").
         action( (_,c) => c.copy(mode="rebuild")).
         children(
+          arg[File]("<log4j-config-file>").text("Log4j Configuration File").
+            action( (x, c) => c.copy(log4jConfigFile=x)).
+            validate( x => if (x.exists()) success else failure(s"Log4j Config file does not exist: $x")),
+
           arg[File]("<config-file>").text("Configuration File").
             action( (x, c) => c.copy(configFile=x)).
             validate( x => if (x.exists()) success else failure(s"Config file does not exist: $x")),
 
           arg[String]("<store-name>").text("Data Store Name. Format is \"pool-name:storeNumber\"").
-            action((x,c) => c.copy(nodeName=x)).
+            action((x,c) => c.copy(storeName=x)).
             validate { x =>
               val arr = x.split(":")
               if (arr.length == 2) {
@@ -193,7 +201,7 @@ object Main {
             case "node" => node(cfg.nodeName, config)
             case "amoeba" => amoeba_server(cfg.log4jConfigFile, config)
             case "debug" => run_debug_code(cfg.log4jConfigFile, config)
-            //case "rebuild" => rebuild(cfg.nodeName, config)
+            case "rebuild" => rebuild(cfg.log4jConfigFile, cfg.storeName, config)
           }
         } catch {
           case e: YamlFormat.FormatError => println(s"Error loading config file: $e")
@@ -512,4 +520,81 @@ object Main {
     }
     sched.shutdownNow()
   }
+
+  def rebuild(log4jConfigFile: File, storeName: String, cfg: ConfigFile.Config): Unit = {
+
+    setLog4jConfigFile(log4jConfigFile)
+
+    val (client, network, nucleus) = createAmoebaClient(cfg)
+
+    val networkThread = new Thread {
+      override def run(): Unit = {
+        network.ioThread()
+      }
+    }
+    networkThread.start()
+
+    implicit val ec: ExecutionContext = client.clientContext
+
+    val arr = storeName.split(":")
+    val poolName = arr(0)
+    val storeIndex = Integer.parseInt(arr(1))
+
+    var store: Backend = null
+    var poolId: PoolId = PoolId(new UUID(0,0))
+    var storeId: StoreId = StoreId(poolId, 0.toByte)
+
+    cfg.nodes.foreach: (_, node) =>
+      node.stores.foreach: s =>
+        if s.pool == poolName && storeIndex == s.store then
+          poolId = PoolId(cfg.pools(s.pool).uuid)
+          storeId = StoreId(poolId, s.store.asInstanceOf[Byte])
+          s.backend match {
+            case b: ConfigFile.RocksDB =>
+              println(s"Rebuilding data store ${poolName}:${storeIndex}. Path ${b.path}")
+              store = new RocksDBBackend(b.path, storeId, ec)
+          }
+
+    assert(store != null)
+
+    def rebuildObject(node:KeyValueListNode, key: Key, value: ValueState): Future[Unit] =
+      def getMetadata(os: ObjectState): (ObjectType.Value, Metadata) = os match
+        case kvos: KeyValueObjectState =>
+          (ObjectType.KeyValue, Metadata(kvos.revision, kvos.refcount, kvos.timestamp))
+        case dos: DataObjectState =>
+          (ObjectType.Data, Metadata(dos.revision, dos.refcount, dos.timestamp))
+        case _: MetadataObjectState =>
+          assert(false, "Unsupported object type!")
+
+      val objectId = ObjectId(key.bytes)
+      val ptr = ObjectPointer(value.value.bytes)
+
+      println(f"Rebuilding object: $objectId")
+
+      val storePointer = ptr.getStorePointer(storeId) match
+        case None => return Future.successful(()) // This store doesn't hold data for this object.
+        case Some(sp) => sp
+
+      val fos = ptr match
+        case p: KeyValueObjectPointer => client.read(p)
+        case p: DataObjectPointer => client.read(p)
+
+      for
+        os <- fos
+        (objectType, metadata) = getMetadata(os)
+        localData = os.getRebuildDataForStore(storeId)
+        _ = store.rebuildWrite(os.id, objectType, metadata, storePointer, localData.getOrElse(DataBuffer()))
+      yield
+        println(f"Rebuilt object ${os.id}")
+
+    for
+      pool <- client.getStoragePool(poolId)
+      allocTree = pool.allocationTree
+      _ <- allocTree.foreach(rebuildObject)
+    yield
+      store.rebuildFlush()
+      println("**** Rebuild Complete ****")
+      ()
+  }
+
 }
