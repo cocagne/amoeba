@@ -25,7 +25,7 @@ class DeletionFinalizationAction(val client: AmoebaClient,
       for {
         pool <- client.getStoragePool(deletedObject.poolId)
         tx = client.newTransaction()
-        _ <- pool.allocationTree.delete(Key(deletedObject.toArray))(tx)
+        _ <- pool.allocationTree.delete(Key(deletedObject.id.toBytes))(tx)
         _ <- tx.commit()
       } yield {
         completionPromise.success(())
