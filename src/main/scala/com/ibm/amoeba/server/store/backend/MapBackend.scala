@@ -5,6 +5,8 @@ import com.ibm.amoeba.common.store.{ReadState, StoreId, StorePointer}
 import com.ibm.amoeba.common.transaction.TransactionId
 import com.ibm.amoeba.server.store.{Locater, ObjectState}
 
+import scala.concurrent.Promise
+
 class MapBackend(val storeId: StoreId) extends Backend {
 
   private var chandler: Option[CompletionHandler] = None
@@ -86,4 +88,14 @@ class MapBackend(val storeId: StoreId) extends Backend {
   }
 
   def get(objectId: ObjectId): Option[ObjectState] = m.get(objectId)
+
+  override def repair(state: CommitState, complete: Promise[Unit]): Unit =
+    val os = new ObjectState(objectId = state.objectId,
+      storePointer = state.storePointer,
+      metadata = state.metadata,
+      objectType = state.objectType,
+      data = state.data,
+      maxSize = state.maxSize)
+    m += (state.objectId -> os)
+    complete.success(())
 }

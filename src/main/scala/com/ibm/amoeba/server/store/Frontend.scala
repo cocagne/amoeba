@@ -1,10 +1,9 @@
 package com.ibm.amoeba.server.store
 
 import java.util.UUID
-
-import com.ibm.amoeba.common.HLCTimestamp
+import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp}
 import com.ibm.amoeba.common.network.{Allocate, AllocateResponse, ClientId, OpportunisticRebuild, ReadResponse, TxAccept, TxFinalized, TxHeartbeat, TxMessage, TxPrepare, TxResolved, TxStatusRequest}
-import com.ibm.amoeba.common.objects.{Metadata, ObjectId, ObjectRevision, ReadError}
+import com.ibm.amoeba.common.objects.{Metadata, ObjectId, ObjectRevision, ObjectType, ReadError}
 import com.ibm.amoeba.common.store.{ReadState, StoreId, StorePointer}
 import com.ibm.amoeba.common.transaction.{TransactionDescription, TransactionId}
 import com.ibm.amoeba.server.crl.{AllocationRecoveryState, CrashRecoveryLog, TransactionRecoveryState}
@@ -13,6 +12,9 @@ import com.ibm.amoeba.server.store.backend.{Backend, Commit, CommitState, Comple
 import com.ibm.amoeba.server.store.cache.ObjectCache
 import com.ibm.amoeba.server.transaction.{TransactionStatusCache, Tx}
 import org.apache.logging.log4j.scala.Logging
+import com.ibm.amoeba.client.ObjectState as ClientObjectState
+
+import scala.concurrent.Promise
 
 
 object Frontend {
@@ -24,6 +26,8 @@ object Frontend {
   case class TransactionRead(transactionId: TransactionId) extends ReadKind
 
   case class OpportuneRebuild(or: OpportunisticRebuild) extends ReadKind
+
+  case class RepairRead(cos: ClientObjectState, completion: Promise[Unit]) extends ReadKind
 }
 
 class Frontend(val storeId: StoreId,
@@ -175,6 +179,23 @@ class Frontend(val storeId: StoreId,
     }
   }
 
+  def readObjectForRepair(current: ClientObjectState, completion: Promise[Unit]): Unit = {
+    objectCache.get(current.pointer.id) match {
+      case Some(os) => repair(current, completion, os)
+      case None =>
+        current.pointer.getStoreLocater(storeId).foreach { locater =>
+          pendingReads.get(locater.objectId) match {
+            case Some(lst) =>
+              pendingReads += (locater.objectId -> (RepairRead(current, completion) :: lst))
+
+            case None =>
+              pendingReads += (locater.objectId -> (RepairRead(current, completion) :: Nil))
+              backend.read(locater)
+          }
+        }
+    }
+  }
+
   private def readObjectForTransaction(transaction: Tx, locater: Locater): Unit = {
     logger.trace(s"Loading object for Tx: ${transaction.transactionId}. Object: ${locater.objectId}")
     objectCache.get(locater.objectId) match {
@@ -212,6 +233,21 @@ class Frontend(val storeId: StoreId,
     }
   }
 
+  private def repair(current: ClientObjectState, completion: Promise[Unit], os: ObjectState): Unit =
+    if current.timestamp <= os.metadata.timestamp then
+      completion.success(())
+    else
+      current.getRebuildDataForStore(storeId) match
+        case None => completion.success(())
+        case Some(storeData) =>
+          os.metadata = Metadata(current.revision, current.refcount, current.timestamp)
+          os.data = storeData
+          val cs = CommitState(os.objectId, os.storePointer, os.metadata,
+            current.pointer.objectType, os.data, current.pointer.size)
+          val txid = TransactionId(current.revision.lastUpdateTxUUID)
+          backend.repair(cs, completion)
+
+
   def backendReadComplete(objectId: ObjectId,
                           storePointer: StorePointer,
                           result: Either[ReadState, ReadError.Value]): Unit = {
@@ -234,7 +270,13 @@ class Frontend(val storeId: StoreId,
               logger.trace(s"Completed read for transaction ${tr.transactionId}. Object: ${os.objectId}")
               transactions.get(tr.transactionId).foreach { tx => tx.objectLoaded(os) }
 
-            case OpportuneRebuild(op) => opportunisticRebuild(op, os)
+            case OpportuneRebuild(op) =>
+              logger.trace(s"Completed read for OpportuneRebuild. Object: ${os.objectId}")
+              opportunisticRebuild(op, os)
+
+            case RepairRead(cos, completion) =>
+              logger.trace(s"Completed read for repair. Object: ${os.objectId}")
+              repair(cos, completion, os)
           }
         }
 
@@ -249,6 +291,12 @@ class Frontend(val storeId: StoreId,
             case tr: TransactionRead => transactions.get(tr.transactionId).foreach { tx => tx.objectLoadFailed(objectId, err) }
 
             case _: OpportuneRebuild => // Can't guarantee correctness so we need to ignore this
+
+            case RepairRead(cos, completion) =>
+              // Failure to read probably means a repair is required
+              val os = new ObjectState(objectId, storePointer, Metadata.Zeroed,
+                ObjectType.Data, DataBuffer.Empty, None)
+              repair(cos, completion, os)
           }
         }
     }

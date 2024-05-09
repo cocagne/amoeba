@@ -7,6 +7,8 @@ import com.ibm.amoeba.common.transaction.TransactionId
 import com.ibm.amoeba.server.store.Locater
 import org.apache.logging.log4j.scala.Logging
 
+import scala.concurrent.Promise
+
 trait Backend extends Logging {
   val storeId: StoreId
 
@@ -46,4 +48,6 @@ trait Backend extends Logging {
   def read(locater: Locater): Unit
 
   def commit(state: CommitState, transactionId: TransactionId): Unit
+  
+  def repair(state: CommitState, complete: Promise[Unit]): Unit
 }

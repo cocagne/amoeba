@@ -1,8 +1,10 @@
 package com.ibm.amoeba.common.objects
 
 import java.nio.ByteBuffer
-
 import com.ibm.amoeba.common.HLCTimestamp
+import com.ibm.amoeba.common.transaction.TransactionId
+
+import java.util.UUID
 
 case class Metadata(revision: ObjectRevision,
                     refcount: ObjectRefcount,
@@ -23,6 +25,11 @@ case class Metadata(revision: ObjectRevision,
 
 object Metadata {
   val EncodedSize: Int = ObjectRevision.EncodedSize + ObjectRefcount.EncodedSize + HLCTimestamp.EncodedSize
+
+  val Zeroed: Metadata = Metadata(
+    ObjectRevision(TransactionId(new UUID(0,0))),
+    ObjectRefcount(0,0),
+    HLCTimestamp(0))
 
   def apply(arr: Array[Byte]): Metadata = Metadata(ByteBuffer.wrap(arr))
 

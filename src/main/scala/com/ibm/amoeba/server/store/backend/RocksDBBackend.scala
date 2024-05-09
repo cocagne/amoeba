@@ -7,7 +7,7 @@ import com.ibm.amoeba.common.store.{ReadState, StoreId, StorePointer}
 import com.ibm.amoeba.common.transaction.TransactionId
 import com.ibm.amoeba.server.store.Locater
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Promise}
 import scala.util.{Failure, Success}
 
 object RocksDBBackend {
@@ -155,4 +155,8 @@ class RocksDBBackend(dbPath:String,
       }
     }
   }
+  
+  override def repair(state: CommitState, complete: Promise[Unit]): Unit =
+    db.put(tokey(state.objectId), encodeDBValue(state.objectType, state.metadata, state.data)).foreach: _ =>
+      complete.success(())
 }

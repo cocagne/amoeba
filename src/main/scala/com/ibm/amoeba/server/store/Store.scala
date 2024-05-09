@@ -11,7 +11,9 @@ import com.ibm.amoeba.server.store.backend.Backend
 import com.ibm.amoeba.server.store.cache.ObjectCache
 import com.ibm.amoeba.server.transaction.{TransactionDriver, TransactionFinalizer, TransactionStatusCache}
 import org.apache.logging.log4j.scala.Logging
+import com.ibm.amoeba.client.ObjectState as ClientObjectState
 
+import scala.concurrent.Promise
 import scala.concurrent.duration.*
 
 class Store(val backend: Backend,
@@ -55,6 +57,10 @@ class Store(val backend: Backend,
         prepareResponseCache.invalidate(txd.transactionId)
       }
     }
+  }
+
+  def repair(os: ClientObjectState, completion: Promise[Unit]) = synchronized {
+    frontend.readObjectForRepair(os, completion)
   }
 
   def hasTransactions: Boolean = synchronized { transactionDrivers.nonEmpty }

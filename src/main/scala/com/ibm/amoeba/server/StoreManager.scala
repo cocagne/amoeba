@@ -1,8 +1,9 @@
 package com.ibm.amoeba.server
 
-import java.util.concurrent.{Executors, LinkedBlockingQueue, TimeUnit}
+import com.ibm.amoeba.client.ObjectState as ClientObjectState
 
-import com.ibm.amoeba.common.network._
+import java.util.concurrent.{Executors, LinkedBlockingQueue, TimeUnit}
+import com.ibm.amoeba.common.network.*
 import com.ibm.amoeba.common.store.StoreId
 import com.ibm.amoeba.common.transaction.TransactionStatus
 import com.ibm.amoeba.common.util.BackgroundTask
@@ -23,6 +24,7 @@ object StoreManager {
   case class IOCompletion(op: Completion) extends Event
   case class TransactionMessage(msg: TxMessage) extends Event
   case class ClientReq(msg: ClientRequest) extends Event
+  case class Repair(storeId: StoreId, os: ClientObjectState, completion: Promise[Unit]) extends Event
   case class LoadStore(backend: Backend) extends Event
   case class Exit() extends Event
   case class RecoveryEvent() extends Event
@@ -109,6 +111,9 @@ class StoreManager(val objectCacheFactory: () => ObjectCache,
     events.put(ClientReq(msg))
   }
 
+  def repair(storeId: StoreId, os: ClientObjectState, completion: Promise[Unit]): Unit =
+    events.put(Repair(storeId, os, completion))
+
   def shutdown()(implicit ec: ExecutionContext): Future[Unit] = {
     events.put(Exit())
     shutdownPromise.future
@@ -173,6 +178,9 @@ class StoreManager(val objectCacheFactory: () => ObjectCache,
             net.sendClientResponse(r)
         }
       }
+
+      case Repair(storeId, os, completion) => stores.get(storeId).foreach: store =>
+        store.repair(os, completion)
 
       case RecoveryEvent() =>
         handleRecoveryEvent()
