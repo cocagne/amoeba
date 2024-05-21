@@ -1,12 +1,11 @@
 package com.ibm.amoeba
 
 import java.util.UUID
-
 import com.ibm.amoeba
 import com.ibm.amoeba.client.internal.{OpportunisticRebuildManager, StaticTypeRegistry}
 import com.ibm.amoeba.client.internal.allocation.{AllocationManager, BaseAllocationDriver}
 import com.ibm.amoeba.client.{AmoebaClient, DataObjectState, ExponentialBackoffRetryStrategy, KeyValueObjectState, ObjectCache, RetryStrategy, StoragePool, Transaction, TransactionStatusCache, TypeRegistry}
-import com.ibm.amoeba.client.internal.network.{Messenger => ClientMessenger}
+import com.ibm.amoeba.client.internal.network.Messenger as ClientMessenger
 import com.ibm.amoeba.client.internal.pool.SimpleStoragePool
 import com.ibm.amoeba.client.internal.read.{BaseReadDriver, ReadManager}
 import com.ibm.amoeba.client.internal.transaction.{ClientTransactionDriver, TransactionImpl, TransactionManager}
@@ -19,9 +18,9 @@ import com.ibm.amoeba.common.pool.PoolId
 import com.ibm.amoeba.common.store.StoreId
 import com.ibm.amoeba.common.transaction.{TransactionDescription, TransactionId}
 import com.ibm.amoeba.common.util.{BackgroundTask, BackgroundTaskPool}
-import com.ibm.amoeba.server.{StoreManager, transaction}
+import com.ibm.amoeba.server.{RegisteredTransactionFinalizerFactory, StoreManager, transaction}
 import com.ibm.amoeba.server.crl.{AllocationRecoveryState, CrashRecoveryLog, CrashRecoveryLogFactory, TransactionRecoveryState}
-import com.ibm.amoeba.server.network.{Messenger => ServerMessenger}
+import com.ibm.amoeba.server.network.Messenger as ServerMessenger
 import com.ibm.amoeba.server.store.Bootstrap
 import com.ibm.amoeba.server.store.backend.MapBackend
 import com.ibm.amoeba.server.store.cache.SimpleLRUObjectCache
@@ -167,7 +166,8 @@ class TestNetwork extends ServerMessenger {
     var client: AmoebaClient = null
 
     def create(txd: TransactionDescription, messenger: ServerMessenger): TransactionFinalizer = {
-      new amoeba.server.transaction.TransactionFinalizer.TransactionFinalizerWrapper(client.createFinalizerFor(txd))
+      val rfa = new RegisteredTransactionFinalizerFactory(client)
+      rfa.create(txd, messenger)
     }
   }
 

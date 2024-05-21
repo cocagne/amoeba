@@ -78,12 +78,4 @@ trait AmoebaClient extends ObjectReader {
   private[amoeba] def getSystemAttribute(key: String): Option[String]
   private[amoeba] def setSystemAttribute(key: String, value: String): Unit
 
-  private[amoeba] def createFinalizerFor(txd: TransactionDescription): TransactionFinalizer = {
-    val actions = txd.finalizationActions.map { sfa =>
-      typeRegistry.getType[FinalizationActionFactory](sfa.typeId.uuid).get.createFinalizationAction(this, 
-        txd, sfa.data)
-    }
-
-    new TransactionFinalizer(this, actions)
-  }
 }
