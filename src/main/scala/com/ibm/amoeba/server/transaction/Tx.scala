@@ -89,6 +89,8 @@ class Tx( trs: TransactionRecoveryState,
   }
 
   private def onAllObjectsLoaded(): Unit = {
+    logger.trace(s"AllObjectsLoaded for tx ${transactionId}. Have delayedPrepare: ${delayedPrepare.nonEmpty}")
+
     // Apply pre-transaction rebuilds
     preTxRebuilds.foreach { r =>
       objects.get(r.objectId).foreach { os =>
@@ -132,12 +134,13 @@ class Tx( trs: TransactionRecoveryState,
     // message as the receivePrepare() method is called immediately after transaction creation.
 
     delayedPrepare.foreach { response =>
+      logger.trace(s"AllObjectsLoaded. Saving to CRL before sending PrepareResponse for tx ${transactionId}")
       val r = response.copy(disposition=disposition, collisions=collisions)
       delayedPrepare = None
       val state = TransactionRecoveryState(storeId, serializedTxd, trsObjectUpdates,
         disposition, status, acceptor.persistentState)
       crl.save(txd.transactionId, state, () =>
-        logger.trace(s"AllObjectsLoaded. Sending PrepareResponse for tx ${transactionId}")
+        logger.trace(s"AllObjectsLoaded. CRL Save Complete. Sending PrepareResponse for tx ${transactionId}")
         net.sendTransactionMessage(r)
       )
     }
@@ -222,6 +225,7 @@ class Tx( trs: TransactionRecoveryState,
         net.sendTransactionMessage(txr)
       )
     else
+      logger.trace(s"Not all objects loaded. Delaying PrepareResponse: ${m.transactionId}")
       delayedPrepare = Some(txr)
   }
 

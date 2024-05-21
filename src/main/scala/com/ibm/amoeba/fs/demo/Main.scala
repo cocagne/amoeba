@@ -5,16 +5,18 @@ import java.nio.file.{Files, Path, Paths}
 import java.util.concurrent.Executors
 import com.ibm.amoeba.AmoebaError
 import com.ibm.amoeba.client.KeyValueObjectState.ValueState
-import com.ibm.amoeba.client.{AmoebaClient, DataObjectState, KeyValueObjectState, MetadataObjectState, ObjectState}
+import com.ibm.amoeba.client.{AmoebaClient, DataObjectState, KeyValueObjectState, MetadataObjectState, ObjectAllocator, ObjectState, StoragePool}
 import com.ibm.amoeba.client.internal.SimpleAmoebaClient
 import com.ibm.amoeba.client.internal.allocation.SinglePoolObjectAllocator
 import com.ibm.amoeba.client.tkvl.{KVObjectRootManager, KeyValueListNode, Root, SinglePoolNodeAllocator, TieredKeyValueList}
-import com.ibm.amoeba.common.DataBuffer
+import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp}
 import com.ibm.amoeba.common.ida.{ReedSolomon, Replication}
 import com.ibm.amoeba.common.network.{ClientId, ClientRequest, ClientResponse, TxMessage}
-import com.ibm.amoeba.common.objects.{ByteArrayKeyOrdering, DataObjectPointer, Key, KeyValueObjectPointer, LexicalKeyOrdering, Metadata, ObjectId, ObjectPointer, ObjectRevisionGuard, ObjectType, Value}
+import com.ibm.amoeba.common.objects.{ByteArrayKeyOrdering, DataObjectPointer, Insert, Key, KeyValueObjectPointer, LexicalKeyOrdering, Metadata, ObjectId, ObjectPointer, ObjectRevisionGuard, ObjectType, Value}
 import com.ibm.amoeba.common.pool.PoolId
 import com.ibm.amoeba.common.store.StoreId
+import com.ibm.amoeba.common.transaction.KeyValueUpdate
+import com.ibm.amoeba.common.transaction.KeyValueUpdate.DoesNotExist
 import com.ibm.amoeba.common.util.{BackgroundTaskPool, YamlFormat}
 import com.ibm.amoeba.fs.FileSystem
 import com.ibm.amoeba.fs.demo.network.ZMQNetwork
@@ -35,9 +37,11 @@ import org.dcache.nfs.vfs.VirtualFileSystem
 import org.dcache.oncrpc4j.rpc.{OncRpcProgram, OncRpcSvcBuilder}
 import org.apache.logging.log4j.scala.Logging
 
+import java.nio.{ByteBuffer, ByteOrder}
 import java.util.UUID
-import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.concurrent.{Await, ExecutionContext, Future, Promise}
 import scala.concurrent.duration.{Duration, MILLISECONDS, SECONDS}
+import scala.concurrent.ExecutionContext.Implicits.global
 
 /*
 place this file in the head of the CLASSPATH
@@ -281,7 +285,7 @@ object Main {
     client.read(nucleus).flatMap(loadFileSystem)
   }
 
-  def run_debug_code(log4jConfigFile: File, cfg: ConfigFile.Config): Unit = {
+  def OLD_run_debug_code(log4jConfigFile: File, cfg: ConfigFile.Config): Unit = {
     println(s"LOG4J CONFIG $log4jConfigFile")
     setLog4jConfigFile(log4jConfigFile)
 
@@ -319,7 +323,7 @@ object Main {
       tkvl = new TieredKeyValueList(client, rootMgr)
 
       _=println("------------ Setting Key(1) ---------------")
-      _ <- tkvl.set(Key(1), Value(Array[Byte](1,2,3)))(tx)
+      _ <- tkvl.set(Key(2), Value(Array[Byte](1,2,3)))(tx)
 
       _=println("------------ Committing! ---------------")
       _ <- tx.commit()
@@ -330,6 +334,70 @@ object Main {
       //alloc <- allocator.allocateDataObject(guard, Array[Byte](0,1,2,3))(tx)
       //_ = tx.overwrite(kvos, tx.revision, rootDirInode.toArray) // ensure Tx has an object to modify
 
+    yield
+      ()
+  }
+
+  def run_debug_code(log4jConfigFile: File, cfg: ConfigFile.Config): Unit = {
+    println(s"LOG4J CONFIG $log4jConfigFile")
+    setLog4jConfigFile(log4jConfigFile)
+
+    val (client, network, nucleus) = createAmoebaClient(cfg)
+
+    val networkThread = new Thread {
+      override def run(): Unit = {
+        network.ioThread()
+      }
+    }
+    networkThread.start()
+
+    implicit val ec: ExecutionContext = client.clientContext
+
+    def randomContent: Array[Byte] =
+      val arr = new Array[Byte](16)
+      val r = UUID.randomUUID()
+      val bb = ByteBuffer.wrap(arr)
+      bb.order(ByteOrder.BIG_ENDIAN)
+      bb.putLong(r.getMostSignificantBits)
+      bb.putLong(r.getLeastSignificantBits)
+      arr
+
+    def allocObject(ovalue: Option[ValueState],
+                    kvos: KeyValueObjectState,
+                    alloc: ObjectAllocator): Future[DataObjectPointer] = ovalue match
+      case Some(v) =>
+        println("------------- Using existing object -------------")
+        Future.successful(ObjectPointer(v.value.bytes).asInstanceOf[DataObjectPointer])
+      case None =>
+        println("------------- Allocating new Object ------------")
+        val tx = client.newTransaction()
+        val key = Key(100)
+        for
+          ptr <- alloc.allocateDataObject(ObjectRevisionGuard(kvos.pointer, kvos.revision),
+            randomContent)(tx)
+          _ = tx.update(kvos.pointer, None, None, DoesNotExist(key) :: Nil, Insert(key, ptr.toArray) :: Nil)
+          _ <- tx.commit()
+        yield
+            ptr
+
+
+    println("------------ Reading Nucleus ---------------")
+    for
+      kvos <- client.read(nucleus)
+      _ = println("------------ Getting Storage Pool---------------")
+      pool <- client.getStoragePool(kvos.pointer.poolId)
+      alloc = pool.createAllocater(Replication(3,2))
+      _ = println("------------ Allocating Data Object ---------------")
+      key = Key(100)
+      dptr <- allocObject(kvos.contents.get(key), kvos, alloc)
+
+      _ = println("------------ Reading Object r---------------")
+      os <- client.read(dptr)
+
+      tx = client.newTransaction()
+      _ = tx.overwrite(dptr, os.revision, DataBuffer(randomContent))
+      _ = println("------------ Committing random update ---------------")
+      _ <- tx.commit()
     yield
       ()
   }
@@ -389,6 +457,82 @@ object Main {
     Thread.currentThread.join()
   }
 
+
+  def repair(client: AmoebaClient, storeManager: StoreManager): Unit =
+
+    def deleteErrorEntry(node: KeyValueListNode, key: Key): Future[Unit] =
+      val tx = client.newTransaction()
+      val fdelete = node.delete(key)(tx)
+      for
+        _ <- tx.commit()
+        _ <- fdelete
+      yield ()
+
+    def deleteErrorEntryByTimestamp(timestamp: HLCTimestamp,
+                                    node: KeyValueListNode,
+                                    key: Key): Future[Unit] =
+      val tx = client.newTransaction()
+      val fdelete = node.delete(key,
+        None,
+        List(KeyValueUpdate.TimestampLessThan(key, timestamp)),
+        (_,_) => Future.successful(()))(tx)
+      for
+        _ <- tx.commit()
+        _ <- fdelete
+      yield ()
+
+    def step2(pool: StoragePool, storeId: StoreId, ptr: ObjectPointer,
+              node: KeyValueListNode, key: Key): Future[Unit] =
+      val fos = ptr match
+        case kp: KeyValueObjectPointer => client.read(kp)
+        case dp: DataObjectPointer => client.read(dp)
+      val frepair = Promise[Unit]()
+      for
+        os <- fos
+        _ = storeManager.repair(storeId, os, frepair)
+        _ <- frepair.future
+        _ <- deleteErrorEntryByTimestamp(os.timestamp, node, key)
+      yield
+        println(s"**** REPAIR Complete: ${ptr.id}")
+        ()
+
+    def step1(ovalue: Option[ValueState], pool: StoragePool, storeId: StoreId,
+              node: KeyValueListNode, key: Key): Future[Unit] = ovalue match
+      case None =>
+        // No object found in the allocation tree. It must have been deleted. Remove error tree entry
+        // TODO - Race condition here where an outstanding AllocationFinalizationAction may not have completed
+        //        before we come along to do a repair. Very unlikely but still possible
+        deleteErrorEntry(node, key)
+      case Some(value) => step2(pool, storeId, ObjectPointer(value.value.bytes), node, key)
+
+    def repairOne(pool: StoragePool, storeId: StoreId)(node: KeyValueListNode,
+                                                       key: Key, value: ValueState): Future[Unit] =
+      val bb = ByteBuffer.wrap(key.bytes)
+      bb.order(ByteOrder.BIG_ENDIAN)
+      bb.get() // storeIndex
+      val msb = bb.getLong()
+      val lsb = bb.getLong()
+      val objectId = ObjectId(new UUID(msb, lsb))
+      println(s"**** REPAIR ONE: ${objectId}")
+      for
+        ovalue <- pool.allocationTree.get(Key(objectId.toBytes))
+        _ <- step1(ovalue, pool, storeId, node, key)
+      yield
+        ()
+
+    storeManager.getStoreIds.foreach: storeId =>
+      val min = Array[Byte](1)
+      val max = Array[Byte](1)
+      min(0) = storeId.poolIndex
+      max(0) = (storeId.poolIndex + 1).toByte
+      for
+        pool <- client.getStoragePool(storeId.poolId)
+        _ <- pool.errorTree.foreachInRange(Key(min), Key(max), repairOne(pool, storeId))
+      yield
+        Future {
+          Thread.sleep(30000)
+          repair(client, storeManager)
+        }
 
 
   def node(nodeName: String, cfg: ConfigFile.Config): Unit = {
@@ -453,8 +597,11 @@ object Main {
       }
     }
     networkThread.start()
-
     storeManager.start()
+
+    // Kickoff repair loop
+    repair(client, storeManager)
+
     networkThread.join()
   }
 

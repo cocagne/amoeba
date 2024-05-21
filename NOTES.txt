@@ -40,6 +40,8 @@ Bootstrap Procedure:
     ./target/pack/bin/demo node local/cfg.yaml node_a
 
   On client:
+    ssh rakis@192.168.64.2
+    sudo
     umount -f /mnt; mount -v -t nfs4 -o "vers=4.1" 192.168.56.1:/ /mnt
 
 
@@ -65,6 +67,7 @@ exec java -cp $CLASSPATH com.ibm.aspen.demo.Main "$@"
 
 ---------------------------------------------------------------------------
 - TODO
+-
 AllocateResponse
     - Add error string to message on failure
     - Handle allocation failure

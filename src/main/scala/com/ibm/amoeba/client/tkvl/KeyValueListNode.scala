@@ -104,6 +104,14 @@ class KeyValueListNode(val reader: ObjectReader,
     KeyValueListNode.delete(node, key, reader, prepareForJoin)
   }
 
+  def delete(key: Key,
+             requiredRevision: Option[ObjectRevision],
+             requirements: List[KeyValueUpdate.KeyRequirement],
+             prepareForJoin: (Key, KeyValueObjectPointer) => Future[Unit]
+            )(implicit tx: Transaction): Future[Unit] = fetchContainingNode(key).flatMap { node =>
+    KeyValueListNode.delete(node, key, requiredRevision, requirements, reader, prepareForJoin)
+  }
+
   def foldLeft[B](initialZ: B)(fn: (B, Map[Key, ValueState]) => B): Future[B] = {
     val p = Promise[B]()
 
@@ -445,6 +453,50 @@ object KeyValueListNode {
               }
 
               tx.update(node.pointer, Some(node.revision), None, List(KeyValueUpdate.Exists(key)), ops)
+
+              val rightContentLock = FullContentLock(kvos.contents.iterator.map(t => KeyRevision(t._1, t._2.revision)).toList)
+              tx.update(rp.pointer, Some(kvos.revision), Some(rightContentLock), Nil, Nil)
+
+              tx.setRefcount(rp.pointer, kvos.refcount, kvos.refcount.decrement())
+
+              prepareForJoin(rp.minimum, rp.pointer)
+            }
+        }
+      }
+    }
+  }
+
+  def delete(node: KeyValueListNode,
+             key: Key,
+             requiredRevision: Option[ObjectRevision],
+             requirements: List[KeyValueUpdate.KeyRequirement],
+             reader: ObjectReader,
+             prepareForJoin: (Key, KeyValueObjectPointer) => Future[Unit])(implicit tx: Transaction, ec: ExecutionContext): Future[Unit] = {
+
+    if (!node.contents.contains(key))
+      Future.successful(())
+    else {
+      if (node.contents.size > 1) {
+        tx.update(node.pointer, requiredRevision, None, requirements, List(Delete(key)))
+        Future.successful(())
+      } else {
+        node.tail match {
+          case None =>
+            tx.update(node.pointer, requiredRevision, None, requirements, List(Delete(key)))
+            Future.successful(())
+
+          case Some(rp) =>
+            reader.read(rp.pointer, s"Deleting key from KVListNode node ${rp.pointer.id}. Minimum: ${rp.minimum}. target: $key").flatMap { kvos =>
+              var ops: List[KeyValueOperation] = Delete(key) :: Nil
+              kvos.right match {
+                case None => ops = DeleteRight() :: ops
+                case Some(rp) => ops = SetRight(rp.bytes) :: ops
+              }
+              kvos.contents.foreach { t =>
+                ops = Insert(t._1, t._2.value.bytes) :: ops
+              }
+
+              tx.update(node.pointer, Some(node.revision), None, requirements, ops)
 
               val rightContentLock = FullContentLock(kvos.contents.iterator.map(t => KeyRevision(t._1, t._2.revision)).toList)
               tx.update(rp.pointer, Some(kvos.revision), Some(rightContentLock), Nil, Nil)

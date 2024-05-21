@@ -26,7 +26,7 @@ object SimpleCRL:
 
   case class DeleteAllocation(storeId: StoreId, transactionId: TransactionId) extends ActionRequest
 
-  case class WriteComplete() extends ActionRequest
+  case class WriteComplete(serialNumber: Long) extends ActionRequest
 
   case class Shutdown(completionHandler: () => Unit) extends ActionRequest
 
@@ -100,7 +100,9 @@ class SimpleCRL private (val maxSizeInBytes: Long,
     writeCurrentLogEntry()
     // Only the writer has a reference to this instance during initialization so this call
     // will block until the writer enqueues a WriteComplete message
-    ioQueue.take()
+    val event = ioQueue.take()
+    // Put this back on the queue for the I/O thread to handle the WriteComplete event
+    ioQueue.put(event)
 
   initializing = false
 
@@ -141,7 +143,9 @@ class SimpleCRL private (val maxSizeInBytes: Long,
 
     writeInProgress = true
     logger.trace(s"CRL beginning write for entry ${currentLogEntry.entrySerialNumber}")
-    val location = streams(currentStream).writeEntry(currentLogEntry, () => ioQueue.put(WriteComplete()))
+    val location = streams(currentStream).writeEntry(currentLogEntry, () => {
+      ioQueue.put(WriteComplete(currentLogEntry.entrySerialNumber))
+    })
     val nextEntrySerialNumber = currentLogEntry.entrySerialNumber+1
     currentLogEntry = new LogEntry(location, nextEntrySerialNumber, oldestEntryNeeded)
 
@@ -158,7 +162,9 @@ class SimpleCRL private (val maxSizeInBytes: Long,
 
         case DeleteAllocation(storeId, transactionId) => onDeleteAllocation(storeId, transactionId)
 
-        case WriteComplete() =>
+        case WriteComplete(serialNumber) =>
+          logger.trace(s"CRL write complete for entry serial number: ${serialNumber}")
+
           writeInProgress = false
           startWrite()
 
@@ -210,6 +216,7 @@ class SimpleCRL private (val maxSizeInBytes: Long,
 
     tx.state = state
 
+    logger.trace(s"CRL adding transaction ${tx.id} to log entry ${currentLogEntry.entrySerialNumber}")
     currentLogEntry.addTx(tx, completionHandler)
     startWrite()
 

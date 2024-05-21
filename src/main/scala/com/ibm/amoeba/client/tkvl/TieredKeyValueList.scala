@@ -3,6 +3,7 @@ package com.ibm.amoeba.client.tkvl
 import com.ibm.amoeba.client.{AmoebaClient, Transaction}
 import com.ibm.amoeba.client.KeyValueObjectState.ValueState
 import com.ibm.amoeba.common.objects.{Key, KeyOrdering, KeyValueObjectPointer, ObjectId, ObjectRevision, ObjectRevisionGuard, Value}
+import com.ibm.amoeba.common.transaction.KeyValueUpdate
 import org.apache.logging.log4j.scala.Logging
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
@@ -97,6 +98,36 @@ class TieredKeyValueList(val client: AmoebaClient,
           case Right(n) => n
         }
         _ <- node.delete(key, onJoin)
+      } yield {
+        ()
+      }
+    }
+
+    rootManager.getRootNode().flatMap { t =>
+      val (tier, ordering, oroot) = t
+      oroot match {
+        case None => Future.successful(())
+        case Some(root) => nonEmpty(tier, ordering, root)
+      }
+    }
+  }
+
+  def delete(key: Key, 
+             requiredRevision: Option[ObjectRevision],
+             requirements: List[KeyValueUpdate.KeyRequirement])(implicit t: Transaction): Future[Unit] = {
+    def onJoin(delMinimum: Key, delNode: KeyValueObjectPointer): Future[Unit] = {
+      JoinFinalizationAction.addToTransaction(rootManager, 1, delMinimum, delNode, t)
+      Future.successful(())
+    }
+
+    def nonEmpty(tier: Int, ordering: KeyOrdering, root: KeyValueListNode): Future[Unit] = {
+      for {
+        e <- fetchContainingNode(client, tier, 0, ordering, key, root, Set())
+        node = e match {
+          case Left(_) => throw new BrokenTree()
+          case Right(n) => n
+        }
+        _ <- node.delete(key, requiredRevision, requirements, onJoin)
       } yield {
         ()
       }

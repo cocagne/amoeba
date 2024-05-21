@@ -206,7 +206,7 @@ object ConfigFile {
     def create(o: Object): SimpleCRL = SimpleCRL(
       path.get(o),
       numStreams.get(o).getOrElse(3),
-      fileSize.get(o).getOrElse(100))
+      fileSize.get(o).getOrElse(300))
   }
 
   case class DataStore(pool: String, store: Int, backend: StorageBackend)

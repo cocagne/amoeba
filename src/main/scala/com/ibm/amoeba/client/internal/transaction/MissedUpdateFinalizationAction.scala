@@ -79,7 +79,7 @@ class MissedUpdateFinalizationAction(val client: AmoebaClient,
     val key = Key(keyBytes)
 
     client.retryStrategy.retryUntilSuccessful(onFail _) {
-      logger.trace(s"Marking missed update for Tx ${txd.transactionId}. Object: $objectId")
+      logger.trace(s"Marking missed update for Tx ${txd.transactionId}. Store: ${storeId} Object: $objectId")
       for {
         pool <- client.getStoragePool(storeId.poolId)
         tx = client.newTransaction()
@@ -87,7 +87,7 @@ class MissedUpdateFinalizationAction(val client: AmoebaClient,
         _ <- pool.errorTree.set(key, Value(Array()))(tx)
         _ <- tx.commit()
       } yield {
-        logger.trace(s"COMPLETED - Marking missed update for Tx ${txd.transactionId}. Object: $objectId")
+        logger.trace(s"COMPLETED - Marking missed update for Tx ${txd.transactionId}. Store: ${storeId} Object: $objectId")
         ()
       }
     }

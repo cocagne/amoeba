@@ -15,7 +15,7 @@ import com.ibm.amoeba.server.store.{Frontend, Store}
 import com.ibm.amoeba.server.transaction.{TransactionDriver, TransactionFinalizer, TransactionStatusCache}
 import org.apache.logging.log4j.scala.Logging
 
-import scala.concurrent.duration.Duration
+import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
 object StoreManager {
@@ -90,6 +90,10 @@ class StoreManager(val objectCacheFactory: () => ObjectCache,
 
     backend.storeId -> store
   }.toMap
+
+  def getStoreIds: List[StoreId] = synchronized {
+    stores.keysIterator.toList
+  }
 
   def hasTransactions: Boolean = synchronized {
     stores.valuesIterator.exists(_.hasTransactions)
