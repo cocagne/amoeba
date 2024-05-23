@@ -1,7 +1,7 @@
 package com.ibm.amoeba.common.objects
 
 import java.nio.charset.StandardCharsets
-
+import scala.util.control.Breaks._
 import com.ibm.amoeba.AmoebaError
 
 sealed abstract class KeyOrdering extends Ordering[Key] {
@@ -28,10 +28,18 @@ object ByteArrayKeyOrdering extends KeyOrdering {
 
     var result = 0 // a and b are the same length and have matching content
 
-    for (i <- a.bytes.indices) {
-      if (i > b.bytes.length-1) result = 1 // a is longer than b and all preceeding bytes are equal
-      if (a.bytes(i) < b.bytes(i)) result = -1 // a is less than b
-      if (a.bytes(i) > b.bytes(i)) result = 1  // a is greater than b
+    breakable {
+      for (i <- a.bytes.indices) {
+        if (i > b.bytes.length - 1) then
+          result = 1 // a is longer than b and all preceeding bytes are equal
+          break
+        if (a.bytes(i) < b.bytes(i))
+          result = -1 // a is less than b
+          break
+        if (a.bytes(i) > b.bytes(i))
+          result = 1 // a is greater than b
+          break
+      }
     }
 
     if (b.bytes.length > a.bytes.length) result = -1 // b is longer than a and all preceeding bytes are equal

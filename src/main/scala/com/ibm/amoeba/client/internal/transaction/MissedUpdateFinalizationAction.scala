@@ -17,7 +17,6 @@ class MissedUpdateFinalizationAction(val client: AmoebaClient,
   implicit val ec: ExecutionContext = client.clientContext
 
   private var commitErrors: Map[StoreId, List[ObjectId]] = Map()
-  private var haveErrors: Boolean = true
 
   private var markTask: Option[ScheduledTask] = None
 
@@ -30,37 +29,38 @@ class MissedUpdateFinalizationAction(val client: AmoebaClient,
   override def updateCommitErrors(commitErrors: Map[StoreId, List[ObjectId]]): Unit = synchronized {
     this.commitErrors = commitErrors
 
-    if (commitErrors.isEmpty && haveErrors) {
-      haveErrors = false
+    if txd.allDataStores.size == commitErrors.keysIterator.toSet.size && !commitErrors.valuesIterator.exists(_.nonEmpty) then
+      println(s"All stores responded to commit of tx ${txd.transactionId} without error. No MissedUpdates.")
+      logger.trace(s"All stores responded to commit of tx ${txd.transactionId} without error. No MissedUpdates.")
       markTask.foreach(_.cancel())
       if (!completionPromise.isCompleted)
         completionPromise.success(())
-    }
   }
 
   def execute(): Unit = synchronized {
-    if (haveErrors) {
-      markTask = Some(client.backgroundTasks.schedule(MissedUpdateFinalizationAction.errorTimeout) {
-        markMissedUpdates()
-      })
-    }
+    markTask = Some(client.backgroundTasks.schedule(MissedUpdateFinalizationAction.errorTimeout) {
+      markMissedUpdates()
+    })
   }
 
   def markMissedUpdates(): Unit = synchronized {
-    if (haveErrors) {
-      val misses = commitErrors.foldLeft(List[(StoreId, ObjectId)]()){ (l, t) =>
-        t._2.map(obj => t._1 -> obj) ++ l
-      }
-      Future.sequence(misses.map(t => markMissedUpdate(t._1, t._2))).foreach { _ =>
-        synchronized {
-          if (!completionPromise.isCompleted)
-            completionPromise.success(())
-        }
+    val errors = txd.allDataStores.foldLeft(List[(StoreId, ObjectId)]()) { (l, storeId) =>
+      commitErrors.get(storeId) match
+        case None => txd.allHostedObjects(storeId).map(ptr => (storeId, ptr.id)) ++ l
+        case Some(lst) => lst.map(objectId => (storeId, objectId)) ++ l
+    }
+
+    Future.sequence(errors.map(t => markMissedUpdate(t._1, t._2))).foreach { _ =>
+      synchronized {
+        if (!completionPromise.isCompleted)
+          completionPromise.success(())
       }
     }
   }
 
   def markMissedUpdate(storeId: StoreId, objectId: ObjectId): Future[Unit] = {
+    //println(s"Marking missed update for Tx ${txd.transactionId}. Store: ${storeId} Object: $objectId")
+
     def onFail(err: Throwable): Future[Unit] = { err match {
       case err: UnknownStoragePool =>
         // StoragePool must have been deleted

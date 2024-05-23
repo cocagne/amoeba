@@ -8,7 +8,7 @@ import com.ibm.amoeba.client.{AmoebaClient, DataObjectState, ExponentialBackoffR
 import com.ibm.amoeba.client.internal.network.Messenger as ClientMessenger
 import com.ibm.amoeba.client.internal.pool.SimpleStoragePool
 import com.ibm.amoeba.client.internal.read.{BaseReadDriver, ReadManager}
-import com.ibm.amoeba.client.internal.transaction.{ClientTransactionDriver, TransactionImpl, TransactionManager}
+import com.ibm.amoeba.client.internal.transaction.{ClientTransactionDriver, MissedUpdateFinalizationAction, TransactionImpl, TransactionManager}
 import com.ibm.amoeba.client.tkvl.{KVObjectRootManager, TieredKeyValueList}
 import com.ibm.amoeba.common.Nucleus
 import com.ibm.amoeba.common.ida.Replication
@@ -161,6 +161,10 @@ class TestNetwork extends ServerMessenger {
   var handleDepth = 0
 
   val nucleus: KeyValueObjectPointer = Bootstrap.initialize(ida, List(store0, store1, store2))
+
+  // All transactions will miss the third store. Don't wait long before updating the
+  // error tree
+  MissedUpdateFinalizationAction.errorTimeout = Duration(50, MILLISECONDS)
 
   object FinalizerFactory extends TransactionFinalizer.Factory {
     var client: AmoebaClient = null

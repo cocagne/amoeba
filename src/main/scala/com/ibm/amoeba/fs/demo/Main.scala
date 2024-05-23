@@ -16,7 +16,7 @@ import com.ibm.amoeba.common.objects.{ByteArrayKeyOrdering, DataObjectPointer, I
 import com.ibm.amoeba.common.pool.PoolId
 import com.ibm.amoeba.common.store.StoreId
 import com.ibm.amoeba.common.transaction.KeyValueUpdate
-import com.ibm.amoeba.common.transaction.KeyValueUpdate.DoesNotExist
+import com.ibm.amoeba.common.transaction.KeyValueUpdate.{DoesNotExist, KeyRequirement}
 import com.ibm.amoeba.common.util.{BackgroundTaskPool, YamlFormat}
 import com.ibm.amoeba.fs.FileSystem
 import com.ibm.amoeba.fs.demo.network.ZMQNetwork
@@ -472,13 +472,13 @@ object Main {
                                     node: KeyValueListNode,
                                     key: Key): Future[Unit] =
       val tx = client.newTransaction()
-      val fdelete = node.delete(key,
+      val fdeletePrep = node.delete(key,
         None,
         List(KeyValueUpdate.TimestampLessThan(key, timestamp)),
         (_,_) => Future.successful(()))(tx)
       for
+        _ <- fdeletePrep
         _ <- tx.commit()
-        _ <- fdelete
       yield ()
 
     def step2(pool: StoragePool, storeId: StoreId, ptr: ObjectPointer,
@@ -513,13 +513,14 @@ object Main {
       val msb = bb.getLong()
       val lsb = bb.getLong()
       val objectId = ObjectId(new UUID(msb, lsb))
-      println(s"**** REPAIR ONE: ${objectId}")
+      println(s"**** REPAIRING Object: ${objectId}")
       for
         ovalue <- pool.allocationTree.get(Key(objectId.toBytes))
         _ <- step1(ovalue, pool, storeId, node, key)
       yield
         ()
 
+    println(s"*** Beginning Repair Process ***")
     storeManager.getStoreIds.foreach: storeId =>
       val min = Array[Byte](1)
       val max = Array[Byte](1)
@@ -529,6 +530,7 @@ object Main {
         pool <- client.getStoragePool(storeId.poolId)
         _ <- pool.errorTree.foreachInRange(Key(min), Key(max), repairOne(pool, storeId))
       yield
+        println(s"*** Repair Process Complete ***")
         Future {
           Thread.sleep(30000)
           repair(client, storeManager)
