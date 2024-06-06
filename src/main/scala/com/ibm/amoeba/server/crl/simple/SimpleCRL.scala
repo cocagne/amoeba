@@ -5,10 +5,12 @@ import com.ibm.amoeba.common.transaction.TransactionId
 import com.ibm.amoeba.server.crl.{AllocationRecoveryState, CrashRecoveryLog, CrashRecoveryLogFactory, TransactionRecoveryState}
 import org.apache.logging.log4j.scala.Logging
 
-import java.nio.file.Path
+import java.io.File
+import java.nio.file.{Path, Paths}
 import java.util.UUID
 import java.util.concurrent.LinkedBlockingQueue
 import scala.collection.immutable.HashMap
+import scala.concurrent.{Future, Promise}
 
 object SimpleCRL:
 
@@ -29,6 +31,11 @@ object SimpleCRL:
   case class WriteComplete(serialNumber: Long) extends ActionRequest
 
   case class Shutdown(completionHandler: () => Unit) extends ActionRequest
+
+  case class GetRecoveryState(storeId: StoreId,
+                              removeStore: Boolean,
+                              completion: (List[TransactionRecoveryState], List[AllocationRecoveryState]) => Unit
+                             ) extends ActionRequest
 
 
   case class InitialCRLState(crl: SimpleCRL,
@@ -168,6 +175,9 @@ class SimpleCRL private (val maxSizeInBytes: Long,
           writeInProgress = false
           startWrite()
 
+        case GetRecoveryState(storeId, removeStore, completion) =>
+          onGetRecoveryState(storeId, removeStore, completion)
+
         case Shutdown(completionHandler) =>
           writer.shutdown(completionHandler)
           return
@@ -199,6 +209,31 @@ class SimpleCRL private (val maxSizeInBytes: Long,
     queueHead = Some(lc)
     if queueTail.isEmpty then
       queueTail = Some(lc)
+
+  private def onGetRecoveryState(storeId: StoreId,
+                                 removeStore: Boolean,
+                                 completion: (List[TransactionRecoveryState], List[AllocationRecoveryState]) => Unit
+                                ): Unit =
+
+    var trsList: List[TransactionRecoveryState] = Nil
+    var arsList: List[AllocationRecoveryState] = Nil
+
+    transactions = transactions.filter: (txid, tx) =>
+      if txid.storeId == storeId then
+        trsList = tx.state :: trsList
+        !removeStore
+      else
+        true
+
+    allocations = allocations.filter: (txid, allocList) =>
+      if txid.storeId == storeId then
+        allocList.foreach: alloc =>
+          arsList = alloc.state :: arsList
+        !removeStore
+      else
+        true
+
+    completion(trsList, arsList)
 
   private def onSaveTransaction(transactionId: TransactionId,
                       state: TransactionRecoveryState,
@@ -258,7 +293,21 @@ class SimpleCRL private (val maxSizeInBytes: Long,
     transactions.get(TxId(storeId, transactionid)).foreach(_.dropTransactionObjectData())
 
   def getFullRecoveryState(storeId: StoreId): (List[TransactionRecoveryState], List[AllocationRecoveryState]) =
-    (r.trsList.filter(_.storeId == storeId), r.arsList.filter(_.storeId == storeId))
+    var trsList: List[TransactionRecoveryState] = Nil
+    var arsList: List[AllocationRecoveryState] = Nil
+
+    val blockingQueue = new LinkedBlockingQueue[String]()
+
+    def completion(tl: List[TransactionRecoveryState], al: List[AllocationRecoveryState]): Unit =
+      trsList = tl
+      arsList = al
+      blockingQueue.put("")
+
+    ioQueue.put(GetRecoveryState(storeId, false, completion))
+
+    blockingQueue.take()
+
+    (trsList, arsList)
 
   def save(transactionId: TransactionId,
            state: TransactionRecoveryState,
@@ -277,6 +326,58 @@ class SimpleCRL private (val maxSizeInBytes: Long,
 
   def dropTransactionObjectData(storeId: StoreId, transactionid: TransactionId): Unit =
     ioQueue.put(DropTransactionData(storeId, transactionid))
+
+  def closeStore(storeId: StoreId): Future[(List[TransactionRecoveryState], List[AllocationRecoveryState])] =
+    val p = Promise[(List[TransactionRecoveryState], List[AllocationRecoveryState])]()
+
+    def completion(trsList: List[TransactionRecoveryState], arsList: List[AllocationRecoveryState]): Unit =
+      p.success((trsList, arsList))
+
+    ioQueue.put(GetRecoveryState(storeId, true, completion))
+
+    p.future
+
+  def loadStoreState(storeId: StoreId, 
+                     trsList: List[TransactionRecoveryState], 
+                     arsList: List[AllocationRecoveryState]): Future[Unit] =
+    
+    logger.info(s"Loading transaction and allocation state for store: $storeId")
+    
+    if trsList.isEmpty && arsList.isEmpty then
+      logger.info(s"Completed load of empty transaction and allocation state for store: $storeId")
+      return Future.successful(())
+    
+    val completion = Promise[Unit]()
+    var outstandingSaves = 1
+    var allStateWritten = false
+
+    def onComplete(): Unit = synchronized {
+      outstandingSaves -= 1
+      // Use allStateWritten to prevent race condition of backend thread writing so fast that we
+      // hit zero before all of the recovery state instances have been written
+      if allStateWritten && outstandingSaves == 0 then
+        logger.info(s"Completed load of transaction and allocation state for store: $storeId")
+        completion.success(())
+    }
+    
+    trsList.foreach: trs =>
+      synchronized {
+        outstandingSaves += 1
+      }
+      save(trs.txd.transactionId, trs, onComplete)
+
+    arsList.foreach: ars =>
+      synchronized {
+        outstandingSaves += 1
+      }
+      save(ars, onComplete)
+
+    synchronized{
+      allStateWritten = true  
+    }
+    onComplete() // Ensure there's at least one call after allStateWritten has been set
+    
+    completion.future
 
   def shutdown(): Unit = 
     val q = new LinkedBlockingQueue[String]()

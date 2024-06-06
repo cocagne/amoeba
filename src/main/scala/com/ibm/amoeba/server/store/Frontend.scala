@@ -14,7 +14,7 @@ import com.ibm.amoeba.server.transaction.{TransactionStatusCache, Tx}
 import org.apache.logging.log4j.scala.Logging
 import com.ibm.amoeba.client.ObjectState as ClientObjectState
 
-import scala.concurrent.Promise
+import scala.concurrent.{Future, Promise}
 
 
 object Frontend {
@@ -69,6 +69,10 @@ class Frontend(val storeId: StoreId,
       pendingAllocations += (ars.allocationTransactionId -> l)
     }
   }
+  
+  def close(): Future[Unit] = backend.close()
+
+  def path: String = backend.path
 
   def receiveTransactionMessage(msg: TxMessage): Unit = msg match {
     case m: TxPrepare => receivePrepare(m)

@@ -7,11 +7,12 @@ import com.ibm.amoeba.codec.ObjectReadError
 import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp}
 import com.ibm.amoeba.common.ida.{IDA, ReedSolomon, Replication}
 import com.ibm.amoeba.common.objects.{ByteArrayKeyOrdering, ByteRange, DataObjectPointer, FullObject, IntegerKeyOrdering, Key, KeyOrdering, KeyRange, KeyRevisionGuard, KeyValueObjectPointer, LargestKeyLessThan, LargestKeyLessThanOrEqualTo, LexicalKeyOrdering, MetadataOnly, ObjectId, ObjectPointer, ObjectRefcount, ObjectRevision, ObjectRevisionGuard, ObjectType, ReadError, SingleKey}
-import com.ibm.amoeba.common.paxos.ProposalId
+import com.ibm.amoeba.common.paxos.{PersistentState, ProposalId}
 import com.ibm.amoeba.common.pool.PoolId
 import com.ibm.amoeba.common.store.{StoreId, StorePointer}
 import com.ibm.amoeba.common.transaction.KeyValueUpdate.KeyRevision
 import com.ibm.amoeba.common.transaction.{DataUpdate, DataUpdateOperation, FinalizationActionId, KeyValueUpdate, LocalTimeRequirement, ObjectUpdate, PreTransactionOpportunisticRebuild, RefcountUpdate, RevisionLock, SerializedFinalizationAction, TransactionDescription, TransactionDisposition, TransactionId, TransactionRequirement, TransactionStatus, VersionBump}
+import com.ibm.amoeba.server.crl.{AllocationRecoveryState, TransactionRecoveryState}
 
 import java.nio.{ByteBuffer, ByteOrder}
 import scala.jdk.CollectionConverters.*
@@ -961,3 +962,102 @@ object Codec extends Logging:
 
   def decode(m: codec.NodeHeartbeat): NodeHeartbeat =
     NodeHeartbeat(m.getFrom)
+    
+  // ----------------------- Non Network Messages -----------------------
+
+  def encode(o: ObjectUpdate): codec.ObjectUpdate =
+    val builder = codec.ObjectUpdate.newBuilder()
+      .setObjectId(encodeUUID(o.objectId.uuid))
+      .setData(ByteString.copyFrom(o.data.asReadOnlyBuffer()))
+
+    builder.build
+
+  def decode(m: codec.ObjectUpdate): ObjectUpdate =
+    val oid = ObjectId(decodeUUID(m.getObjectId))
+    val objectData = DataBuffer(m.getData.toByteArray)
+    
+    ObjectUpdate(oid, objectData)
+
+
+  def encode(o: PersistentState): codec.PersistentState =
+    val builder = codec.PersistentState.newBuilder()
+    
+    o.promised.foreach: p =>
+      builder.setPromised(encode(p))
+    o.accepted.foreach: (pid, value) =>
+      builder.setAcceptedProposalId(encode(pid))
+      builder.setAcceptedValue(value)
+      
+    builder.build
+
+  def decode(m: codec.PersistentState): PersistentState =
+    val promised = if m.hasPromised then
+      Some(decode(m.getPromised))
+    else
+      None
+      
+    val accepted = if m.hasAcceptedProposalId then
+      Some((decode(m.getAcceptedProposalId), m.getAcceptedValue))
+    else
+      None
+
+    PersistentState(promised, accepted)
+
+
+  def encode(o: TransactionRecoveryState): codec.TransactionRecoveryState =
+    val builder = codec.TransactionRecoveryState.newBuilder()
+
+    builder.setStoreId(encode(o.storeId))
+    builder.setSerializedTxd(ByteString.copyFrom(o.serializedTxd.asReadOnlyBuffer()))
+    o.objectUpdates.foreach: ou =>
+      builder.addObjectUpdates(encode(ou))
+    builder.setDisposition(encodeTransactionDisposition(o.disposition))
+    builder.setStatus(encodeTransactionStatus(o.status))
+    builder.setPaxosAcceptorState(encode(o.paxosAcceptorState))
+
+    builder.build
+
+  def decode(m: codec.TransactionRecoveryState): TransactionRecoveryState =
+    val storeId = decode(m.getStoreId)
+    val serializedTxd = DataBuffer(m.getSerializedTxd.toByteArray)
+    val objectUpdates = m.getObjectUpdatesList.asScala.map(decode).toList
+    val disposition = decodeTransactionDisposition(m.getDisposition)
+    val status = decodeTransactionStatus(m.getStatus)
+    val paxosAcceptorState = decode(m.getPaxosAcceptorState)
+    
+    TransactionRecoveryState(storeId, serializedTxd, objectUpdates, disposition, status, paxosAcceptorState)
+    
+  
+  def encode(o: AllocationRecoveryState): codec.AllocationRecoveryState =
+    val builder = codec.AllocationRecoveryState.newBuilder()
+
+    builder.setStoreId(encode(o.storeId))
+    builder.setStorePointer(encode(o.storePointer))
+    builder.setNewObjectId(encodeUUID(o.newObjectId.uuid))
+    builder.setObjectType(encodeObjectType(o.objectType))
+    o.objectSize.foreach: sz =>
+      builder.setObjectSize(sz)
+    builder.setObjectData(ByteString.copyFrom(o.objectData.asReadOnlyBuffer()))
+    builder.setInitialRefcount(encode(o.initialRefcount))
+    builder.setTimestamp(o.timestamp.asLong)
+    builder.setTransactionUuid(encodeUUID(o.allocationTransactionId.uuid))
+    builder.setSerializedRevisionGuard(ByteString.copyFrom(o.serializedRevisionGuard.asReadOnlyBuffer()))
+    
+    builder.build
+
+  def decode(m: codec.AllocationRecoveryState): AllocationRecoveryState =
+    val storeId = decode(m.getStoreId)
+    val storePointer = decode(m.getStorePointer)
+    val newObjectId = ObjectId(decodeUUID(m.getNewObjectId))
+    val objectType = decodeObjectType(m.getObjectType)
+    val objectSize = if m.getObjectSize == 0 then None else Some(m.getObjectSize)
+    val objectData = DataBuffer(m.getObjectData.toByteArray)
+    val initialRefcount = decode(m.getInitialRefcount)
+    val timestamp = HLCTimestamp(m.getTimestamp)
+    val transactionId = TransactionId(decodeUUID(m.getTransactionUuid))
+    val serializedRevisionGuard = DataBuffer(m.getSerializedRevisionGuard.toByteArray)
+
+    AllocationRecoveryState(storeId, storePointer, newObjectId, objectType, objectSize, objectData,
+      initialRefcount, timestamp, transactionId, serializedRevisionGuard)
+
+  

@@ -144,7 +144,6 @@ enum LocalTimeRequirementEnum {
   LOCAL_TIME_REQUIREMENT_ENUM_EQUALS = 2;
 }
 
-
 message LocalTimeRequirement {
   uint64 timestamp = 1;
   LocalTimeRequirementEnum requirement = 2;
@@ -430,5 +429,48 @@ message Message {
     NodeHeartbeat node_heartbeat = 18;
     TxStatusRequest status_request = 19;
     TxStatusResponse status_response = 20;
+  }
+}
+
+//---------------------------------------------------------------------------
+//- Non-network Messages
+//---------------------------------------------------------------------------
+message ObjectUpdate {
+  UUID object_id = 1;
+  bytes data = 2;
+}
+
+message PersistentState {
+  ProposalId promised = 1;             // Option[ProposalId],
+  ProposalId accepted_proposal_id = 2; // Option[(ProposalId, Boolean)]
+  bool accepted_value = 3;
+}
+
+message TransactionRecoveryState {
+  StoreId store_id = 1;
+  bytes serialized_txd = 2;
+  repeated ObjectUpdate object_updates = 3;
+  TransactionDisposition disposition = 4;
+  TransactionStatus status = 5;
+  PersistentState paxos_acceptor_state = 6;
+}
+
+message AllocationRecoveryState {
+  StoreId store_id = 1;
+  StorePointer store_pointer = 2;
+  UUID new_object_id = 3;
+  ObjectType object_type = 4;
+  uint32 object_size = 5;
+  bytes object_data = 6;
+  ObjectRefcount initial_refcount = 7;
+  uint64 timestamp = 8;
+  UUID transaction_uuid = 9;
+  bytes serialized_revision_guard = 10;
+}
+
+message StoreCRLEntry {
+  oneof msg {
+    TransactionRecoveryState trs = 1;
+    AllocationRecoveryState ars = 2;
   }
 }

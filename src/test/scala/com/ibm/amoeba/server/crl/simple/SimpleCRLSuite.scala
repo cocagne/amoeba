@@ -8,12 +8,14 @@ import com.ibm.amoeba.common.paxos.{PersistentState, ProposalId}
 import com.ibm.amoeba.common.pool.PoolId
 import com.ibm.amoeba.common.store.{StoreId, StorePointer}
 import com.ibm.amoeba.common.transaction.{DataUpdate, DataUpdateOperation, ObjectUpdate, TransactionDescription, TransactionDisposition, TransactionId, TransactionStatus}
-import com.ibm.amoeba.server.crl.{AllocationRecoveryState, TransactionRecoveryState}
+import com.ibm.amoeba.server.crl.{AllocationRecoveryState, CrashRecoveryLog, TransactionRecoveryState}
 
 import java.nio.ByteBuffer
 import java.nio.file.Path
 import java.util.UUID
 import java.util.concurrent.LinkedBlockingQueue
+import scala.concurrent.Await
+import scala.concurrent.duration.*
 
 object SimpleCRLSuite:
   val transactionId = TransactionId(new UUID(0, 1))
@@ -72,6 +74,7 @@ object SimpleCRLSuite:
     List(DataUpdate(op1, ObjectRevision(transactionId), DataUpdateOperation.Overwrite)),
     List(), None, List(), List())
   val trsValidTxd = TransactionRecoveryState(storeId, txd.serialize(), List(ou1, ou2), disp, status, pax)
+  val trsValidTxd2 = TransactionRecoveryState(storeId2, txd.serialize(), List(ou1, ou2), disp, status, pax)
 
 
 
@@ -85,7 +88,79 @@ class SimpleCRLSuite extends FileBasedTests {
     lst.reverse
 
 
-  test("SimpleCRL Drop Transaction Data Foo") {
+  test("Save & Recover CRL Saved State File Foo") {
+    val savePath = tdir.toPath.resolve("crl_save_file.log")
+    val queue = new LinkedBlockingQueue[String]()
+
+    def completionHandler(): Unit = queue.put("")
+
+    val i = SimpleCRL(tdir.toPath, 3, 1024 * 1024)
+
+    i.crl.save(transactionId, trsValidTxd, completionHandler)
+
+    queue.take() // Block till completion handlers are run
+
+    i.crl.save(transactionId, trsValidTxd2, completionHandler)
+
+    queue.take() // Block till completion handlers are run
+
+    i.crl.save(ars, completionHandler)
+
+    queue.take() // Block till completion handlers are run
+
+    i.crl.save(ars2, completionHandler)
+
+    queue.take() // Block till completion handlers are run
+
+    val (trs1, ars1) = i.crl.getFullRecoveryState(storeId)
+
+    assert(trs1.size == 1)
+    assert(ars1.size == 1)
+
+    val (t2, a2) = i.crl.getFullRecoveryState(storeId2)
+
+    assert(t2.size == 1)
+    assert(a2.size == 1)
+
+    val (t, a) = Await.result(i.crl.closeStore(storeId), Duration(5000, MILLISECONDS))
+
+    val (t3, a3) = i.crl.getFullRecoveryState(storeId)
+
+    assert(t3.size == 0)
+    assert(a3.size == 0)
+
+    val (t4, a4) = i.crl.getFullRecoveryState(storeId2)
+
+    assert(t4.size == 1)
+    assert(a4.size == 1)
+
+    CrashRecoveryLog.saveStoreState(storeId, t, a, savePath)
+
+    val (sid, trl, arl) = CrashRecoveryLog.loadStoreState(savePath)
+
+    assert(sid == storeId)
+    assert(trl.length == 1)
+    assert(arl.length == 1)
+
+    assert(trl.head == trsValidTxd)
+    assert(arl.head == ars)
+
+    Await.result(i.crl.loadStore(sid, trl, arl), Duration(5000, MILLISECONDS))
+
+    val (t5, a5) = i.crl.getFullRecoveryState(storeId)
+
+    assert(t5.size == 1)
+    assert(a5.size == 1)
+
+    val (t6, a6) = i.crl.getFullRecoveryState(storeId2)
+
+    assert(t6.size == 1)
+    assert(a6.size == 1)
+
+    i.crl.shutdown()
+  }
+
+  test("SimpleCRL Drop Transaction Data") {
     val queue = new LinkedBlockingQueue[String]()
 
     def completionHandler(): Unit = queue.put("")

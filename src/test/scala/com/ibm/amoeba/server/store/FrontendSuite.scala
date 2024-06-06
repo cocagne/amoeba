@@ -1,7 +1,6 @@
 package com.ibm.amoeba.server.store
 
 import java.util.UUID
-
 import com.ibm.amoeba.common.ida.Replication
 import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp}
 import com.ibm.amoeba.common.network.{Allocate, AllocateResponse, ClientId, ClientResponse, TxMessage, TxPrepare, TxResolved}
@@ -17,6 +16,8 @@ import com.ibm.amoeba.server.store.cache.SimpleLRUObjectCache
 import com.ibm.amoeba.server.transaction.TransactionStatusCache
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
+
+import scala.concurrent.Future
 
 object FrontendSuite {
 
@@ -64,6 +65,9 @@ object FrontendSuite {
     var aDrop = false
 
     override def getFullRecoveryState(storeId: StoreId): (List[TransactionRecoveryState], List[AllocationRecoveryState]) = (Nil, Nil)
+
+    override def closeStore(storeId: StoreId): Future[(List[TransactionRecoveryState], List[AllocationRecoveryState])] =
+      Future.successful((List[TransactionRecoveryState](), List[AllocationRecoveryState]()))
 
     override def save(txid: TransactionId, 
                       state: TransactionRecoveryState,

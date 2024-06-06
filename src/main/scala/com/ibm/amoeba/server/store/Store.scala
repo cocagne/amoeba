@@ -13,7 +13,7 @@ import com.ibm.amoeba.server.transaction.{TransactionDriver, TransactionFinalize
 import org.apache.logging.log4j.scala.Logging
 import com.ibm.amoeba.client.ObjectState as ClientObjectState
 
-import scala.concurrent.Promise
+import scala.concurrent.{Future, Promise}
 import scala.concurrent.duration.*
 
 class Store(val backend: Backend,
@@ -30,6 +30,8 @@ class Store(val backend: Backend,
   val frontend = new Frontend(backend.storeId, backend, objectCache, net, crl, txStatusCache)
 
   private var transactionDrivers: Map[TransactionId, TransactionDriver] = Map()
+  
+  def close(): Future[Unit] = frontend.close()
 
   def heartbeat(): Unit = {
     transactionDrivers.values.foreach { td =>

@@ -7,12 +7,14 @@ import com.ibm.amoeba.common.transaction.TransactionId
 import com.ibm.amoeba.server.store.Locater
 import org.apache.logging.log4j.scala.Logging
 
-import scala.concurrent.Promise
+import scala.concurrent.{Future, Promise}
 
 trait Backend extends Logging {
   val storeId: StoreId
 
-  def close(): Unit
+  def path: String
+  
+  def close(): Future[Unit] 
 
   def setCompletionHandler(handler: CompletionHandler): Unit
 

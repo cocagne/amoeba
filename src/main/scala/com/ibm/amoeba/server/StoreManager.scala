@@ -29,6 +29,7 @@ object StoreManager {
   case class Exit() extends Event
   case class RecoveryEvent() extends Event
   case class HeartbeatEvent() extends Event
+  case class ShutdownStore(storeId: StoreId, completion: Promise[Unit]) extends Event
 
   class IOHandler(mgr: StoreManager) extends CompletionHandler {
     override def complete(op: Completion): Unit = {
@@ -122,6 +123,12 @@ class StoreManager(val objectCacheFactory: () => ObjectCache,
     events.put(Exit())
     shutdownPromise.future
   }
+  
+  def closeStore(storeId: StoreId): Future[Unit] = {
+    val p = Promise[Unit]()
+    events.put(ShutdownStore(storeId, p))
+    p.future
+  }
 
   protected def addRecoveryEvent(): Unit = events.add(RecoveryEvent())
 
@@ -198,6 +205,16 @@ class StoreManager(val objectCacheFactory: () => ObjectCache,
       case HeartbeatEvent() =>
         //logger.trace("Main loop got heartbeat event")
         stores.valuesIterator.foreach(_.heartbeat())
+
+      case ShutdownStore(storeId, completion) =>
+        val f = stores.get(storeId) match
+          case None => Future.successful(())
+          case Some(store) => 
+            //crl.closeStore(storeId, store.path)
+            store.close()
+            
+        stores -= storeId
+        
 
       case null => // nothing to do
 
