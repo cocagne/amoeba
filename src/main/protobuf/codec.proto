@@ -481,4 +481,12 @@ message PoolConfig {
   uint32 numberOfStores = 3;
   IDA defaultIDA = 4;
   uint32 maxObjectSize = 5;
+  
+}
+
+message Host {
+  UUID hostId = 1;
+  string name = 2;
+  string address = 3;
+  uint32 port = 4;
 }

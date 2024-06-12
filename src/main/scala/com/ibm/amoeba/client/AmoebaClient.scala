@@ -31,6 +31,8 @@ trait AmoebaClient extends ObjectReader {
 
   def getStoragePool(poolId: PoolId): Future[StoragePool]
 
+  def getHost(hostId: HostId): Future[Host]
+
   def transact[T](prepare: Transaction => Future[T])(implicit ec: ExecutionContext): Future[T] = {
     val tx = newTransaction()
 

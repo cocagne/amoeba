@@ -1,9 +1,9 @@
 package com.ibm.amoeba.client.internal
 
-import com.ibm.amoeba.client.{AmoebaClient, DataObjectState, ExponentialBackoffRetryStrategy, KeyValueObjectState, ObjectCache, RetryStrategy, StoragePool, Transaction, TransactionStatusCache, TypeRegistry}
+import com.ibm.amoeba.client.{AmoebaClient, DataObjectState, ExponentialBackoffRetryStrategy, Host, HostId, KeyValueObjectState, ObjectCache, RetryStrategy, StoragePool, Transaction, TransactionStatusCache, TypeRegistry}
 import com.ibm.amoeba.client.internal.allocation.{AllocationManager, SuperSimpleAllocationDriver}
 import com.ibm.amoeba.common.objects.{DataObjectPointer, Key, KeyValueObjectPointer}
-import com.ibm.amoeba.client.internal.network.{Messenger => ClientMessenger}
+import com.ibm.amoeba.client.internal.network.Messenger as ClientMessenger
 import com.ibm.amoeba.client.internal.pool.SimpleStoragePool
 import com.ibm.amoeba.client.internal.read.{ReadManager, SimpleReadDriver}
 import com.ibm.amoeba.client.internal.transaction.{SimpleClientTransactionDriver, TransactionImpl, TransactionManager}
@@ -53,12 +53,20 @@ class SimpleAmoebaClient(val msngr: ClientMessenger,
     val root = new KVObjectRootManager(this, Nucleus.PoolTreeKey, nucleus)
     val tkvl = new TieredKeyValueList(this, root)
     for {
-      poolPtr <- tkvl.get(Key(Nucleus.poolId.uuid))
+      poolPtr <- tkvl.get(Key(poolId.uuid))
       poolKvos <- read(KeyValueObjectPointer(poolPtr.get.value.bytes))
     } yield {
       SimpleStoragePool(this, poolKvos)
     }
   }
+
+  def getHost(hostId: HostId): Future[Host] =
+    val root = new KVObjectRootManager(this, Nucleus.HostTreeKey, nucleus)
+    val tkvl = new TieredKeyValueList(this, root)
+    for
+      hostValue <- tkvl.get(Key(hostId.uuid))
+    yield
+      Host(hostValue.get.value.bytes)
 
   override def shutdown(): Unit = backgroundTasks.shutdown(Duration(50, MILLISECONDS))
 

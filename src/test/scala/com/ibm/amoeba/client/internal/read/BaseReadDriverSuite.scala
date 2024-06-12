@@ -1,11 +1,10 @@
 package com.ibm.amoeba.client.internal.read
 
 import java.util.UUID
-
 import com.ibm.amoeba.client.internal.OpportunisticRebuildManager
 import com.ibm.amoeba.client.internal.allocation.AllocationManager
 import com.ibm.amoeba.client.internal.network.Messenger
-import com.ibm.amoeba.client.{AmoebaClient, CorruptedObject, DataObjectState, InvalidObject, KeyValueObjectState, ObjectCache, RetryStrategy, StoragePool, Transaction, TransactionStatusCache, TypeRegistry}
+import com.ibm.amoeba.client.{AmoebaClient, CorruptedObject, DataObjectState, Host, HostId, InvalidObject, KeyValueObjectState, ObjectCache, RetryStrategy, StoragePool, Transaction, TransactionStatusCache, TypeRegistry}
 import com.ibm.amoeba.common.network.{ClientId, ClientResponse, ReadResponse}
 import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp}
 import com.ibm.amoeba.common.ida.Replication
@@ -14,12 +13,11 @@ import com.ibm.amoeba.common.pool.PoolId
 import com.ibm.amoeba.common.store.{StoreId, StorePointer}
 import com.ibm.amoeba.common.transaction.{TransactionDescription, TransactionId}
 import com.ibm.amoeba.common.util.BackgroundTask
-
 import org.scalatest.funsuite.AsyncFunSuite
 import org.scalatest.matchers.should.Matchers
 
 import scala.concurrent.{Await, ExecutionContext, Future}
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 object BaseReadDriverSuite {
   val awaitDuration = Duration(100, MILLISECONDS)
@@ -62,6 +60,8 @@ object BaseReadDriverSuite {
     def newTransaction(): Transaction = null
 
     def getStoragePool(poolId: PoolId): Future[StoragePool] = null
+
+    def getHost(hostId: HostId): Future[Host] = null
 
     val retryStrategy: RetryStrategy = null
 

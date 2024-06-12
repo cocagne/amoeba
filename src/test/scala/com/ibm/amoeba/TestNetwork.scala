@@ -4,7 +4,7 @@ import java.util.UUID
 import com.ibm.amoeba
 import com.ibm.amoeba.client.internal.{OpportunisticRebuildManager, StaticTypeRegistry}
 import com.ibm.amoeba.client.internal.allocation.{AllocationManager, BaseAllocationDriver}
-import com.ibm.amoeba.client.{AmoebaClient, DataObjectState, ExponentialBackoffRetryStrategy, KeyValueObjectState, ObjectCache, RetryStrategy, StoragePool, Transaction, TransactionStatusCache, TypeRegistry}
+import com.ibm.amoeba.client.{AmoebaClient, DataObjectState, ExponentialBackoffRetryStrategy, Host, HostId, KeyValueObjectState, ObjectCache, RetryStrategy, StoragePool, Transaction, TransactionStatusCache, TypeRegistry}
 import com.ibm.amoeba.client.internal.network.Messenger as ClientMessenger
 import com.ibm.amoeba.client.internal.pool.SimpleStoragePool
 import com.ibm.amoeba.client.internal.read.{BaseReadDriver, ReadManager}
@@ -108,12 +108,14 @@ object TestNetwork {
       val root = new KVObjectRootManager(this, Nucleus.PoolTreeKey, nucleus)
       val tkvl = new TieredKeyValueList(this, root)
       for {
-        poolPtr <- tkvl.get(Key(Nucleus.poolId.uuid))
+        poolPtr <- tkvl.get(Key(poolId.uuid))
         poolKvos <- read(KeyValueObjectPointer(poolPtr.get.value.bytes))
       } yield {
         SimpleStoragePool(this, poolKvos)
       }
     }
+
+    def getHost(hostId: HostId): Future[Host] = Future.successful(Host(HostId(new UUID(0,0)), "testhost", "localhost", 1234))
 
     override def shutdown(): Unit = backgroundTasks.shutdown(Duration(50, MILLISECONDS))
 

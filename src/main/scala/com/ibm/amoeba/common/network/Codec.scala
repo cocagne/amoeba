@@ -1,7 +1,7 @@
 package com.ibm.amoeba.common.network
 
 import com.google.protobuf.ByteString
-import com.ibm.amoeba.client.StoragePool
+import com.ibm.amoeba.client.{Host, HostId, StoragePool}
 import org.apache.logging.log4j.scala.Logging
 import com.ibm.amoeba.codec
 import com.ibm.amoeba.codec.ObjectReadError
@@ -1081,4 +1081,23 @@ object Codec extends Logging:
     val maxObjectSize = if m.getMaxObjectSize == 0 then None else Some(m.getMaxObjectSize)
 
     StoragePool.Config(poolId, name, numberOfStores, defaultIDA, maxObjectSize)
+
+
+  def encode(o: Host): codec.Host =
+    val builder = codec.Host.newBuilder()
+
+    builder.setHostId(encodeUUID(o.hostId.uuid))
+    builder.setName(o.name)
+    builder.setAddress(o.address)
+    builder.setPort(o.port)
+
+    builder.build
+
+  def decode(m: codec.Host): Host =
+    val hostId = HostId(decodeUUID(m.getHostId))
+    val name = m.getName
+    val address = m.getAddress
+    val port = m.getPort
+
+    Host(hostId, name, address, port)
   
