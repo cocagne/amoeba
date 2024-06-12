@@ -1,29 +1,43 @@
 package com.ibm.amoeba.client
 
 import java.util.UUID
-
 import com.ibm.amoeba.client.tkvl.TieredKeyValueList
 import com.ibm.amoeba.common.ida.IDA
+import com.ibm.amoeba.common.network.Codec
 import com.ibm.amoeba.common.objects.Key
 import com.ibm.amoeba.common.pool.PoolId
+import com.ibm.amoeba.codec
 
 object StoragePool {
   private [amoeba] val ConfigKey = Key(Array[Byte](0))
   private [amoeba] val ErrorTreeKey = Key(Array[Byte](1))
   private [amoeba] val AllocationTreeKey = Key(Array[Byte](2))
+
+  final case class Config(
+                         poolId: PoolId,
+                         name: String,
+                         numberOfStores: Int,
+                         defaultIDA: IDA,
+                         maxObjectSize: Option[Int]
+                         ):
+    def encode(): Array[Byte] = Codec.encode(this).toByteArray
+
+  object Config:
+    def apply(cfg: Array[Byte]): Config = Codec.decode(codec.PoolConfig.parseFrom(cfg))
+  
 }
 
 trait StoragePool {
 
   val poolId: PoolId
+  
+  val name: String
 
   val numberOfStores: Int
 
   val maxObjectSize: Option[Int]
 
   val defaultIDA: IDA
-
-  val allocationTreeAllocatorConfig: Option[UUID]
 
   def supportsIDA(ida: IDA): Boolean
 

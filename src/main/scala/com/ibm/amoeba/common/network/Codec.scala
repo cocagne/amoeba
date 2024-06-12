@@ -1,6 +1,7 @@
 package com.ibm.amoeba.common.network
 
 import com.google.protobuf.ByteString
+import com.ibm.amoeba.client.StoragePool
 import org.apache.logging.log4j.scala.Logging
 import com.ibm.amoeba.codec
 import com.ibm.amoeba.codec.ObjectReadError
@@ -1060,4 +1061,24 @@ object Codec extends Logging:
     AllocationRecoveryState(storeId, storePointer, newObjectId, objectType, objectSize, objectData,
       initialRefcount, timestamp, transactionId, serializedRevisionGuard)
 
+
+  def encode(o: StoragePool.Config): codec.PoolConfig =
+    val builder = codec.PoolConfig.newBuilder()
+
+    builder.setPoolId(encodeUUID(o.poolId.uuid))
+    builder.setName(o.name)
+    builder.setNumberOfStores(o.numberOfStores)
+    builder.setDefaultIDA(encode(o.defaultIDA))
+    builder.setMaxObjectSize(o.maxObjectSize.getOrElse(0))
+
+    builder.build
+
+  def decode(m: codec.PoolConfig): StoragePool.Config =
+    val poolId = PoolId(decodeUUID(m.getPoolId))
+    val name = m.getName
+    val numberOfStores = m.getNumberOfStores
+    val defaultIDA = decode(m.getDefaultIDA)
+    val maxObjectSize = if m.getMaxObjectSize == 0 then None else Some(m.getMaxObjectSize)
+
+    StoragePool.Config(poolId, name, numberOfStores, defaultIDA, maxObjectSize)
   

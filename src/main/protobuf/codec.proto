@@ -474,3 +474,11 @@ message StoreCRLEntry {
     AllocationRecoveryState ars = 2;
   }
 }
+
+message PoolConfig {
+  UUID poolId = 1;
+  string name = 2;
+  uint32 numberOfStores = 3;
+  IDA defaultIDA = 4;
+  uint32 maxObjectSize = 5;
+}

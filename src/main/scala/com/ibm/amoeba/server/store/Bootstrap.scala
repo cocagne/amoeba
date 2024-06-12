@@ -57,7 +57,7 @@ object Bootstrap {
       val errTreeRoot = allocate()
       val allocTreeRoot = allocate()
 
-      val poolConfig = SimpleStoragePool.encode(Nucleus.poolId, ida.width, ida, None, None)
+      val poolConfig = SimpleStoragePool.encode(Nucleus.poolId, "bootstrap", ida.width, ida, None)
       val errorTree = Root(0, ByteArrayKeyOrdering, Some(errTreeRoot), BootstrapPoolNodeAllocator).encode()
       val allocTree = Root(0, ByteArrayKeyOrdering, Some(allocTreeRoot), BootstrapPoolNodeAllocator).encode()
 
