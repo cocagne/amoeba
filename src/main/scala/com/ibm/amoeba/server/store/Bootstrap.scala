@@ -1,8 +1,7 @@
 package com.ibm.amoeba.server.store
 
 import java.util.UUID
-
-import com.ibm.amoeba.client.StoragePool
+import com.ibm.amoeba.client.{Host, HostId, StoragePool}
 import com.ibm.amoeba.client.internal.pool.SimpleStoragePool
 import com.ibm.amoeba.client.tkvl.{BootstrapPoolNodeAllocator, Root}
 import com.ibm.amoeba.common.{HLCTimestamp, Nucleus}
@@ -56,14 +55,19 @@ object Bootstrap {
 
       val errTreeRoot = allocate()
       val allocTreeRoot = allocate()
+      val hostsTreeRoot = allocate()
 
-      val poolConfig = SimpleStoragePool.encode(Nucleus.poolId, "bootstrap", ida.width, ida, None)
+      val storeHosts = (0 until ida.width).map(idx => HostId(new UUID(0,idx))).toArray
+
+      val poolConfig = SimpleStoragePool.encode(Nucleus.poolId, "bootstrap", ida.width, ida, storeHosts, None)
       val errorTree = Root(0, ByteArrayKeyOrdering, Some(errTreeRoot), BootstrapPoolNodeAllocator).encode()
       val allocTree = Root(0, ByteArrayKeyOrdering, Some(allocTreeRoot), BootstrapPoolNodeAllocator).encode()
+      val hostsTree = Root(0, ByteArrayKeyOrdering, Some(hostsTreeRoot), BootstrapPoolNodeAllocator).encode()
 
       val pool = allocate(List(StoragePool.ConfigKey -> poolConfig,
                                StoragePool.ErrorTreeKey -> errorTree,
-                               StoragePool.AllocationTreeKey -> allocTree))
+                               StoragePool.AllocationTreeKey -> allocTree,
+                               StoragePool.HostsTreeKey -> hostsTree))
 
       val poolTreeRoot = allocate(List(Key(Nucleus.poolId.uuid) -> pool.toArray))
       val poolTree = Root(0,
@@ -80,6 +84,7 @@ object Bootstrap {
         Key(allocTreeRoot.id.uuid) -> allocTreeRoot.toArray,
         Key(pool.id.uuid) -> pool.toArray,
         Key(poolTreeRoot.id.uuid) -> poolTreeRoot.toArray,
+        Key(hostsTreeRoot.id.uuid) -> hostsTreeRoot.toArray,
         Key(nucleus.id.uuid) -> nucleus.toArray
       ))
 

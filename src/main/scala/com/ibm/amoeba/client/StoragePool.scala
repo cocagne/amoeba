@@ -12,25 +12,27 @@ object StoragePool {
   private [amoeba] val ConfigKey = Key(Array[Byte](0))
   private [amoeba] val ErrorTreeKey = Key(Array[Byte](1))
   private [amoeba] val AllocationTreeKey = Key(Array[Byte](2))
+  private [amoeba] val HostsTreeKey = Key(Array[Byte](3))
 
   final case class Config(
                          poolId: PoolId,
                          name: String,
                          numberOfStores: Int,
                          defaultIDA: IDA,
-                         maxObjectSize: Option[Int]
+                         maxObjectSize: Option[Int],
+                         storeHosts: Array[HostId]
                          ):
     def encode(): Array[Byte] = Codec.encode(this).toByteArray
 
   object Config:
     def apply(cfg: Array[Byte]): Config = Codec.decode(codec.PoolConfig.parseFrom(cfg))
-  
+
 }
 
 trait StoragePool {
 
   val poolId: PoolId
-  
+
   val name: String
 
   val numberOfStores: Int
@@ -38,6 +40,8 @@ trait StoragePool {
   val maxObjectSize: Option[Int]
 
   val defaultIDA: IDA
+
+  val storeHosts: Array[HostId]
 
   def supportsIDA(ida: IDA): Boolean
 

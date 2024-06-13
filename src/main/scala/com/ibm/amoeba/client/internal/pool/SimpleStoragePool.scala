@@ -2,10 +2,9 @@ package com.ibm.amoeba.client.internal.pool
 
 import java.nio.{ByteBuffer, ByteOrder}
 import java.util.UUID
-
 import com.ibm.amoeba.client.internal.allocation.SinglePoolObjectAllocator
 import com.ibm.amoeba.client.tkvl.{KVObjectRootManager, TieredKeyValueList}
-import com.ibm.amoeba.client.{AmoebaClient, KeyValueObjectState, ObjectAllocator, StoragePool}
+import com.ibm.amoeba.client.{AmoebaClient, HostId, KeyValueObjectState, ObjectAllocator, StoragePool}
 import com.ibm.amoeba.common.ida.IDA
 import com.ibm.amoeba.common.pool.PoolId
 
@@ -15,9 +14,10 @@ object SimpleStoragePool {
              name: String,
              numberOfStores: Int,
              defaultIDA: IDA,
+             storeHosts: Array[HostId],
              maxObjectSize: Option[Int]): Array[Byte] = {
-    StoragePool.Config(poolId, name, numberOfStores, defaultIDA, maxObjectSize).encode()
-    
+    StoragePool.Config(poolId, name, numberOfStores, defaultIDA, maxObjectSize, storeHosts).encode()
+
   }
 
   def apply(client: AmoebaClient, kvos: KeyValueObjectState): SimpleStoragePool = {
@@ -30,7 +30,7 @@ object SimpleStoragePool {
     val errorTree = new TieredKeyValueList(client,
       new KVObjectRootManager(client, StoragePool.ErrorTreeKey, kvos.pointer))
 
-    new SimpleStoragePool(client, cfg.poolId, cfg.name, cfg.numberOfStores, cfg.defaultIDA, cfg.maxObjectSize,
+    new SimpleStoragePool(client, cfg.poolId, cfg.name, cfg.numberOfStores, cfg.defaultIDA, cfg.storeHosts, cfg.maxObjectSize,
       allocTree, errorTree)
   }
 }
@@ -40,6 +40,7 @@ class SimpleStoragePool(val client: AmoebaClient,
                         val name: String,
                         val numberOfStores: Int,
                         val defaultIDA: IDA,
+                        val storeHosts: Array[HostId],
                         val maxObjectSize: Option[Int],
                         val allocationTree: TieredKeyValueList,
                         val errorTree: TieredKeyValueList) extends StoragePool {

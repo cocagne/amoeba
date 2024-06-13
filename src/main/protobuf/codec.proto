@@ -481,7 +481,7 @@ message PoolConfig {
   uint32 numberOfStores = 3;
   IDA defaultIDA = 4;
   uint32 maxObjectSize = 5;
-  
+  repeated UUID storeHosts = 6;
 }
 
 message Host {
