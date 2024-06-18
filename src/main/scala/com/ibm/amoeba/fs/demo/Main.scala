@@ -5,7 +5,7 @@ import java.nio.file.{Files, Path, Paths}
 import java.util.concurrent.Executors
 import com.ibm.amoeba.AmoebaError
 import com.ibm.amoeba.client.KeyValueObjectState.ValueState
-import com.ibm.amoeba.client.{AmoebaClient, DataObjectState, KeyValueObjectState, MetadataObjectState, ObjectAllocator, ObjectState, StoragePool}
+import com.ibm.amoeba.client.{AmoebaClient, DataObjectState, Host, HostId, KeyValueObjectState, MetadataObjectState, ObjectAllocator, ObjectState, StoragePool}
 import com.ibm.amoeba.client.internal.SimpleAmoebaClient
 import com.ibm.amoeba.client.internal.allocation.SinglePoolObjectAllocator
 import com.ibm.amoeba.client.tkvl.{KVObjectRootManager, KeyValueListNode, Root, SinglePoolNodeAllocator, TieredKeyValueList}
@@ -238,6 +238,10 @@ object Main {
                          onnet: Option[(NetworkBridge, ZMQNetwork)]=None): (AmoebaClient, ZMQNetwork, KeyValueObjectPointer) = {
     val nucleus = cfg.onucleus.getOrElse(throw new ConfigError("Nucleus Pointer is missing from the config file!"))
 
+    val hosts = cfg.nodes.map: (name, h) =>
+      HostId(h.uuid) -> Host(HostId(h.uuid), name, h.endpoint.host, h.endpoint.port)
+
+
     val (networkBridge, nnet) = onnet.getOrElse(createNetwork(cfg, None, None))
 
     val txStatusCacheDuration = Duration(10, SECONDS)
@@ -254,7 +258,8 @@ object Main {
       initialReadDelay,
       maxReadDelay,
       txRetransmitDelay,
-      allocationRetransmitDelay), nnet, nucleus)
+      allocationRetransmitDelay,
+      hosts),  nnet, nucleus)
 
     networkBridge.oclient = Some(ret._1)
 

@@ -24,7 +24,8 @@ class SimpleAmoebaClient(val msngr: ClientMessenger,
                          initialReadDelay: Duration,
                          maxReadDelay: Duration,
                          txRetransmitDelay: Duration,
-                         allocationRetransmitDelay: Duration) extends AmoebaClient {
+                         allocationRetransmitDelay: Duration,
+                         bootstrapHosts: Map[HostId, Host]) extends AmoebaClient {
 
   var attributes: Map[String, String] = Map()
 
@@ -61,6 +62,10 @@ class SimpleAmoebaClient(val msngr: ClientMessenger,
   }
 
   def getHost(hostId: HostId): Future[Host] =
+    bootstrapHosts.get(hostId) match
+      case Some(host) => return Future.successful(host)
+      case None =>
+
     val root = new KVObjectRootManager(this, Nucleus.HostTreeKey, nucleus)
     val tkvl = new TieredKeyValueList(this, root)
     for
