@@ -9,12 +9,12 @@ import com.ibm.amoeba.client.{AmoebaClient, DataObjectState, Host, HostId, KeyVa
 import com.ibm.amoeba.client.internal.SimpleAmoebaClient
 import com.ibm.amoeba.client.internal.allocation.SinglePoolObjectAllocator
 import com.ibm.amoeba.client.tkvl.{KVObjectRootManager, KeyValueListNode, Root, SinglePoolNodeAllocator, TieredKeyValueList}
-import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp}
+import com.ibm.amoeba.common.{DataBuffer, HLCTimestamp, Nucleus}
 import com.ibm.amoeba.common.ida.{ReedSolomon, Replication}
 import com.ibm.amoeba.common.network.{ClientId, ClientRequest, ClientResponse, TxMessage}
 import com.ibm.amoeba.common.objects.{ByteArrayKeyOrdering, DataObjectPointer, Insert, Key, KeyValueObjectPointer, LexicalKeyOrdering, Metadata, ObjectId, ObjectPointer, ObjectRevisionGuard, ObjectType, Value}
 import com.ibm.amoeba.common.pool.PoolId
-import com.ibm.amoeba.common.store.StoreId
+import com.ibm.amoeba.common.store.{StoreId, StorePointer}
 import com.ibm.amoeba.common.transaction.KeyValueUpdate
 import com.ibm.amoeba.common.transaction.KeyValueUpdate.{DoesNotExist, KeyRequirement}
 import com.ibm.amoeba.common.util.{BackgroundTaskPool, YamlFormat}
@@ -86,7 +86,8 @@ object Main {
   val AmoebafsKey: Key = Key("amoeba")
 
   case class Args(mode:String="",
-                  configFile:File=null,
+                  nodeConfigFile:File=null,
+                  bootstrapConfigFile:File=null,
                   log4jConfigFile: File=null,
                   nodeName:String="",
                   storeName:String="",
@@ -124,17 +125,17 @@ object Main {
       cmd("bootstrap").text("Bootstrap a new Amoeba system").
         action( (_,c) => c.copy(mode="bootstrap")).
         children(
-          arg[File]("<config-file>").text("Configuration File").
-            action( (x, c) => c.copy(configFile=x)).
-            validate( x => if (x.exists()) success else failure(s"Config file does not exist: $x"))
+          arg[File]("<bootstrap-config-file>").text("Bootstrap Configuration File").
+            action( (x, c) => c.copy(bootstrapConfigFile=x)).
+            validate( x => if (x.exists()) success else failure(s"Bootstrap Config file does not exist: $x"))
         )
 
       cmd("debug").text("Runs debugging code").
         action((_, c) => c.copy(mode = "debug")).
         children(
-          arg[File]("<config-file>").text("Configuration File").
-            action((x, c) => c.copy(configFile = x)).
-            validate(x => if (x.exists()) success else failure(s"Config file does not exist: $x")),
+          arg[File]("<bootstrap-config-file>").text("Bootstrap Configuration File").
+            action((x, c) => c.copy(bootstrapConfigFile = x)).
+            validate(x => if (x.exists()) success else failure(s"Bootstrap Config file does not exist: $x")),
 
           arg[File]("<log4j-config-file>").text("Log4j Configuration File").
             action( (x, c) => c.copy(log4jConfigFile=x)).
@@ -144,18 +145,21 @@ object Main {
       cmd("node").text("Starts an Amoeba Storage Node").
         action( (_,c) => c.copy(mode="node")).
         children(
-          arg[File]("<config-file>").text("Configuration File").
-            action( (x, c) => c.copy(configFile=x)).
-            validate( x => if (x.exists()) success else failure(s"Config file does not exist: $x")),
+          arg[File]("<bootstrap-config-file>").text("Bootstrap Configuration File").
+            action( (x, c) => c.copy(bootstrapConfigFile=x)).
+            validate( x => if (x.exists()) success else failure(s"Bootstrap Config file does not exist: $x")),
 
-          arg[String]("<node-name>").text("Storage Node Name").action((x,c) => c.copy(nodeName=x))
+          //arg[String]("<node-name>").text("Storage Node Name").action((x,c) => c.copy(nodeName=x))
+          arg[File]("<node-config-file>").text("Node Configuration File").
+            action( (x, c) => c.copy(nodeConfigFile=x)).
+            validate( x => if (x.exists()) success else failure(s"Node Config file does not exist: $x"))
         )
 
       cmd("nfs").text("Launches a Amoeba NFS server").
         action( (_,c) => c.copy(mode="amoeba")).
         children(
-          arg[File]("<config-file>").text("Amoeba Configuration File").
-            action( (x, c) => c.copy(configFile=x)).
+          arg[File]("<bootstrap-config-file>").text("Bootstrap Configuration File").
+            action( (x, c) => c.copy(bootstrapConfigFile=x)).
             validate( x => if (x.exists()) success else failure(s"Config file does not exist: $x")),
 
           arg[File]("<log4j-config-file>").text("Log4j Configuration File").
@@ -170,11 +174,11 @@ object Main {
             action( (x, c) => c.copy(log4jConfigFile=x)).
             validate( x => if (x.exists()) success else failure(s"Log4j Config file does not exist: $x")),
 
-          arg[File]("<config-file>").text("Configuration File").
-            action( (x, c) => c.copy(configFile=x)).
+          arg[File]("<bootstrap-config-file>").text("Bootstrap Configuration File").
+            action( (x, c) => c.copy(bootstrapConfigFile=x)).
             validate( x => if (x.exists()) success else failure(s"Config file does not exist: $x")),
 
-          arg[String]("<store-name>").text("Data Store Name. Format is \"pool-name:storeNumber\"").
+          arg[String]("<store-identifier>").text("Data Store Identifier. Format is \"pool-uuid:storeNumber\"").
             action((x,c) => c.copy(storeName=x)).
             validate { x =>
               val arr = x.split(":")
@@ -197,15 +201,15 @@ object Main {
       case Some(cfg) =>
         //
         try {
-          val config = ConfigFile.loadConfig(cfg.configFile)
+          val bootstrapConfig = BootstrapConfig.loadBootstrapConfig(cfg.bootstrapConfigFile)
           println(s"Successful config: $cfg")
           //println(s"Config file: $config")
           cfg.mode match {
-            case "bootstrap" => bootstrap(config)
-            case "node" => node(cfg.nodeName, config)
-            case "amoeba" => amoeba_server(cfg.log4jConfigFile, config)
-            case "debug" => run_debug_code(cfg.log4jConfigFile, config)
-            case "rebuild" => rebuild(cfg.log4jConfigFile, cfg.storeName, config)
+            case "bootstrap" => bootstrap(bootstrapConfig, Paths.get("local/bootstrap"))
+            case "node" => node(cfg.nodeName, bootstrapConfig, StorageNodeConfig.loadStorageNode(cfg.nodeConfigFile))
+            case "amoeba" => amoeba_server(cfg.log4jConfigFile, bootstrapConfig)
+            case "debug" => run_debug_code(cfg.log4jConfigFile, bootstrapConfig)
+            case "rebuild" => rebuild(cfg.log4jConfigFile, cfg.storeName, bootstrapConfig)
           }
         } catch {
           case e: YamlFormat.FormatError => println(s"Error loading config file: $e")
@@ -215,18 +219,15 @@ object Main {
     }
   }
 
-  def createNetwork(cfg:ConfigFile.Config,
+  def createNetwork(cfg:BootstrapConfig.Config,
                     storageNode: Option[(String, String, Int)],
                     oclientId: Option[ClientId]): (NetworkBridge, ZMQNetwork) = {
     val b = new NetworkBridge
-    val nodes = cfg.nodes.map(ds => ds._2.name -> (ds._2.endpoint.host, ds._2.endpoint.port))
-    val stores = cfg.nodes.flatMap { t =>
-      val (nodeName, node) = t
-      node.stores.map { ds =>
-        val poolUUID = cfg.pools(ds.pool).uuid
-        StoreId(PoolId(poolUUID), ds.store.asInstanceOf[Byte]) -> nodeName
-      }
-    }
+    val nodes = cfg.nodes.map(ds => ds.name -> (ds.host, ds.port)).toMap
+    val stores = cfg.nodes.zipWithIndex.map { (node, index) =>
+      StoreId(PoolId(new UUID(0,0)), index.toByte) -> node.name
+    }.toMap
+
     val heartbeatPeriod = Duration(5, SECONDS)
     (b, new ZMQNetwork(oclientId, nodes, stores, storageNode, heartbeatPeriod,
       b.onClientResponseReceived,
@@ -234,13 +235,12 @@ object Main {
       b.onTransactionMessageReceived))
   }
 
-  def createAmoebaClient(cfg: ConfigFile.Config,
+  def createAmoebaClient(cfg: BootstrapConfig.Config,
                          onnet: Option[(NetworkBridge, ZMQNetwork)]=None): (AmoebaClient, ZMQNetwork, KeyValueObjectPointer) = {
-    val nucleus = cfg.onucleus.getOrElse(throw new ConfigError("Nucleus Pointer is missing from the config file!"))
 
-    val hosts = cfg.nodes.map: (name, h) =>
-      HostId(h.uuid) -> Host(HostId(h.uuid), name, h.endpoint.host, h.endpoint.port)
-
+    val hosts = cfg.nodes.zipWithIndex.map { (node, index) =>
+      HostId(new UUID(0, index)) -> Host(HostId(new UUID(0, index)), node.name, node.host, node.port)
+    }.toMap
 
     val (networkBridge, nnet) = onnet.getOrElse(createNetwork(cfg, None, None))
 
@@ -252,6 +252,9 @@ object Main {
 
     val sched = Executors.newScheduledThreadPool(3)
     val ec: ExecutionContext = ExecutionContext.fromExecutorService(sched)
+
+    val nucleus = KeyValueObjectPointer(Nucleus.objectId, Nucleus.poolId, None,
+      cfg.bootstrapIDA, (0 until cfg.bootstrapIDA.width).map(idx => StorePointer(idx.toByte, Array())).toArray)
 
     val ret = (new SimpleAmoebaClient(nnet.clientMessenger, nnet.clientId, ec, nucleus,
       txStatusCacheDuration,
@@ -290,7 +293,7 @@ object Main {
     client.read(nucleus).flatMap(loadFileSystem)
   }
 
-  def OLD_run_debug_code(log4jConfigFile: File, cfg: ConfigFile.Config): Unit = {
+  def OLD_run_debug_code(log4jConfigFile: File, cfg: BootstrapConfig.Config): Unit = {
     println(s"LOG4J CONFIG $log4jConfigFile")
     setLog4jConfigFile(log4jConfigFile)
 
@@ -343,7 +346,7 @@ object Main {
       ()
   }
 
-  def run_debug_code(log4jConfigFile: File, cfg: ConfigFile.Config): Unit = {
+  def run_debug_code(log4jConfigFile: File, cfg: BootstrapConfig.Config): Unit = {
     println(s"LOG4J CONFIG $log4jConfigFile")
     setLog4jConfigFile(log4jConfigFile)
 
@@ -407,7 +410,7 @@ object Main {
       ()
   }
 
-  def amoeba_server(log4jConfigFile: File, cfg: ConfigFile.Config): Unit = {
+  def amoeba_server(log4jConfigFile: File, cfg: BootstrapConfig.Config): Unit = {
     println(s"LOG4J CONFIG $log4jConfigFile")
     setLog4jConfigFile(log4jConfigFile)
 
@@ -542,36 +545,30 @@ object Main {
         }
 
 
-  def node(nodeName: String, cfg: ConfigFile.Config): Unit = {
+  def node(nodeName: String,
+           bootstrapCfg: BootstrapConfig.Config,
+           nodeCfg: StorageNodeConfig.StorageNode): Unit = {
 
     val sched = Executors.newScheduledThreadPool(3)
     implicit val ec: ExecutionContext = ExecutionContext.fromExecutorService(sched)
 
-    val node = cfg.nodes.getOrElse(nodeName, throw new ConfigError(s"Invalid node name $nodeName"))
+    setLog4jConfigFile(nodeCfg.log4jConfigFile)
 
-    setLog4jConfigFile(node.log4jConfigFile)
-
-    val simpleCrl = node.crl match {
-      case b: ConfigFile.SimpleCRL => SimpleCRL.Factory(Paths.get(b.path), b.numStreams, b.fileSizeMb * 1024 * 1024)
-    }
-
-    val stores = node.stores.map { s =>
-      val storeId = StoreId(PoolId(cfg.pools(s.pool).uuid), s.store.asInstanceOf[Byte])
-
-      s.backend match {
-        case b: ConfigFile.RocksDB =>
-          println(s"Creating data store $storeId. Path ${b.path}")
-          new RocksDBBackend(b.path, storeId, ec)
-      }
+    val simpleCrl = nodeCfg.crl match {
+      case b: StorageNodeConfig.SimpleCRL =>
+        val crlRoot = Paths.get(s"${nodeCfg.rootDir}/crl")
+        if ! Files.exists(crlRoot) then
+          mkdirectory(crlRoot)
+        SimpleCRL.Factory(crlRoot, b.numStreams, b.fileSizeMb * 1024 * 1024)
     }
 
     val objectCacheFactory = () => new SimpleLRUObjectCache(100)
 
-    val nodeEndpoint = Some(node.name, node.endpoint.host, node.endpoint.port)
+    val nodeEndpoint = Some(nodeCfg.name, nodeCfg.endpoint.host, nodeCfg.endpoint.port)
 
-    val (networkBridge, nnet) = createNetwork(cfg, nodeEndpoint, None)
+    val (networkBridge, nnet) = createNetwork(bootstrapCfg, nodeEndpoint, None)
 
-    val (client, network, _) = createAmoebaClient(cfg, Some((networkBridge, nnet)))
+    val (client, network, _) = createAmoebaClient(bootstrapCfg, Some((networkBridge, nnet)))
 
     networkBridge.oclient = Some(client)
 
@@ -586,6 +583,8 @@ object Main {
     val nodeNet = nnet.serverMessenger
 
     val storeManager = new StoreManager(
+      nodeCfg.rootDir,
+      ec,
       objectCacheFactory,
       nodeNet,
       new BackgroundTaskPool,
@@ -593,7 +592,6 @@ object Main {
       txFinalizerFactory,
       SimpleTransactionDriver.factory(txRetryDelay, txRetryCap),
       txHeartbeatPeriod,
-      stores
     ) with SimpleDriverRecoveryMixin
 
     networkBridge.onode = Some(storeManager)
@@ -616,40 +614,28 @@ object Main {
     Files.createDirectories(p)
   }
 
-  def bootstrap(cfg: ConfigFile.Config): Unit = {
-
-    //if (cfg.onucleus.isDefined)
-    //  throw new ConfigError("Nucleus Pointer is defined. Bootstrap process is already complete!")
+  def bootstrap(cfg: BootstrapConfig.Config, storesDir: Path): Unit = {
 
     val sched = Executors.newScheduledThreadPool(1)
     implicit val ec: ExecutionContext = ExecutionContext.fromExecutorService(sched)
 
-    val bootstrapStores = cfg.nodes.values.flatMap(n => n.stores).map { s =>
+    val bootstrapStores = cfg.nodes.zipWithIndex.map: (node, poolIndex) =>
 
-      val poolIndex: Byte = s.store.asInstanceOf[Byte]
-      val dataStoreId = StoreId(PoolId(cfg.pools(s.pool).uuid), poolIndex)
+      val dataStoreId = StoreId(PoolId(new UUID(0,0)), poolIndex.toByte)
 
-      s.backend match {
-        case b: ConfigFile.RocksDB =>
-          println(s"Creating data store $dataStoreId. Path ${b.path}")
-          // Ensure parent directory exists
-          mkdirectory(Paths.get(b.path).getParent)
-          new RocksDBBackend(b.path, dataStoreId, ec)
-      }
-    }.toList.filter( backend =>
-      // Create all stores but filter this list down to just the bootstrap-pool for Bootstrap process
-      backend.storeId.poolId.uuid.getMostSignificantBits == 0 &&
-      backend.storeId.poolId.uuid.getLeastSignificantBits == 0)
+      val storeRoot = storesDir.resolve(s"${dataStoreId.poolId}:$poolIndex")
 
-    cfg.nodes.values.foreach { n =>
-      n.crl match {
-        case s: ConfigFile.SimpleCRL => mkdirectory(Paths.get(s.path))
-      }
-    }
+      println(s"Creating data store $dataStoreId. Path $storeRoot")
+      mkdirectory(storeRoot)
+      Files.writeString(storeRoot.resolve("store_config.yaml"),
+      s"""
+          |pool-uuid: "00000000-0000-0000-0000-000000000000"
+          |store-index: $poolIndex,
+          |backend: "rocksdb"
+          |""".stripMargin)
+      new RocksDBBackend(storeRoot.toString, dataStoreId, ec)
 
-    val bootstrapPoolIDA = cfg.allocaters("bootstrap-allocater").ida
-
-    val nucleus = Bootstrap.initialize(bootstrapPoolIDA, bootstrapStores)
+    val nucleus = Bootstrap.initialize(cfg.bootstrapIDA, bootstrapStores)
 
     // Print yaml representation of Radicle Pointer
     println("# NHucleus Pointer Definition")
@@ -675,7 +661,7 @@ object Main {
     sched.shutdownNow()
   }
 
-  def rebuild(log4jConfigFile: File, storeName: String, cfg: ConfigFile.Config): Unit = {
+  def rebuild(log4jConfigFile: File, storeName: String, cfg: BootstrapConfig.Config): Unit = {
 
     setLog4jConfigFile(log4jConfigFile)
 
@@ -691,22 +677,23 @@ object Main {
     implicit val ec: ExecutionContext = client.clientContext
 
     val arr = storeName.split(":")
-    val poolName = arr(0)
+    val poolUuid = UUID.fromString(arr(0))
     val storeIndex = Integer.parseInt(arr(1))
 
     var store: Backend = null
     var poolId: PoolId = PoolId(new UUID(0,0))
     var storeId: StoreId = StoreId(poolId, 0.toByte)
 
-    cfg.nodes.foreach: (_, node) =>
-      node.stores.foreach: s =>
-        if s.pool == poolName && storeIndex == s.store then
-          poolId = PoolId(cfg.pools(s.pool).uuid)
-          storeId = StoreId(poolId, s.store.asInstanceOf[Byte])
-          s.backend match {
-            case b: ConfigFile.RocksDB =>
-              println(s"Rebuilding data store ${poolName}:${storeIndex}. Path ${b.path}")
-              store = new RocksDBBackend(b.path, storeId, ec)
+    cfg.nodes.zipWithIndex.foreach: (node, index) =>
+      Path.of(s"local/${node.name}/stores").toFile.listFiles.toList.foreach: storeFn =>
+        val cfg = StoreConfig.loadStore(storeFn.toPath.resolve("store_config.yaml").toFile)
+        if poolUuid == cfg.poolUuid && storeIndex == cfg.index then
+          poolId = PoolId(cfg.poolUuid)
+          storeId = StoreId(poolId, cfg.index.toByte)
+          cfg.backend match {
+            case b: StoreConfig.RocksDB =>
+              println(s"Rebuilding data store $poolUuid:$storeIndex. Path $storeFn")
+              store = new RocksDBBackend(storeFn.toString, storeId, ec)
           }
 
     assert(store != null)

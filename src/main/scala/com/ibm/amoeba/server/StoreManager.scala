@@ -4,9 +4,11 @@ import com.ibm.amoeba.client.ObjectState as ClientObjectState
 
 import java.util.concurrent.{Executors, LinkedBlockingQueue, TimeUnit}
 import com.ibm.amoeba.common.network.*
+import com.ibm.amoeba.common.pool.PoolId
 import com.ibm.amoeba.common.store.StoreId
 import com.ibm.amoeba.common.transaction.TransactionStatus
 import com.ibm.amoeba.common.util.BackgroundTask
+import com.ibm.amoeba.fs.demo.{StorageNodeConfig, StoreConfig}
 import com.ibm.amoeba.server.crl.CrashRecoveryLogFactory
 import com.ibm.amoeba.server.network.Messenger
 import com.ibm.amoeba.server.store.backend.{Backend, Completion, CompletionHandler}
@@ -14,8 +16,11 @@ import com.ibm.amoeba.server.store.cache.ObjectCache
 import com.ibm.amoeba.server.store.{Frontend, Store}
 import com.ibm.amoeba.server.transaction.{TransactionDriver, TransactionFinalizer, TransactionStatusCache}
 import org.apache.logging.log4j.scala.Logging
+import com.ibm.amoeba.server.store.backend.{Backend, RocksDBBackend}
 
-import scala.concurrent.duration._
+import java.io.File
+import java.nio.file.{Files, Path}
+import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
 object StoreManager {
@@ -39,14 +44,15 @@ object StoreManager {
   
 }
 
-class StoreManager(val objectCacheFactory: () => ObjectCache,
+class StoreManager(val rootDir: Path,
+                   implicit val ec: ExecutionContext,
+                   val objectCacheFactory: () => ObjectCache,
                    val net: Messenger,
                    val backgroundTasks: BackgroundTask,
                    crlFactory: CrashRecoveryLogFactory,
                    val finalizerFactory: TransactionFinalizer.Factory,
                    val txDriverFactory: TransactionDriver.Factory,
-                   val heartbeatPeriod: Duration,
-                   initialBackends: List[Backend]) extends Logging {
+                   val heartbeatPeriod: Duration) extends Logging {
   import StoreManager._
 
   private val events = new LinkedBlockingQueue[Event]()
@@ -80,17 +86,24 @@ class StoreManager(val objectCacheFactory: () => ObjectCache,
     events.put(HeartbeatEvent())
   }
 
-  protected var stores: Map[StoreId, Store] = initialBackends.map { backend =>
-    backend.setCompletionHandler(op => {
-      logger.trace(s"Backend completed operation: $op")
-      events.add(IOCompletion(op))
-    })
+  protected var stores: Map[StoreId, Store] = Map()
+  
+  rootDir.toFile.listFiles().toList.filter(fn => Files.exists(fn.toPath.resolve("store_config.yaml"))).foreach: fn =>
+    loadStoreFromPath(fn.toPath)
+  
+  protected def loadStoreFromPath(storePath: Path): Unit =
+    val cfg = StoreConfig.loadStore(storePath.resolve("store_config.yaml").toFile)
 
-    val store = new Store(backend, objectCacheFactory(), net, backgroundTasks, crl,
-      txStatusCache, finalizerFactory, txDriverFactory, heartbeatPeriod*8)
+    val storeId = StoreId(PoolId(cfg.poolUuid), cfg.index.asInstanceOf[Byte])
 
-    backend.storeId -> store
-  }.toMap
+    val backend = cfg.backend match {
+      case b: StoreConfig.RocksDB =>
+        println(s"Creating data store $storeId. Path $storePath")
+        new RocksDBBackend(storePath.toString, storeId, ec)
+    }
+    
+    loadStore(backend)
+    
 
   def getStoreIds: List[StoreId] = synchronized {
     stores.keysIterator.toList

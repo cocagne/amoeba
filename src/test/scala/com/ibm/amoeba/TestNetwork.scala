@@ -26,6 +26,7 @@ import com.ibm.amoeba.server.store.backend.MapBackend
 import com.ibm.amoeba.server.store.cache.SimpleLRUObjectCache
 import com.ibm.amoeba.server.transaction.{TransactionDriver, TransactionFinalizer}
 
+import java.nio.file.Path
 import scala.concurrent.duration.{Duration, MILLISECONDS, SECONDS}
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
@@ -180,10 +181,15 @@ class TestNetwork extends ServerMessenger {
     }
   }
 
-  val smgr = new StoreManager(objectCacheFactory, this, BackgroundTask.NoBackgroundTasks,
+  val smgr = new StoreManager(Path.of("/"),
+    scala.concurrent.ExecutionContext.Implicits.global,
+    objectCacheFactory, this, BackgroundTask.NoBackgroundTasks,
     TestCRL, FinalizerFactory, TransactionDriver.noErrorRecoveryFactory,
-    Duration(5, SECONDS),
-    List(store0, store1, store2))
+    Duration(5, SECONDS))
+  
+  smgr.loadStore(store0)
+  smgr.loadStore(store1)
+  smgr.loadStore(store2)
 
   def handleEvents(): Unit = synchronized {
     smgr.handleEvents()

@@ -24,7 +24,7 @@ sudo launchctl start com.apple.rpcbind
 
 sbt compile && rm -r local/node_* && ./t bootstrap local/cfg.yaml
 
-./t node local/t.yaml node_a
+./t node local/bootstrap_config.yaml local/node_a.yaml
 
 ./t  nfs local/t.yaml local/amoeba-log4j.yaml
 
@@ -68,6 +68,9 @@ exec java -cp $CLASSPATH com.ibm.aspen.demo.Main "$@"
 ---------------------------------------------------------------------------
 - TODO
 -
+Load CRL entries if backend.rootDir/crl_save.log exists
+    - Delete file after write to system CRL completes
+
 AllocateResponse
     - Add error string to message on failure
     - Handle allocation failure
