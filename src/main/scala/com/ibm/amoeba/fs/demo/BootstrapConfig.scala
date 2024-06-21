@@ -8,6 +8,26 @@ import com.ibm.amoeba.common.util.YamlFormat._
 import org.yaml.snakeyaml.Yaml
 import org.yaml.snakeyaml.constructor.SafeConstructor
 
+/*
+bootstrap-ida:
+      type: replication
+      width: 3
+      write-threshold: 2
+
+bootstrap-storage-nodes:
+  - name: node_a
+    host: 127.0.0.1
+    port: 5000
+
+  - name: node_b
+    host: 127.0.0.1
+    port: 5001
+
+  - name: node_c
+    host: 127.0.0.1
+    port: 5002
+*/
+
 object BootstrapConfig {
 
   object ReplicationFormat extends YObject[IDA]:

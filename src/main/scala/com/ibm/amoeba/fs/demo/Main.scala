@@ -623,15 +623,16 @@ object Main {
 
       val dataStoreId = StoreId(PoolId(new UUID(0,0)), poolIndex.toByte)
 
-      val storeRoot = storesDir.resolve(s"${dataStoreId.poolId}:$poolIndex")
+      val storeRoot = storesDir.resolve(s"${dataStoreId.poolId.uuid}:$poolIndex")
 
       println(s"Creating data store $dataStoreId. Path $storeRoot")
       mkdirectory(storeRoot)
       Files.writeString(storeRoot.resolve("store_config.yaml"),
       s"""
           |pool-uuid: "00000000-0000-0000-0000-000000000000"
-          |store-index: $poolIndex,
-          |backend: "rocksdb"
+          |store-index: $poolIndex
+          |backend:
+          |  storage-engine: rocksdb
           |""".stripMargin)
       new RocksDBBackend(storeRoot.toString, dataStoreId, ec)
 

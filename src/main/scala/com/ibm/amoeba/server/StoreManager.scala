@@ -88,17 +88,19 @@ class StoreManager(val rootDir: Path,
 
   protected var stores: Map[StoreId, Store] = Map()
   
-  rootDir.toFile.listFiles().toList.filter(fn => Files.exists(fn.toPath.resolve("store_config.yaml"))).foreach: fn =>
+  rootDir.resolve("stores").toFile.listFiles().toList.filter{ fn =>
+    Files.exists(fn.toPath.resolve("store_config.yaml"))
+  }.foreach: fn =>
     loadStoreFromPath(fn.toPath)
   
   protected def loadStoreFromPath(storePath: Path): Unit =
+    logger.info(s"Loading store $storePath")
     val cfg = StoreConfig.loadStore(storePath.resolve("store_config.yaml").toFile)
 
     val storeId = StoreId(PoolId(cfg.poolUuid), cfg.index.asInstanceOf[Byte])
 
     val backend = cfg.backend match {
       case b: StoreConfig.RocksDB =>
-        println(s"Creating data store $storeId. Path $storePath")
         new RocksDBBackend(storePath.toString, storeId, ec)
     }
     

@@ -7,8 +7,24 @@ import com.ibm.amoeba.common.util.YamlFormat._
 import org.yaml.snakeyaml.Yaml
 import org.yaml.snakeyaml.constructor.SafeConstructor
 
+/*
+pool-uuid: "00000000-0000-0000-0000-000000000000"
+store-index: 0
+backend:
+  storage-engine: rocksdb
+*/
 
 object StoreConfig {
+
+  sealed abstract class StorageBackend
+
+  case class RocksDB() extends StorageBackend
+
+  object RocksDB extends YObject[RocksDB]:
+    val attrs: List[Attr] = Nil
+
+    def create(o: Object): RocksDB = RocksDB()
+
 
   case class Store(poolUuid: UUID, index: Int, backend: StorageBackend)
 
@@ -20,16 +36,6 @@ object StoreConfig {
     val attrs: List[Attr] = poolUuid :: storeIndex :: backend :: Nil
 
     def create(o: Object): Store = Store(poolUuid.get(o), storeIndex.get(o), backend.get(o))
-
-
-  sealed abstract class StorageBackend
-
-  case class RocksDB() extends StorageBackend
-
-  object RocksDB extends YObject[RocksDB]:
-    val attrs: List[Attr] = Nil
-
-    def create(o: Object): RocksDB = RocksDB()
 
 
   def loadStore(file: File): Store =

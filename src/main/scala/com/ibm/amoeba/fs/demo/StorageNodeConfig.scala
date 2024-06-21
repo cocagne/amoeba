@@ -8,6 +8,17 @@ import org.yaml.snakeyaml.constructor.SafeConstructor
 
 import java.nio.file.Path
 
+/*
+name: node_a
+uuid: 00000000-0000-0000-0000-000000000000
+root-dir: local/node_a
+endpoint:
+  host: 127.0.0.1
+  port: 5000
+log4j-config: local/log4j-conf.xml
+crl:
+  storage-engine: simple-crl
+*/
 
 object StorageNodeConfig {
 
