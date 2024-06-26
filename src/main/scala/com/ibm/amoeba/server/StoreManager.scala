@@ -9,7 +9,7 @@ import com.ibm.amoeba.common.store.StoreId
 import com.ibm.amoeba.common.transaction.TransactionStatus
 import com.ibm.amoeba.common.util.BackgroundTask
 import com.ibm.amoeba.fs.demo.{StorageNodeConfig, StoreConfig}
-import com.ibm.amoeba.server.crl.CrashRecoveryLogFactory
+import com.ibm.amoeba.server.crl.{CrashRecoveryLog, CrashRecoveryLogFactory}
 import com.ibm.amoeba.server.network.Messenger
 import com.ibm.amoeba.server.store.backend.{Backend, Completion, CompletionHandler}
 import com.ibm.amoeba.server.store.cache.ObjectCache
@@ -87,11 +87,14 @@ class StoreManager(val rootDir: Path,
   }
 
   protected var stores: Map[StoreId, Store] = Map()
-  
-  rootDir.resolve("stores").toFile.listFiles().toList.filter{ fn =>
-    Files.exists(fn.toPath.resolve("store_config.yaml"))
-  }.foreach: fn =>
-    loadStoreFromPath(fn.toPath)
+
+  val filesArray = rootDir.resolve("stores").toFile.listFiles()
+
+  if filesArray != null then
+    filesArray.toList.filter{ fn =>
+      Files.exists(fn.toPath.resolve("store_config.yaml"))
+    }.foreach: fn =>
+      loadStoreFromPath(fn.toPath)
   
   protected def loadStoreFromPath(storePath: Path): Unit =
     logger.info(s"Loading store $storePath")
@@ -216,6 +219,14 @@ class StoreManager(val rootDir: Path,
           txStatusCache,finalizerFactory, txDriverFactory, heartbeatPeriod*8)
         backend.setCompletionHandler(ioHandler)
         stores += (backend.storeId -> store)
+
+        val crl_save = Path.of(backend.path).resolve("crl_save.log")
+
+        if Files.exists(crl_save) then
+          val (storeId, trs, ars) = CrashRecoveryLog.loadStoreState(crl_save)
+          crl.loadStore(storeId, trs, ars).foreach: _ =>
+            Files.delete(crl_save)
+
 
       case HeartbeatEvent() =>
         //logger.trace("Main loop got heartbeat event")
