@@ -7,6 +7,7 @@ import com.ibm.amoeba.common.store.{ReadState, StoreId, StorePointer}
 import com.ibm.amoeba.common.transaction.TransactionId
 import com.ibm.amoeba.server.store.Locater
 
+import java.nio.file.Path
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
 
@@ -48,7 +49,7 @@ object RocksDBBackend {
   }
 }
 
-class RocksDBBackend(dbPath:String,
+class RocksDBBackend(dbPath:Path,
                      override val storeId: StoreId,
                      implicit val executionContext: ExecutionContext) extends Backend {
 
@@ -62,7 +63,7 @@ class RocksDBBackend(dbPath:String,
 
   override def close(): Future[Unit] = db.close()
   
-  override def path: String = dbPath
+  override def path: Path = dbPath
 
   override def setCompletionHandler(handler: CompletionHandler): Unit = {
     chandler = Some(handler)

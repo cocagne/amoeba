@@ -78,7 +78,7 @@ class ZCnCBackend(val network: ZMQNetwork,
       case b: RocksDBType =>
         val dir = storesDir.resolve(s"${msg.storeId.poolId.uuid}:${msg.storeId.poolIndex}")
         println(s"Creating NEW data store ${msg.storeId.poolId.uuid}:${msg.storeId.poolIndex}. Path $dir")
-        new RocksDBBackend(dir.toString, msg.storeId,
+        new RocksDBBackend(dir, msg.storeId,
           scala.concurrent.ExecutionContext.Implicits.global)
 
     storeManagers.head.loadStore(backend).foreach(_ => completionQueue.put(""))

@@ -634,7 +634,7 @@ object Main {
           |backend:
           |  storage-engine: rocksdb
           |""".stripMargin)
-      new RocksDBBackend(storeRoot.toString, dataStoreId, ec)
+      new RocksDBBackend(storeRoot, dataStoreId, ec)
 
     val nucleus = Bootstrap.initialize(cfg.bootstrapIDA, bootstrapStores)
 
@@ -694,7 +694,7 @@ object Main {
           cfg.backend match {
             case b: StoreConfig.RocksDB =>
               println(s"Rebuilding data store $poolUuid:$storeIndex. Path $storeFn")
-              store = new RocksDBBackend(storeFn.toString, storeId, ec)
+              store = new RocksDBBackend(storeFn.toPath, storeId, ec)
           }
 
     assert(store != null)

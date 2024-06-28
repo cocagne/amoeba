@@ -68,8 +68,6 @@ exec java -cp $CLASSPATH com.ibm.aspen.demo.Main "$@"
 ---------------------------------------------------------------------------
 - TODO
 -
-Load CRL entries if backend.rootDir/crl_save.log exists
-    - Delete file after write to system CRL completes
 
 AllocateResponse
     - Add error string to message on failure

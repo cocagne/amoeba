@@ -5,6 +5,7 @@ import com.ibm.amoeba.common.store.{ReadState, StoreId, StorePointer}
 import com.ibm.amoeba.common.transaction.TransactionId
 import com.ibm.amoeba.server.store.{Locater, ObjectState}
 
+import java.nio.file.Path
 import scala.concurrent.{Future, Promise}
 
 class MapBackend(val storeId: StoreId) extends Backend {
@@ -15,7 +16,7 @@ class MapBackend(val storeId: StoreId) extends Backend {
 
   override def close(): Future[Unit] = Future.successful(())
   
-  override def path: String = ""
+  override def path: Path = Path.of("/")
 
   override def setCompletionHandler(handler: CompletionHandler): Unit = {
     chandler = Some(handler)

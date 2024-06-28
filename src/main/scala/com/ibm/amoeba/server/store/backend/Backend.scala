@@ -7,12 +7,15 @@ import com.ibm.amoeba.common.transaction.TransactionId
 import com.ibm.amoeba.server.store.Locater
 import org.apache.logging.log4j.scala.Logging
 
+import java.nio.file.Path
 import scala.concurrent.{Future, Promise}
 
 trait Backend extends Logging {
   val storeId: StoreId
 
-  def path: String
+  def path: Path
+
+  def crlSaveFile: Path = path.resolve("crl_save.log")
   
   def close(): Future[Unit] 
 

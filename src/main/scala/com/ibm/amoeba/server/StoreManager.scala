@@ -104,7 +104,7 @@ class StoreManager(val rootDir: Path,
 
     val backend = cfg.backend match {
       case b: StoreConfig.RocksDB =>
-        new RocksDBBackend(storePath.toString, storeId, ec)
+        new RocksDBBackend(storePath, storeId, ec)
     }
     
     loadStore(backend)
@@ -226,12 +226,10 @@ class StoreManager(val rootDir: Path,
         backend.setCompletionHandler(ioHandler)
         stores += (backend.storeId -> store)
 
-        val crl_save = Path.of(backend.path).resolve("crl_save.log")
-
-        if Files.exists(crl_save) then
-          val (storeId, trs, ars) = CrashRecoveryLog.loadStoreState(crl_save)
+        if Files.exists(backend.crlSaveFile) then
+          val (storeId, trs, ars) = CrashRecoveryLog.loadStoreState(backend.crlSaveFile)
           crl.loadStore(storeId, trs, ars).foreach: _ =>
-            Files.delete(crl_save)
+            Files.delete(backend.crlSaveFile)
             p.success(())
         else
           p.success(())
@@ -245,9 +243,8 @@ class StoreManager(val rootDir: Path,
           case None => completion.success(())
           case Some(store) =>
             stores -= storeId
-            val save_file = store.backend.path + "/crl_save.log"
             crl.closeStore(storeId).foreach: (trs, ars) =>
-              CrashRecoveryLog.saveStoreState(storeId, trs, ars, Path.of(save_file))
+              CrashRecoveryLog.saveStoreState(storeId, trs, ars, store.backend.crlSaveFile)
               store.close().foreach: _ =>
                 completion.success(())
         

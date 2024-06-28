@@ -2,6 +2,7 @@ package com.ibm.amoeba.server.store.backend
 
 import org.rocksdb.{FlushOptions, Options, RocksDB, WriteBatch, WriteOptions}
 
+import java.nio.file.Path
 import scala.concurrent.{Await, ExecutionContext, Future, Promise}
 import scala.concurrent.duration.*
 
@@ -19,15 +20,14 @@ object BufferedConsistentRocksDB {
   *  is done and no outstanding commit exists, a commit for that single operation is immediately started.
   *
   */
-class BufferedConsistentRocksDB(
-                                 val dbPath:String)(implicit ec: ExecutionContext) {
+class BufferedConsistentRocksDB(val dbPath:Path)(implicit ec: ExecutionContext) {
 
   import BufferedConsistentRocksDB._
 
   private[this] val db: RocksDB = {
     val options = new Options().setCreateIfMissing(true)
     try {
-      RocksDB.open(options, dbPath)
+      RocksDB.open(options, dbPath.toString)
     } finally {
       options.close()
     }
