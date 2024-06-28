@@ -488,7 +488,8 @@ message Host {
   UUID hostId = 1;
   string name = 2;
   string address = 3;
-  uint32 port = 4;
+  uint32 dataPort = 4;
+  uint32 cncPort = 5;
 }
 
 //---------------------------------------------------------------------------

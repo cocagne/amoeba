@@ -1095,7 +1095,8 @@ object Codec extends Logging:
     builder.setHostId(encodeUUID(o.hostId.uuid))
     builder.setName(o.name)
     builder.setAddress(o.address)
-    builder.setPort(o.port)
+    builder.setDataPort(o.dataPort)
+    builder.setCncPort(o.cncPort)
 
     builder.build
 
@@ -1103,9 +1104,10 @@ object Codec extends Logging:
     val hostId = HostId(decodeUUID(m.getHostId))
     val name = m.getName
     val address = m.getAddress
-    val port = m.getPort
+    val dataPort = m.getDataPort
+    val cncPort = m.getCncPort
 
-    Host(hostId, name, address, port)
+    Host(hostId, name, address, dataPort, cncPort)
 
   // CnC Messages -----------------------------------------------------------------
 

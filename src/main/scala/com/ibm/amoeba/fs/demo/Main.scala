@@ -19,7 +19,7 @@ import com.ibm.amoeba.common.transaction.KeyValueUpdate
 import com.ibm.amoeba.common.transaction.KeyValueUpdate.{DoesNotExist, KeyRequirement}
 import com.ibm.amoeba.common.util.{BackgroundTaskPool, YamlFormat}
 import com.ibm.amoeba.fs.FileSystem
-import com.ibm.amoeba.fs.demo.network.ZMQNetwork
+import com.ibm.amoeba.fs.demo.network.{ZCnCBackend, ZMQNetwork}
 import com.ibm.amoeba.fs.impl.simple.SimpleFileSystem
 import com.ibm.amoeba.fs.nfs.AmoebaNFS
 import com.ibm.amoeba.server.crl.simple.SimpleCRL
@@ -223,7 +223,7 @@ object Main {
                     storageNode: Option[(String, String, Int)],
                     oclientId: Option[ClientId]): (NetworkBridge, ZMQNetwork) = {
     val b = new NetworkBridge
-    val nodes = cfg.nodes.map(ds => ds.name -> (ds.host, ds.port)).toMap
+    val nodes = cfg.nodes.map(ds => ds.name -> (ds.host, ds.dataPort)).toMap
     val stores = cfg.nodes.zipWithIndex.map { (node, index) =>
       StoreId(PoolId(new UUID(0,0)), index.toByte) -> node.name
     }.toMap
@@ -239,7 +239,7 @@ object Main {
                          onnet: Option[(NetworkBridge, ZMQNetwork)]=None): (AmoebaClient, ZMQNetwork, KeyValueObjectPointer) = {
 
     val hosts = cfg.nodes.zipWithIndex.map { (node, index) =>
-      HostId(new UUID(0, index)) -> Host(HostId(new UUID(0, index)), node.name, node.host, node.port)
+      HostId(new UUID(0, index)) -> Host(HostId(new UUID(0, index)), node.name, node.host, node.dataPort, node.cncPort)
     }.toMap
 
     val (networkBridge, nnet) = onnet.getOrElse(createNetwork(cfg, None, None))
@@ -564,7 +564,7 @@ object Main {
 
     val objectCacheFactory = () => new SimpleLRUObjectCache(100)
 
-    val nodeEndpoint = Some(nodeCfg.name, nodeCfg.endpoint.host, nodeCfg.endpoint.port)
+    val nodeEndpoint = Some(nodeCfg.name, nodeCfg.endpoint.host, nodeCfg.endpoint.dataPort)
 
     val (networkBridge, nnet) = createNetwork(bootstrapCfg, nodeEndpoint, None)
 
@@ -603,6 +603,11 @@ object Main {
     }
     networkThread.start()
     storeManager.start()
+    
+    val cncBackend = new ZCnCBackend(nnet,
+      nodeCfg.rootDir.resolve("stores"),
+      storeManager :: Nil,
+      nodeCfg.endpoint.cncPort)
 
     // Kickoff repair loop
     repair(client, storeManager)

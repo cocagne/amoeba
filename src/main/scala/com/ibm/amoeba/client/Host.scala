@@ -14,7 +14,8 @@ object Host:
 
 case class Host(hostId: HostId,
                 name: String,
-                address: String, 
-                port: Int):
+                address: String,
+                dataPort: Int,
+                cncPort: Int):
   
   def encode(): Array[Byte] = Codec.encode(this).toByteArray

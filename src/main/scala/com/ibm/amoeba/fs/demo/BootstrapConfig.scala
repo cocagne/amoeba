@@ -17,15 +17,18 @@ bootstrap-ida:
 bootstrap-storage-nodes:
   - name: node_a
     host: 127.0.0.1
-    port: 5000
+    data-port: 5000
+    cnc-port: 5001
 
   - name: node_b
     host: 127.0.0.1
-    port: 5001
+    data-port: 5002
+    cnc-port: 5003
 
   - name: node_c
     host: 127.0.0.1
-    port: 5002
+    data-port: 5004
+    cnc-port: 5005
 */
 
 object BootstrapConfig {
@@ -52,16 +55,18 @@ object BootstrapConfig {
     def create(o: Object): BootstrapIDA = BootstrapIDA(ida.get(o), maxObjectSize.get(o))
 
 
-  case class StorageNode(name: String, host: String, port: Int)
+  case class StorageNode(name: String, host: String, dataPort: Int, cncPort: Int)
 
   object StorageNode extends YObject[StorageNode]:
-    val name: Required[String] = Required("name", YString)
-    val host: Required[String] = Required("host", YString)
-    val port: Required[Int]    = Required("port", YInt)
+    val name: Required[String]  = Required("name", YString)
+    val host: Required[String]  = Required("host", YString)
+    val dataPort: Required[Int] = Required("data-port", YInt)
+    val cncPort: Required[Int]  = Required("cnc-port", YInt)
 
-    val attrs: List[Attr] = name :: host :: port :: Nil
 
-    def create(o: Object): StorageNode = StorageNode(name.get(o), host.get(o), port.get(o))
+    val attrs: List[Attr] = name :: host :: dataPort :: cncPort :: Nil
+
+    def create(o: Object): StorageNode = StorageNode(name.get(o), host.get(o), dataPort.get(o), cncPort.get(o))
 
 
   case class Config(bootstrapIDA: IDA, nodes: List[StorageNode]):

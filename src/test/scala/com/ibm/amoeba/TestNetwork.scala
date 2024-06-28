@@ -116,7 +116,7 @@ object TestNetwork {
       }
     }
 
-    def getHost(hostId: HostId): Future[Host] = Future.successful(Host(HostId(new UUID(0,0)), "testhost", "localhost", 1234))
+    def getHost(hostId: HostId): Future[Host] = Future.successful(Host(HostId(new UUID(0,0)), "testhost", "localhost", 1234, 1235))
 
     override def shutdown(): Unit = backgroundTasks.shutdown(Duration(50, MILLISECONDS))
 

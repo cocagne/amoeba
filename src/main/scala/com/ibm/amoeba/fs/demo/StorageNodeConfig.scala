@@ -14,7 +14,8 @@ uuid: 00000000-0000-0000-0000-000000000000
 root-dir: local/node_a
 endpoint:
   host: 127.0.0.1
-  port: 5000
+  data-port: 5000
+  cnc-port: 5001
 log4j-config: local/log4j-conf.xml
 crl:
   storage-engine: simple-crl
@@ -37,15 +38,16 @@ object StorageNodeConfig {
       fileSize.get(o).getOrElse(300))
 
 
-  case class Endpoint(host: String, port: Int)
+  case class Endpoint(host: String, dataPort: Int, cncPort: Int)
 
   object Endpoint extends YObject[Endpoint]:
     val host: Required[String] = Required("host", YString)
-    val port: Required[Int] = Required("port", YInt)
+    val dataPort: Required[Int] = Required("data-port", YInt)
+    val cncPort: Required[Int] = Required("cnc-port", YInt)
 
-    val attrs: List[Attr] = host :: port :: Nil
+    val attrs: List[Attr] = host :: dataPort :: cncPort :: Nil
 
-    def create(o: Object): Endpoint = Endpoint(host.get(o), port.get(o))
+    def create(o: Object): Endpoint = Endpoint(host.get(o), dataPort.get(o), cncPort.get(o))
 
 
   case class StorageNode(name: String,
