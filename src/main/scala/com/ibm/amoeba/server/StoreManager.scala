@@ -30,7 +30,7 @@ object StoreManager {
   case class TransactionMessage(msg: TxMessage) extends Event
   case class ClientReq(msg: ClientRequest) extends Event
   case class Repair(storeId: StoreId, os: ClientObjectState, completion: Promise[Unit]) extends Event
-  case class LoadStore(backend: Backend) extends Event
+  case class LoadStore(backend: Backend, completion: Promise[Unit]) extends Event
   case class Exit() extends Event
   case class RecoveryEvent() extends Event
   case class HeartbeatEvent() extends Event
@@ -110,6 +110,10 @@ class StoreManager(val rootDir: Path,
     loadStore(backend)
     
 
+  def containsStore(storeId: StoreId): Boolean = synchronized {
+    stores.contains(storeId)
+  } 
+  
   def getStoreIds: List[StoreId] = synchronized {
     stores.keysIterator.toList
   }
@@ -122,8 +126,10 @@ class StoreManager(val rootDir: Path,
     stores.values.foreach(_.logTransactionStatus(log))
   }
 
-  def loadStore(backend: Backend): Unit = {
-    events.put(LoadStore(backend))
+  def loadStore(backend: Backend): Future[Unit] = {
+    val p = Promise[Unit]()
+    events.put(LoadStore(backend, p))
+    p.future
   }
 
   def receiveTransactionMessage(msg: TxMessage): Unit = {
@@ -214,7 +220,7 @@ class StoreManager(val rootDir: Path,
       case RecoveryEvent() =>
         handleRecoveryEvent()
 
-      case LoadStore(backend) =>
+      case LoadStore(backend, p) =>
         val store = new Store(backend, objectCacheFactory(), net, backgroundTasks, crl,
           txStatusCache,finalizerFactory, txDriverFactory, heartbeatPeriod*8)
         backend.setCompletionHandler(ioHandler)
@@ -226,24 +232,27 @@ class StoreManager(val rootDir: Path,
           val (storeId, trs, ars) = CrashRecoveryLog.loadStoreState(crl_save)
           crl.loadStore(storeId, trs, ars).foreach: _ =>
             Files.delete(crl_save)
-
-
+            p.success(())
+        else
+          p.success(())
+        
       case HeartbeatEvent() =>
         //logger.trace("Main loop got heartbeat event")
         stores.valuesIterator.foreach(_.heartbeat())
-
-      case ShutdownStore(storeId, completion) =>
-        val f = stores.get(storeId) match
-          case None => Future.successful(())
-          case Some(store) => 
-            //crl.closeStore(storeId, store.path)
-            store.close()
-            
-        stores -= storeId
         
-
+      case ShutdownStore(storeId, completion) =>
+        stores.get(storeId) match
+          case None => completion.success(())
+          case Some(store) =>
+            stores -= storeId
+            val save_file = store.backend.path + "/crl_save.log"
+            crl.closeStore(storeId).foreach: (trs, ars) =>
+              CrashRecoveryLog.saveStoreState(storeId, trs, ars, Path.of(save_file))
+              store.close().foreach: _ =>
+                completion.success(())
+        
       case null => // nothing to do
-
+      
       case _:Exit =>
         shutdownCalled = true
         shutdownPromise.success(())

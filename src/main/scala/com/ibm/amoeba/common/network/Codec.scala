@@ -13,7 +13,9 @@ import com.ibm.amoeba.common.pool.PoolId
 import com.ibm.amoeba.common.store.{StoreId, StorePointer}
 import com.ibm.amoeba.common.transaction.KeyValueUpdate.KeyRevision
 import com.ibm.amoeba.common.transaction.{DataUpdate, DataUpdateOperation, FinalizationActionId, KeyValueUpdate, LocalTimeRequirement, ObjectUpdate, PreTransactionOpportunisticRebuild, RefcountUpdate, RevisionLock, SerializedFinalizationAction, TransactionDescription, TransactionDisposition, TransactionId, TransactionRequirement, TransactionStatus, VersionBump}
+import com.ibm.amoeba.server.cnc.{NewStore, ShutdownStore, TransferStore}
 import com.ibm.amoeba.server.crl.{AllocationRecoveryState, TransactionRecoveryState}
+import com.ibm.amoeba.server.store.backend.{BackendType, RocksDBType}
 
 import java.nio.{ByteBuffer, ByteOrder}
 import scala.jdk.CollectionConverters.*
@@ -1104,4 +1106,56 @@ object Codec extends Logging:
     val port = m.getPort
 
     Host(hostId, name, address, port)
+
+  // CnC Messages -----------------------------------------------------------------
+
+  def encodeBackendType(o: BackendType): codec.BackendType = o match
+    case RocksDBType() => codec.BackendType.BACKEND_TYPE_ROCKS_DB
+
+  def decodeBackendType(m: codec.BackendType): BackendType = m match
+    case codec.BackendType.BACKEND_TYPE_ROCKS_DB => RocksDBType()
+    case f => throw new EncodingError(f"Invalid Backend Type: $f")
+
+
+  def encode(o: NewStore): codec.NewStore =
+    val builder = codec.NewStore.newBuilder()
+
+    builder.setStoreId(encode(o.storeId))
+    builder.setBackendType(encodeBackendType(o.backendType))
+
+    builder.build
+
+  def decode(m: codec.NewStore): NewStore =
+    val storeId = decode(m.getStoreId)
+    val backendType = decodeBackendType(m.getBackendType)
+
+    NewStore(storeId, backendType)
+
+
+  def encode(o: ShutdownStore): codec.ShutdownStore =
+    val builder = codec.ShutdownStore.newBuilder()
+
+    builder.setStoreId(encode(o.storeId))
+
+    builder.build
+
+  def decode(m: codec.ShutdownStore): ShutdownStore =
+    val storeId = decode(m.getStoreId)
+
+    ShutdownStore(storeId)
+
+
+  def encode(o: TransferStore): codec.TransferStore =
+    val builder = codec.TransferStore.newBuilder()
+
+    builder.setStoreId(encode(o.storeId))
+    builder.setToHost(encodeUUID(o.toHost.uuid))
+
+    builder.build
+
+  def decode(m: codec.TransferStore): TransferStore =
+    val storeId = decode(m.getStoreId)
+    val toHost = HostId(decodeUUID(m.getToHost))
+
+    TransferStore(storeId, toHost)
   

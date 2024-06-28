@@ -433,7 +433,7 @@ message Message {
 }
 
 //---------------------------------------------------------------------------
-//- Non-network Messages
+//- CRL State Messages
 //---------------------------------------------------------------------------
 message ObjectUpdate {
   UUID object_id = 1;
@@ -489,4 +489,34 @@ message Host {
   string name = 2;
   string address = 3;
   uint32 port = 4;
+}
+
+//---------------------------------------------------------------------------
+//- CnC Messages
+//---------------------------------------------------------------------------
+
+enum BackendType {
+  BACKEND_TYPE_ROCKS_DB = 0;
+}
+
+message NewStore {
+  StoreId storeId = 1;
+  BackendType backendType = 2;
+}
+
+message ShutdownStore {
+  StoreId storeId = 1;
+}
+
+message TransferStore {
+  StoreId storeId = 1;
+  UUID toHost = 2;
+}
+
+message CnCMessage {
+  oneof msg {
+    NewStore new_store = 1;
+    ShutdownStore shutdown_store = 2;
+    TransferStore transfer_store = 3;
+  }
 }

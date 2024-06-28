@@ -91,8 +91,8 @@ class ZMQNetwork(val oclientId: Option[ClientId],
   val clientId: ClientId = oclientId.getOrElse(ClientId(UUID.randomUUID()))
 
   logger.debug(s"ZMQNetwork Client ID: ${clientId.uuid.toString}")
-
-  private val context = new ZContext()
+  
+  private[network] val context = new ZContext()
 
   private var clients: Map[ClientId, Array[Byte]] = Map()
 
