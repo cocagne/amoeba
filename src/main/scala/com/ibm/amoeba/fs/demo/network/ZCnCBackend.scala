@@ -52,6 +52,8 @@ class ZCnCBackend(val network: ZMQNetwork,
         case None =>
         case Some(cmsg) =>
 
+          val replyBuilder = codec.CnCReply.newBuilder()
+
           if cmsg.hasNewStore then
             val message = Codec.decode(cmsg.getNewStore)
             logger.trace(s"Got CnC message $message")
@@ -69,8 +71,14 @@ class ZCnCBackend(val network: ZMQNetwork,
 
           // Wait for operation completion
           val m = completionQueue.take()
+          
+          val okBuilder = codec.CnCOk.newBuilder()
 
-          repSocket.send("")
+          replyBuilder.setOk(okBuilder.build)
+
+          val rmsg = replyBuilder.build.toByteArray
+
+          repSocket.send(rmsg)
 
 
   def onNewStore(msg: NewStore): Unit =

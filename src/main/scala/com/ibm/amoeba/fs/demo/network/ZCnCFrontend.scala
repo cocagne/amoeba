@@ -13,7 +13,9 @@ import scala.concurrent.{Future, Promise}
 object ZCnCFrontend:
   sealed abstract class QMsg
 
-  final case class CnC(msg: CnCMessage, promise: Promise[Unit]) extends QMsg
+  final case class CnCNewStore(msg: NewStore, promise: Promise[Unit]) extends QMsg
+  final case class CnCShutdownStore(msg: ShutdownStore, promise: Promise[Unit]) extends QMsg
+  final case class CnCTransferStore(msg: TransferStore, promise: Promise[Unit]) extends QMsg
 
   final case class Shutdown(promise: Promise[Unit]) extends QMsg
 
@@ -38,49 +40,65 @@ class ZCnCFrontend(val network: ZMQNetwork,
   private def ioThread(): Unit =
     while true do
       val m = msgQueue.take()
+      val builder = codec.CnCRequest.newBuilder()
+
       m match
         case Shutdown(p) =>
           p.success(())
           return
-        case CnC(msg, p) =>
-          val builder = codec.CnCRequest.newBuilder()
+        case CnCNewStore(msg, p) => builder.setNewStore(Codec.encode(msg))
+        case CnCShutdownStore(msg, p) => builder.setShutdownStore(Codec.encode(msg))
+        case CnCTransferStore(msg, p) => builder.setTransferStore(Codec.encode(msg))
 
-          msg match
-            case msg: NewStore => builder.setNewStore(Codec.encode(msg))
-            case msg: ShutdownStore => builder.setShutdownStore(Codec.encode(msg))
-            case msg: TransferStore => builder.setTransferStore(Codec.encode(msg))
+      val encodedMessage = builder.build.toByteArray
 
-          val encodedMessage = builder.build.toByteArray
+      reqSocket.send(encodedMessage)
 
-          reqSocket.send(encodedMessage)
+      val rmsg = reqSocket.recv()
 
-          val rmsg = reqSocket.recv()
+      if rmsg != null then
+        val bb = ByteBuffer.wrap(rmsg)
+        bb.order(ByteOrder.BIG_ENDIAN)
+        val rm = try codec.CnCReply.parseFrom(bb) catch
+          case t: Throwable =>
+            logger.error(s"******* PARSE CnCReply ERROR: $t", t)
+            m match
+              case Shutdown(p) =>
+              case CnCNewStore(msg, p) => p.failure(t)
+              case CnCShutdownStore(msg, p) => p.failure(t)
+              case CnCTransferStore(msg, p) => p.failure(t)
+            throw t
 
-          if rmsg != null then
-            val bb = ByteBuffer.wrap(rmsg)
-            bb.order(ByteOrder.BIG_ENDIAN)
-            val m = try codec.CnCReply.parseFrom(bb) catch
-              case t: Throwable =>
-                logger.error(s"******* PARSE CnCReply ERROR: $t", t)
-                p.failure(t)
-                throw t
-
-            if m.hasOk then
+        m match
+          case Shutdown(p) =>
+          case CnCNewStore(msg, p) =>
+            if rm.hasOk then
               p.success(())
             else
               p.failure(new Exception("Invalid CnCReply received"))
+          case CnCShutdownStore(msg, p) =>
+            if rm.hasOk then
+              p.success(())
+            else
+              p.failure(new Exception("Invalid CnCReply received"))
+          case CnCTransferStore(msg, p) =>
+            if rm.hasOk then
+              p.success(())
+            else
+              p.failure(new Exception("Invalid CnCReply received"))
+
   
   def send(msg: NewStore): Future[Unit] =
     val p = Promise[Unit]
-    msgQueue.put(CnC(msg, p))
+    msgQueue.put(CnCNewStore(msg, p))
     p.future
 
   def send(msg: ShutdownStore): Future[Unit] =
     val p = Promise[Unit]
-    msgQueue.put(CnC(msg, p))
+    msgQueue.put(CnCShutdownStore(msg, p))
     p.future
 
   def send(msg: TransferStore): Future[Unit] =
     val p = Promise[Unit]
-    msgQueue.put(CnC(msg, p))
+    msgQueue.put(CnCTransferStore(msg, p))
     p.future
