@@ -514,10 +514,19 @@ message TransferStore {
   UUID toHost = 2;
 }
 
-message CnCMessage {
+message CnCRequest {
   oneof msg {
     NewStore new_store = 1;
     ShutdownStore shutdown_store = 2;
     TransferStore transfer_store = 3;
+  }
+}
+
+message CnCOk {
+}
+
+message CnCReply {
+  oneof msg {
+    CnCOk ok = 1;
   }
 }

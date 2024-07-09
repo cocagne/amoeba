@@ -43,18 +43,32 @@ class ZCnCFrontend(val network: ZMQNetwork,
           p.success(())
           return
         case CnC(msg, p) =>
-          val encodedMessage = msg match
-            case msg: NewStore => Codec.encode(msg).toByteArray
-            case msg: ShutdownStore => Codec.encode(msg).toByteArray
-            case msg: TransferStore => Codec.encode(msg).toByteArray
+          val builder = codec.CnCRequest.newBuilder()
+
+          msg match
+            case msg: NewStore => builder.setNewStore(Codec.encode(msg))
+            case msg: ShutdownStore => builder.setShutdownStore(Codec.encode(msg))
+            case msg: TransferStore => builder.setTransferStore(Codec.encode(msg))
+
+          val encodedMessage = builder.build.toByteArray
 
           reqSocket.send(encodedMessage)
 
-          // TODO: Parse result and use explicit return messages.
-          //       For now just return success
-          reqSocket.recv()
-          
-          p.success(())
+          val rmsg = reqSocket.recv()
+
+          if rmsg != null then
+            val bb = ByteBuffer.wrap(rmsg)
+            bb.order(ByteOrder.BIG_ENDIAN)
+            val m = try codec.CnCReply.parseFrom(bb) catch
+              case t: Throwable =>
+                logger.error(s"******* PARSE CnCReply ERROR: $t", t)
+                p.failure(t)
+                throw t
+
+            if m.hasOk then
+              p.success(())
+            else
+              p.failure(new Exception("Invalid CnCReply received"))
   
   def send(msg: NewStore): Future[Unit] =
     val p = Promise[Unit]
