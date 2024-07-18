@@ -12,7 +12,8 @@ object Nucleus {
 
   val poolId: PoolId = PoolId(new UUID(0, 0))
 
-  private [amoeba] val PoolTreeKey = Key(Array[Byte](0))
-
-  private [amoeba] val HostTreeKey = Key(Array[Byte](1))
+  private[amoeba] val PoolTreeKey = Key(Array[Byte](0))
+  private[amoeba] val HostsTreeKey = Key(Array[Byte](1))
+  private[amoeba] val PoolNameTreeKey = Key(Array[Byte](3))
+  private[amoeba] val HostsNameTreeKey = Key(Array[Byte](4))
 }

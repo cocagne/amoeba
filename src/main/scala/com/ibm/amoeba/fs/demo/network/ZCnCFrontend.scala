@@ -1,5 +1,6 @@
 package com.ibm.amoeba.fs.demo.network
 
+import com.ibm.amoeba.client.Host
 import com.ibm.amoeba.codec
 import com.ibm.amoeba.common.network.Codec
 import com.ibm.amoeba.server.cnc.{CnCFrontend, CnCMessage, NewStore, ShutdownStore, TransferStore}
@@ -19,16 +20,15 @@ object ZCnCFrontend:
 
   final case class Shutdown(promise: Promise[Unit]) extends QMsg
 
-class ZCnCFrontend(val network: ZMQNetwork,
-                   val hostAddr: String,
-                   val cncPort: Int) extends CnCFrontend with Logging:
+class ZCnCFrontend(val network: ZMQNetwork, 
+                   val host: Host) extends CnCFrontend with Logging:
 
   import ZCnCFrontend._
 
   private val msgQueue = new LinkedBlockingQueue[QMsg]()
 
   private val reqSocket = network.context.createSocket(SocketType.REQ)
-  reqSocket.connect(s"tcp://$hostAddr:$cncPort")
+  reqSocket.connect(s"tcp://${host.address}:${host.cncPort}")
 
   private val networkThread = new Thread {
     override def run(): Unit = {

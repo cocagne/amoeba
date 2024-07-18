@@ -25,6 +25,9 @@ import com.ibm.amoeba.server.store.Bootstrap
 import com.ibm.amoeba.server.store.backend.MapBackend
 import com.ibm.amoeba.server.store.cache.SimpleLRUObjectCache
 import com.ibm.amoeba.server.transaction.{TransactionDriver, TransactionFinalizer}
+import com.ibm.amoeba.server.store.backend.BackendType
+import com.ibm.amoeba.server.cnc.{CnCFrontend, NewStore}
+import com.ibm.amoeba.common.ida.IDA
 
 import java.nio.file.Path
 import scala.concurrent.duration.{Duration, MILLISECONDS, SECONDS}
@@ -105,19 +108,30 @@ object TestNetwork {
       new TransactionImpl(this, txManager, _ => 0, None)
     }
 
-    def getStoragePool(poolId: PoolId): Future[StoragePool] = {
+    def getStoragePool(poolName: String): Future[Option[StoragePool]] = ???
+
+    def getStoragePool(poolId: PoolId): Future[Option[StoragePool]] = {
       val root = new KVObjectRootManager(this, Nucleus.PoolTreeKey, nucleus)
       val tkvl = new TieredKeyValueList(this, root)
       for {
         poolPtr <- tkvl.get(Key(poolId.uuid))
         poolKvos <- read(KeyValueObjectPointer(poolPtr.get.value.bytes))
       } yield {
-        SimpleStoragePool(this, poolKvos)
+        Some(SimpleStoragePool(this, poolKvos))
       }
     }
 
-    def getHost(hostId: HostId): Future[Host] = Future.successful(Host(HostId(new UUID(0,0)), "testhost", "localhost", 1234, 1235))
+    override def newStoragePool(newPoolName: String,
+                       hostCncFrontends: List[CnCFrontend],
+                       ida: IDA,
+                       backendType: BackendType): Future[StoragePool] = ???
 
+    protected def createStoragePool(config: StoragePool.Config): Future[StoragePool] = ???
+
+    def getHost(hostId: HostId): Future[Option[Host]] = Future.successful(Some(Host(HostId(new UUID(0,0)), "testhost", "localhost", 1234, 1235)))
+
+    def getHost(hostName: String): Future[Option[Host]] = getHost(HostId(new UUID(0,0)))
+    
     override def shutdown(): Unit = backgroundTasks.shutdown(Duration(50, MILLISECONDS))
 
     val retryStrategy: RetryStrategy = new ExponentialBackoffRetryStrategy(this)
@@ -166,7 +180,11 @@ class TestNetwork extends ServerMessenger {
 
   var handleDepth = 0
 
-  val nucleus: KeyValueObjectPointer = Bootstrap.initialize(ida, List(store0, store1, store2))
+  val nucleus: KeyValueObjectPointer = Bootstrap.initialize(ida, 
+    List(store0, store1, store2), List(
+      ("node1", new UUID(0,0)),
+      ("node2", new UUID(0,1)),
+      ("node3", new UUID(0,2))))
 
   // All transactions will miss the third store. Don't wait long before updating the
   // error tree

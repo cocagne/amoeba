@@ -24,7 +24,7 @@ class AllocationFinalizationAction(val client: AmoebaClient,
     for {
       pool <- client.getStoragePool(newObject.poolId)
       tx = client.newTransaction()
-      _ <- pool.allocationTree.set(Key(newObject.id.toBytes), Value(newObject.toArray))(tx)
+      _ <- pool.get.allocationTree.set(Key(newObject.id.toBytes), Value(newObject.toArray))(tx)
       _ <- tx.commit()
     } yield {
       logger.debug(s"AllocationFA Completed Successfully for Tx ${txd.transactionId}, Object ${newObject.id}")

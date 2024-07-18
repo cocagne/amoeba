@@ -18,14 +18,16 @@ import com.ibm.amoeba.common.store.{StoreId, StorePointer}
 import com.ibm.amoeba.common.transaction.KeyValueUpdate
 import com.ibm.amoeba.common.transaction.KeyValueUpdate.{DoesNotExist, KeyRequirement}
 import com.ibm.amoeba.common.util.{BackgroundTaskPool, YamlFormat}
+import com.ibm.amoeba.common.ida.IDA
 import com.ibm.amoeba.fs.FileSystem
-import com.ibm.amoeba.fs.demo.network.{ZCnCBackend, ZMQNetwork}
+import com.ibm.amoeba.fs.demo.network.{ZCnCBackend, ZCnCFrontend, ZMQNetwork}
 import com.ibm.amoeba.fs.impl.simple.SimpleFileSystem
 import com.ibm.amoeba.fs.nfs.AmoebaNFS
+import com.ibm.amoeba.server.cnc.NewStore
 import com.ibm.amoeba.server.crl.simple.SimpleCRL
 import com.ibm.amoeba.server.{RegisteredTransactionFinalizerFactory, SimpleDriverRecoveryMixin, StoreManager}
 import com.ibm.amoeba.server.store.Bootstrap
-import com.ibm.amoeba.server.store.backend.{Backend, RocksDBBackend}
+import com.ibm.amoeba.server.store.backend.{Backend, RocksDBBackend, RocksDBType}
 import com.ibm.amoeba.server.store.cache.SimpleLRUObjectCache
 import com.ibm.amoeba.server.transaction.SimpleTransactionDriver
 import org.dcache.nfs.ExportFile
@@ -92,7 +94,13 @@ object Main {
                   nodeName:String="",
                   storeName:String="",
                   host:String="",
-                  port:Int=0)
+                  port:Int=0,
+                  newPoolName: String="",
+                  idaType: String="",
+                  width:Int=0,
+                  readThreshold:Int=0,
+                  writeThreshold:Int=0,
+                  hosts:List[String]=Nil)
 
   class ConfigError(msg: String) extends AmoebaError(msg)
 
@@ -194,6 +202,43 @@ object Main {
             }
         )
 
+      cmd("new-pool").text("Creates a new storage pool").
+        action((_, c) => c.copy(mode = "new-pool")).
+        children(
+          arg[File]("<log4j-config-file>").text("Log4j Configuration File").
+            action((x, c) => c.copy(log4jConfigFile = x)).
+            validate(x => if (x.exists()) success else failure(s"Log4j Config file does not exist: $x")),
+
+          arg[File]("<bootstrap-config-file>").text("Bootstrap Configuration File").
+            action((x, c) => c.copy(bootstrapConfigFile = x)).
+            validate(x => if (x.exists()) success else failure(s"Config file does not exist: $x")),
+
+          arg[String]("<new-pool-name>").text("Name of the new Pool").
+            action((x, c) => c.copy(newPoolName = x)),
+
+          arg[String]("<ida-type>").text("IDA type. Must be Replication or Reed-Solomon").
+            action((x, c) => c.copy(idaType = x.toLowerCase())).
+            validate { x =>
+              val xl = x.toLowerCase
+              if xl == "replication" || xl == "reed-solomon" then
+                success
+              else
+                failure("IDA type must be Replication or Reed-Solomon")
+            },
+
+          arg[Int]("<width>").text("Number of hosts holding slices/replicas").
+            action((x, c) => c.copy(width = x)),
+
+          arg[Int]("<read-threshold>").text("Minimum number of slices/replicas that must be read to reconstruct an object").
+            action((x, c) => c.copy(readThreshold = x)),
+
+          arg[Int]("<write-threshold>").text("Minimum number of slices/replicas that must be written to successfully write an object").
+            action((x, c) => c.copy(writeThreshold = x)),
+
+          arg[Seq[String]]("<hosts>").text("Comma-separated list of host names to host the object slice/replicas").
+            action((x, c) => c.copy(hosts = x.toList)),
+        )
+
       checkConfig( c => if (c.mode == "") failure("Invalid command") else success )
     }
 
@@ -201,6 +246,7 @@ object Main {
       case Some(cfg) =>
         //
         try {
+          println(s"Loading BootstrapConfig ${cfg.bootstrapConfigFile}")
           val bootstrapConfig = BootstrapConfig.loadBootstrapConfig(cfg.bootstrapConfigFile)
           println(s"Successful config: $cfg")
           //println(s"Config file: $config")
@@ -210,6 +256,7 @@ object Main {
             case "amoeba" => amoeba_server(cfg.log4jConfigFile, bootstrapConfig)
             case "debug" => run_debug_code(cfg.log4jConfigFile, bootstrapConfig)
             case "rebuild" => rebuild(cfg.log4jConfigFile, cfg.storeName, bootstrapConfig)
+            case "new-pool" => new_pool(cfg.log4jConfigFile, bootstrapConfig, cfg.newPoolName, cfg.idaType, cfg.width, cfg.readThreshold, cfg.writeThreshold, cfg.hosts)
           }
         } catch {
           case e: YamlFormat.FormatError => println(s"Error loading config file: $e")
@@ -284,8 +331,8 @@ object Main {
       case None =>
         println("Creating Amoeba")
         val guard = ObjectRevisionGuard(kvos.pointer, kvos.revision)
-        client.getStoragePool(kvos.pointer.poolId).flatMap { pool =>
-          val allocator = new SinglePoolObjectAllocator(client, pool, kvos.pointer.ida, None)
+        client.getStoragePool(kvos.pointer.poolId).flatMap { opool =>
+          val allocator = new SinglePoolObjectAllocator(client, opool.get, kvos.pointer.ida, None)
           SimpleFileSystem.bootstrap(client, guard, allocator, kvos.pointer, AmoebafsKey)
         }
     }
@@ -394,7 +441,7 @@ object Main {
       kvos <- client.read(nucleus)
       _ = println("------------ Getting Storage Pool---------------")
       pool <- client.getStoragePool(kvos.pointer.poolId)
-      alloc = pool.createAllocater(Replication(3,2))
+      alloc = pool.get.createAllocator(Replication(3,2))
       _ = println("------------ Allocating Data Object ---------------")
       key = Key(100)
       dptr <- allocObject(kvos.contents.get(key), kvos, alloc)
@@ -535,8 +582,8 @@ object Main {
       min(0) = storeId.poolIndex
       max(0) = (storeId.poolIndex + 1).toByte
       for
-        pool <- client.getStoragePool(storeId.poolId)
-        _ <- pool.errorTree.foreachInRange(Key(min), Key(max), repairOne(pool, storeId))
+        opool <- client.getStoragePool(storeId.poolId)
+        _ <- opool.get.errorTree.foreachInRange(Key(min), Key(max), repairOne(opool.get, storeId))
       yield
         println(s"*** Repair Process Complete ***")
         Future {
@@ -603,7 +650,7 @@ object Main {
     }
     networkThread.start()
     storeManager.start()
-    
+
     val cncBackend = new ZCnCBackend(nnet,
       nodeCfg.rootDir.resolve("stores"),
       storeManager :: Nil,
@@ -641,7 +688,9 @@ object Main {
           |""".stripMargin)
       new RocksDBBackend(storeRoot, dataStoreId, ec)
 
-    val nucleus = Bootstrap.initialize(cfg.bootstrapIDA, bootstrapStores)
+    val nucleus = Bootstrap.initialize(cfg.bootstrapIDA,
+      bootstrapStores,
+      cfg.nodes.zipWithIndex.map((n, idx) => (n.name, new UUID(0, idx))))
 
     // Print yaml representation of Radicle Pointer
     println("# NHucleus Pointer Definition")
@@ -735,13 +784,59 @@ object Main {
         println(f"Rebuilt object ${os.id}")
 
     for
-      pool <- client.getStoragePool(poolId)
-      allocTree = pool.allocationTree
+      opool <- client.getStoragePool(poolId)
+      allocTree = opool.get.allocationTree
       _ <- allocTree.foreach(rebuildObject)
     yield
       store.rebuildFlush()
       println("**** Rebuild Complete ****")
       ()
+  }
+
+  def new_pool(log4jConfigFile: File,
+               bootstrapConfig: BootstrapConfig.Config,
+               newPoolName: String,
+               idaType: String,
+               width: Int,
+               readThreshold: Int,
+               writeThreshold: Int,
+               hosts: List[String]): Unit = {
+    println(s"READ $readThreshold, WRITE $writeThreshold")
+    require(hosts.length == width)
+    require(width >= readThreshold && width >= writeThreshold)
+    require(readThreshold <= writeThreshold)
+
+    setLog4jConfigFile(log4jConfigFile)
+
+    val (client, network, nucleus) = createAmoebaClient(bootstrapConfig)
+
+    val networkThread = new Thread {
+      override def run(): Unit = {
+        network.ioThread()
+      }
+    }
+    networkThread.start()
+
+    implicit val ec: ExecutionContext = client.clientContext
+
+    val newPoolId = PoolId(UUID.randomUUID())
+    
+    val ida: IDA = idaType match
+      case "replication" => Replication(width, writeThreshold)
+      case "reed-solomon" => ReedSolomon(width, readThreshold, writeThreshold)
+      case _ => throw new Exception(s"Invalid IDA type: $idaType")
+
+    def getHost(name: String): Future[Host] =
+      client.getHost(name).map:
+        case None => throw new Exception(f"Host name not found: $name")
+        case Some(host) => host
+
+    for
+      hlist <- Future.sequence(hosts.map(getHost))
+      frontends = hlist.map(host => new ZCnCFrontend(network, host))
+      _ <- client.newStoragePool(newPoolName, frontends, ida, RocksDBType())
+    yield
+      println(f"New Pool Created: $newPoolId")
   }
 
 }

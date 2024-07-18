@@ -3,12 +3,17 @@ package com.ibm.amoeba.client
 import com.ibm.amoeba.client.internal.OpportunisticRebuildManager
 import com.ibm.amoeba.client.internal.allocation.AllocationManager
 import com.ibm.amoeba.client.internal.network.Messenger
+import com.ibm.amoeba.common.ida.IDA
 import com.ibm.amoeba.common.network.{ClientId, ClientResponse}
 import com.ibm.amoeba.common.objects.{DataObjectPointer, KeyValueObjectPointer}
 import com.ibm.amoeba.common.pool.PoolId
+import com.ibm.amoeba.common.store.StoreId
 import com.ibm.amoeba.common.transaction.TransactionDescription
 import com.ibm.amoeba.common.util.BackgroundTask
+import com.ibm.amoeba.server.cnc.{CnCFrontend, NewStore}
+import com.ibm.amoeba.server.store.backend.BackendType
 
+import java.util.UUID
 import scala.concurrent.{ExecutionContext, Future}
 
 trait AmoebaClient extends ObjectReader {
@@ -29,9 +34,35 @@ trait AmoebaClient extends ObjectReader {
 
   def newTransaction(): Transaction
 
-  def getStoragePool(poolId: PoolId): Future[StoragePool]
+  def getStoragePool(poolId: PoolId): Future[Option[StoragePool]]
 
-  def getHost(hostId: HostId): Future[Host]
+  def getStoragePool(poolName: String): Future[Option[StoragePool]]
+  
+  def newStoragePool(newPoolName: String, 
+                     hostCncFrontends: List[CnCFrontend], 
+                     ida: IDA,
+                     backendType: BackendType): Future[StoragePool] =
+
+    implicit val ec: ExecutionContext = this.clientContext
+
+    val newPoolId = PoolId(UUID.randomUUID())
+    
+    for 
+      _ <- Future.sequence(hostCncFrontends.zipWithIndex.map { (fend, idx) =>
+        fend.send(NewStore(StoreId(newPoolId, idx.toByte), backendType))
+      })
+      poolCfg = StoragePool.Config(
+        newPoolId, newPoolName, ida.width, ida, None, hostCncFrontends.map(_.host.hostId).toArray
+      )
+      newStoragePool <- createStoragePool(poolCfg)
+    yield
+      newStoragePool
+      
+  protected def createStoragePool(config: StoragePool.Config): Future[StoragePool]
+
+  def getHost(hostId: HostId): Future[Option[Host]]
+
+  def getHost(hostName: String): Future[Option[Host]]
 
   def transact[T](prepare: Transaction => Future[T])(implicit ec: ExecutionContext): Future[T] = {
     val tx = newTransaction()

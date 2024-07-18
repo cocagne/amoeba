@@ -47,7 +47,7 @@ class SimpleStoragePool(val client: AmoebaClient,
 
   override def supportsIDA(ida: IDA): Boolean = numberOfStores >= ida.width
 
-  override def createAllocater(ida: IDA): ObjectAllocator = new SinglePoolObjectAllocator(client,
+  override def createAllocator(ida: IDA): ObjectAllocator = new SinglePoolObjectAllocator(client,
     this, ida, maxObjectSize)
 
   override def selectStoresForAllocation(ida: IDA): Array[Int] = {

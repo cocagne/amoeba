@@ -6,13 +6,17 @@ import com.ibm.amoeba.client.internal.pool.SimpleStoragePool
 import com.ibm.amoeba.client.tkvl.{BootstrapPoolNodeAllocator, Root}
 import com.ibm.amoeba.common.{HLCTimestamp, Nucleus}
 import com.ibm.amoeba.common.ida.IDA
-import com.ibm.amoeba.common.objects.{ByteArrayKeyOrdering, Insert, Key, KeyValueObjectPointer, KeyValueOperation, Metadata, ObjectId, ObjectRefcount, ObjectRevision, ObjectType, Value}
+import com.ibm.amoeba.common.objects.{ByteArrayKeyOrdering, Insert, Key, KeyValueObjectPointer, KeyValueOperation, LexicalKeyOrdering, Metadata, ObjectId, ObjectRefcount, ObjectRevision, ObjectType, Value}
 import com.ibm.amoeba.common.transaction.TransactionId
 import com.ibm.amoeba.server.store.backend.Backend
+import com.ibm.amoeba.common.util.uuid2byte
 
 object Bootstrap {
 
-    def initialize(ida: IDA, stores: List[Backend]): KeyValueObjectPointer = {
+    def initialize(ida: IDA, 
+                   stores: List[Backend], 
+                   hostNames: List[(String, UUID)]): KeyValueObjectPointer = {
+      
       require( ida.width == stores.length )
 
       val bootstrapMetadata = Metadata(
@@ -55,19 +59,16 @@ object Bootstrap {
 
       val errTreeRoot = allocate()
       val allocTreeRoot = allocate()
-      val hostsTreeRoot = allocate()
 
       val storeHosts = (0 until ida.width).map(idx => HostId(new UUID(0,idx))).toArray
 
       val poolConfig = SimpleStoragePool.encode(Nucleus.poolId, "bootstrap", ida.width, ida, storeHosts, None)
       val errorTree = Root(0, ByteArrayKeyOrdering, Some(errTreeRoot), BootstrapPoolNodeAllocator).encode()
       val allocTree = Root(0, ByteArrayKeyOrdering, Some(allocTreeRoot), BootstrapPoolNodeAllocator).encode()
-      val hostsTree = Root(0, ByteArrayKeyOrdering, Some(hostsTreeRoot), BootstrapPoolNodeAllocator).encode()
 
       val pool = allocate(List(StoragePool.ConfigKey -> poolConfig,
                                StoragePool.ErrorTreeKey -> errorTree,
-                               StoragePool.AllocationTreeKey -> allocTree,
-                               StoragePool.HostsTreeKey -> hostsTree))
+                               StoragePool.AllocationTreeKey -> allocTree))
 
       val poolTreeRoot = allocate(List(Key(Nucleus.poolId.uuid) -> pool.toArray))
       val poolTree = Root(0,
@@ -75,7 +76,34 @@ object Bootstrap {
         Some(poolTreeRoot),
         BootstrapPoolNodeAllocator)
 
-      val nucleusContent: List[(Key, Array[Byte])] = List(Nucleus.PoolTreeKey -> poolTree.encode())
+      val poolNameTreeRootObj = allocate()
+      val poolNameTreeRoot = Root(0, LexicalKeyOrdering, Some(poolNameTreeRootObj), BootstrapPoolNodeAllocator).encode()
+      val poolNameTree = Root(0,
+        ByteArrayKeyOrdering,
+        Some(poolNameTreeRootObj),
+        BootstrapPoolNodeAllocator)
+
+      val hostsTreeRootObj = allocate()
+      val hostsTreeRoot = Root(0, ByteArrayKeyOrdering, Some(hostsTreeRootObj), BootstrapPoolNodeAllocator).encode()
+      val hostsTree = Root(0,
+        ByteArrayKeyOrdering,
+        Some(hostsTreeRootObj),
+        BootstrapPoolNodeAllocator)
+      
+      val hostsNameTreeRootObj = allocate(
+        hostNames.map((name, uuid) => (Key(name), uuid2byte(uuid)))
+      )
+      val hostsNameTreeRoot = Root(0, LexicalKeyOrdering, Some(hostsNameTreeRootObj), BootstrapPoolNodeAllocator).encode()
+      val hostsNameTree = Root(0,
+        ByteArrayKeyOrdering,
+        Some(hostsNameTreeRootObj),
+        BootstrapPoolNodeAllocator)
+
+      val nucleusContent: List[(Key, Array[Byte])] = List(
+        Nucleus.PoolTreeKey -> poolTree.encode(),
+        Nucleus.PoolNameTreeKey -> poolNameTree.encode(),
+        Nucleus.HostsTreeKey -> hostsTree.encode(),
+        Nucleus.HostsNameTreeKey -> hostsNameTree.encode())
 
       val nucleus = allocate(nucleusContent, Some(Nucleus.objectId))
 
@@ -84,7 +112,9 @@ object Bootstrap {
         Key(allocTreeRoot.id.uuid) -> allocTreeRoot.toArray,
         Key(pool.id.uuid) -> pool.toArray,
         Key(poolTreeRoot.id.uuid) -> poolTreeRoot.toArray,
-        Key(hostsTreeRoot.id.uuid) -> hostsTreeRoot.toArray,
+        Key(poolNameTreeRootObj.id.uuid) -> poolNameTreeRootObj.toArray,
+        Key(hostsTreeRootObj.id.uuid) -> hostsTreeRootObj.toArray,
+        Key(hostsNameTreeRootObj.id.uuid) -> hostsNameTreeRootObj.toArray,
         Key(nucleus.id.uuid) -> nucleus.toArray
       ))
 

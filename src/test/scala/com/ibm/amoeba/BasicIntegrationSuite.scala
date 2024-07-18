@@ -15,7 +15,7 @@ class BasicIntegrationSuite extends IntegrationTestSuite {
   }
 
   test("Insert key value pair into nucleus") {
-    val key = Key(Array[Byte](1))
+    val key = Key(Array[Byte](100))
     val value = Value(Array[Byte](2))
 
     def update(kvos: KeyValueObjectState): Future[Unit] = {
@@ -42,7 +42,7 @@ class BasicIntegrationSuite extends IntegrationTestSuite {
   }
 
   test("Allocate data object") {
-    val key = Key(Array[Byte](1))
+    val key = Key(Array[Byte](100))
     val value = Value(Array[Byte](2))
 
     implicit val tx = client.newTransaction()
@@ -57,7 +57,7 @@ class BasicIntegrationSuite extends IntegrationTestSuite {
         List(Insert(key, value.bytes)))
 
       pool <- client.getStoragePool(Nucleus.poolId)
-      alloc = pool.createAllocater(Replication(3,2))
+      alloc = pool.get.createAllocator(Replication(3,2))
 
       dp <- alloc.allocateDataObject(ObjectRevisionGuard(nucleus, ikvos.revision), Array[Byte](0))
 
@@ -75,7 +75,7 @@ class BasicIntegrationSuite extends IntegrationTestSuite {
   }
 
   test("Allocate KeyValue object") {
-    val key = Key(Array[Byte](1))
+    val key = Key(Array[Byte](100))
     val value = Value(Array[Byte](2))
 
     implicit val tx = client.newTransaction()
@@ -91,7 +91,7 @@ class BasicIntegrationSuite extends IntegrationTestSuite {
 
       pool <- client.getStoragePool(Nucleus.poolId)
 
-      alloc = pool.createAllocater(Replication(3,2))
+      alloc = pool.get.createAllocator(Replication(3,2))
 
       kp <- alloc.allocateKeyValueObject(ObjectRevisionGuard(nucleus, ikvos.revision), Map(key -> value))
 
@@ -113,7 +113,7 @@ class BasicIntegrationSuite extends IntegrationTestSuite {
   }
 
   test("Allocate and update data object") {
-    val key = Key(Array[Byte](1))
+    val key = Key(Array[Byte](100))
     val value = Value(Array[Byte](2))
 
     implicit val tx = client.newTransaction()
@@ -128,7 +128,7 @@ class BasicIntegrationSuite extends IntegrationTestSuite {
         List(Insert(key, value.bytes)))
 
       pool <- client.getStoragePool(Nucleus.poolId)
-      alloc = pool.createAllocater(Replication(3,2))
+      alloc = pool.get.createAllocator(Replication(3,2))
 
       dp <- alloc.allocateDataObject(ObjectRevisionGuard(nucleus, ikvos.revision), Array[Byte](0))
 

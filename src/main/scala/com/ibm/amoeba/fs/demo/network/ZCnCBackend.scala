@@ -43,7 +43,7 @@ class ZCnCBackend(val network: ZMQNetwork,
       val bb = ByteBuffer.wrap(encodedMessage)
       bb.order(ByteOrder.BIG_ENDIAN)
 
-      val r = try Some(codec.CnCMessage.parseFrom(bb)) catch
+      val r = try Some(codec.CnCRequest.parseFrom(bb)) catch
         case t: Throwable =>
           logger.error(s"******* PARSE CNC MESSAGE ERROR: $t", t)
           None
@@ -71,7 +71,7 @@ class ZCnCBackend(val network: ZMQNetwork,
 
           // Wait for operation completion
           val m = completionQueue.take()
-          
+
           val okBuilder = codec.CnCOk.newBuilder()
 
           replyBuilder.setOk(okBuilder.build)

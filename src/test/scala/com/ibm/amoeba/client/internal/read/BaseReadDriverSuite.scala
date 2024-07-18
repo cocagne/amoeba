@@ -15,6 +15,9 @@ import com.ibm.amoeba.common.transaction.{TransactionDescription, TransactionId}
 import com.ibm.amoeba.common.util.BackgroundTask
 import org.scalatest.funsuite.AsyncFunSuite
 import org.scalatest.matchers.should.Matchers
+import com.ibm.amoeba.server.store.backend.BackendType
+import com.ibm.amoeba.server.cnc.{CnCFrontend, NewStore}
+import com.ibm.amoeba.common.ida.IDA
 
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration.*
@@ -59,9 +62,20 @@ object BaseReadDriverSuite {
 
     def newTransaction(): Transaction = null
 
-    def getStoragePool(poolId: PoolId): Future[StoragePool] = null
+    def getStoragePool(poolId: PoolId): Future[Option[StoragePool]] = null
 
-    def getHost(hostId: HostId): Future[Host] = null
+    def getStoragePool(poolName: String): Future[Option[StoragePool]] = null
+
+    override def newStoragePool(newPoolName: String,
+                       hostCncFrontends: List[CnCFrontend],
+                       ida: IDA,
+                       backendType: BackendType): Future[StoragePool] = ???
+
+    protected def createStoragePool(config: StoragePool.Config): Future[StoragePool] = ???
+
+    def getHost(hostId: HostId): Future[Option[Host]] = null
+
+    def getHost(hostName: String): Future[Option[Host]] = null
 
     val retryStrategy: RetryStrategy = null
 

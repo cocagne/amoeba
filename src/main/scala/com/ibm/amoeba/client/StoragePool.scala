@@ -12,7 +12,6 @@ object StoragePool {
   private [amoeba] val ConfigKey = Key(Array[Byte](0))
   private [amoeba] val ErrorTreeKey = Key(Array[Byte](1))
   private [amoeba] val AllocationTreeKey = Key(Array[Byte](2))
-  private [amoeba] val HostsTreeKey = Key(Array[Byte](3))
 
   final case class Config(
                          poolId: PoolId,
@@ -45,7 +44,9 @@ trait StoragePool {
 
   def supportsIDA(ida: IDA): Boolean
 
-  def createAllocater(ida: IDA): ObjectAllocator
+  def createAllocator(ida: IDA): ObjectAllocator
+  
+  def defaultAllocator: ObjectAllocator = createAllocator(defaultIDA)
 
   /** Throws AllocationError: UnsupportedIDA if the IDA is not supported*/
   private[client] def selectStoresForAllocation(ida: IDA): Array[Int]
