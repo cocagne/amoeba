@@ -13,6 +13,7 @@ import com.ibm.amoeba.common.pool.PoolId
 import com.ibm.amoeba.common.store.{StoreId, StorePointer}
 import com.ibm.amoeba.common.transaction.KeyValueUpdate.KeyRevision
 import com.ibm.amoeba.common.transaction.{DataUpdate, DataUpdateOperation, FinalizationActionId, KeyValueUpdate, LocalTimeRequirement, ObjectUpdate, PreTransactionOpportunisticRebuild, RefcountUpdate, RevisionLock, SerializedFinalizationAction, TransactionDescription, TransactionDisposition, TransactionId, TransactionRequirement, TransactionStatus, VersionBump}
+import com.ibm.amoeba.server.cnc
 import com.ibm.amoeba.server.cnc.{NewStore, ShutdownStore, TransferStore}
 import com.ibm.amoeba.server.crl.{AllocationRecoveryState, TransactionRecoveryState}
 import com.ibm.amoeba.server.store.backend.{BackendType, RocksDBType}
@@ -1097,6 +1098,7 @@ object Codec extends Logging:
     builder.setAddress(o.address)
     builder.setDataPort(o.dataPort)
     builder.setCncPort(o.cncPort)
+    builder.setStoreTransferPort(o.storeTransferPort)
 
     builder.build
 
@@ -1106,8 +1108,9 @@ object Codec extends Logging:
     val address = m.getAddress
     val dataPort = m.getDataPort
     val cncPort = m.getCncPort
+    val storeTransferPort = m.getStoreTransferPort
 
-    Host(hostId, name, address, dataPort, cncPort)
+    Host(hostId, name, address, dataPort, cncPort, storeTransferPort)
 
   // CnC Messages -----------------------------------------------------------------
 
@@ -1160,6 +1163,17 @@ object Codec extends Logging:
     val toHost = HostId(decodeUUID(m.getToHost))
 
     TransferStore(storeId, toHost)
+
+
+  def encode(o: cnc.Error): codec.CnCError =
+    val builder = codec.CnCError.newBuilder()
+
+    builder.setMessage(o.message)
+
+    builder.build
+
+  def decode(m: codec.CnCError): cnc.Error =
+    cnc.Error(m.getMessage)
 
 
   

@@ -16,6 +16,7 @@ endpoint:
   host: 127.0.0.1
   data-port: 5000
   cnc-port: 5001
+  store-transfer-port: 5002
 log4j-config: local/log4j-conf.xml
 crl:
   storage-engine: simple-crl
@@ -38,16 +39,17 @@ object StorageNodeConfig {
       fileSize.get(o).getOrElse(300))
 
 
-  case class Endpoint(host: String, dataPort: Int, cncPort: Int)
+  case class Endpoint(host: String, dataPort: Int, cncPort: Int, storeTransferPort: Int)
 
   object Endpoint extends YObject[Endpoint]:
     val host: Required[String] = Required("host", YString)
     val dataPort: Required[Int] = Required("data-port", YInt)
     val cncPort: Required[Int] = Required("cnc-port", YInt)
+    val storeTransferPort: Required[Int] = Required("store-transfer-port", YInt)
 
-    val attrs: List[Attr] = host :: dataPort :: cncPort :: Nil
+    val attrs: List[Attr] = host :: dataPort :: cncPort :: storeTransferPort :: Nil
 
-    def create(o: Object): Endpoint = Endpoint(host.get(o), dataPort.get(o), cncPort.get(o))
+    def create(o: Object): Endpoint = Endpoint(host.get(o), dataPort.get(o), cncPort.get(o), storeTransferPort.get(o))
 
 
   case class StorageNode(name: String,

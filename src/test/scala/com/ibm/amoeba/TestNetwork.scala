@@ -128,7 +128,7 @@ object TestNetwork {
 
     protected def createStoragePool(config: StoragePool.Config): Future[StoragePool] = ???
 
-    def getHost(hostId: HostId): Future[Option[Host]] = Future.successful(Some(Host(HostId(new UUID(0,0)), "testhost", "localhost", 1234, 1235)))
+    def getHost(hostId: HostId): Future[Option[Host]] = Future.successful(Some(Host(HostId(new UUID(0,0)), "testhost", "localhost", 1234, 1235, 1236)))
 
     def getHost(hostName: String): Future[Option[Host]] = getHost(HostId(new UUID(0,0)))
     

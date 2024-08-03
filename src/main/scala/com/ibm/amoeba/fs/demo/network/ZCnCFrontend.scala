@@ -3,7 +3,7 @@ package com.ibm.amoeba.fs.demo.network
 import com.ibm.amoeba.client.Host
 import com.ibm.amoeba.codec
 import com.ibm.amoeba.common.network.Codec
-import com.ibm.amoeba.server.cnc.{CnCFrontend, CnCMessage, NewStore, ShutdownStore, TransferStore}
+import com.ibm.amoeba.server.cnc.{CnCFrontend, CnCRequest, NewStore, ShutdownStore, TransferStore}
 import org.apache.logging.log4j.scala.Logging
 import org.zeromq.SocketType
 
@@ -82,10 +82,12 @@ class ZCnCFrontend(val network: ZMQNetwork,
             else
               p.failure(new Exception("Invalid CnCReply received"))
           case CnCTransferStore(msg, p) =>
+            // msg.storeId, msg.toHost,
             if rm.hasOk then
               p.success(())
             else
               p.failure(new Exception("Invalid CnCReply received"))
+
 
   
   def send(msg: NewStore): Future[Unit] =

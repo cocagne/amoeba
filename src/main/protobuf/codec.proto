@@ -490,6 +490,7 @@ message Host {
   string address = 3;
   uint32 dataPort = 4;
   uint32 cncPort = 5;
+  uint32 storeTransferPort = 6;
 }
 
 //---------------------------------------------------------------------------
@@ -514,6 +515,7 @@ message TransferStore {
   UUID toHost = 2;
 }
 
+
 message CnCRequest {
   oneof msg {
     NewStore new_store = 1;
@@ -523,6 +525,10 @@ message CnCRequest {
 }
 
 message CnCOk {
+}
+
+message CnCError {
+  string message = 1;
 }
 
 message CnCReply {

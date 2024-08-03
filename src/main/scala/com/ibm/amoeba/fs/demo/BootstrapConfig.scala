@@ -10,25 +10,28 @@ import org.yaml.snakeyaml.constructor.SafeConstructor
 
 /*
 bootstrap-ida:
-      type: replication
-      width: 3
-      write-threshold: 2
+  type: replication
+  width: 3
+  write-threshold: 2
 
 bootstrap-storage-nodes:
   - name: node_a
     host: 127.0.0.1
     data-port: 5000
     cnc-port: 5001
+    store-transfer-port: 5002
 
   - name: node_b
     host: 127.0.0.1
-    data-port: 5002
-    cnc-port: 5003
+    data-port: 5010
+    cnc-port: 5011
+    store-transfer-port: 5012
 
   - name: node_c
     host: 127.0.0.1
-    data-port: 5004
-    cnc-port: 5005
+    data-port: 5020
+    cnc-port: 5021
+    store-transfer-port: 5022
 */
 
 object BootstrapConfig {
@@ -55,18 +58,19 @@ object BootstrapConfig {
     def create(o: Object): BootstrapIDA = BootstrapIDA(ida.get(o), maxObjectSize.get(o))
 
 
-  case class StorageNode(name: String, host: String, dataPort: Int, cncPort: Int)
+  case class StorageNode(name: String, host: String, dataPort: Int, cncPort: Int, storeTransferPort: Int)
 
   object StorageNode extends YObject[StorageNode]:
     val name: Required[String]  = Required("name", YString)
     val host: Required[String]  = Required("host", YString)
     val dataPort: Required[Int] = Required("data-port", YInt)
     val cncPort: Required[Int]  = Required("cnc-port", YInt)
+    val storeTransferPort: Required[Int]  = Required("store-transfer-port", YInt)
 
 
-    val attrs: List[Attr] = name :: host :: dataPort :: cncPort :: Nil
+    val attrs: List[Attr] = name :: host :: dataPort :: cncPort :: storeTransferPort :: Nil
 
-    def create(o: Object): StorageNode = StorageNode(name.get(o), host.get(o), dataPort.get(o), cncPort.get(o))
+    def create(o: Object): StorageNode = StorageNode(name.get(o), host.get(o), dataPort.get(o), cncPort.get(o), storeTransferPort.get(o))
 
 
   case class Config(bootstrapIDA: IDA, nodes: List[StorageNode]):

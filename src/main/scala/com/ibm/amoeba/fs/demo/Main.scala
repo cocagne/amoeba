@@ -23,7 +23,6 @@ import com.ibm.amoeba.fs.FileSystem
 import com.ibm.amoeba.fs.demo.network.{ZCnCBackend, ZCnCFrontend, ZMQNetwork}
 import com.ibm.amoeba.fs.impl.simple.SimpleFileSystem
 import com.ibm.amoeba.fs.nfs.AmoebaNFS
-import com.ibm.amoeba.server.cnc.NewStore
 import com.ibm.amoeba.server.crl.simple.SimpleCRL
 import com.ibm.amoeba.server.{RegisteredTransactionFinalizerFactory, SimpleDriverRecoveryMixin, StoreManager}
 import com.ibm.amoeba.server.store.Bootstrap
@@ -286,7 +285,7 @@ object Main {
                          onnet: Option[(NetworkBridge, ZMQNetwork)]=None): (AmoebaClient, ZMQNetwork, KeyValueObjectPointer) = {
 
     val hosts = cfg.nodes.zipWithIndex.map { (node, index) =>
-      HostId(new UUID(0, index)) -> Host(HostId(new UUID(0, index)), node.name, node.host, node.dataPort, node.cncPort)
+      HostId(new UUID(0, index)) -> Host(HostId(new UUID(0, index)), node.name, node.host, node.dataPort, node.cncPort, node.storeTransferPort)
     }.toMap
 
     val (networkBridge, nnet) = onnet.getOrElse(createNetwork(cfg, None, None))
