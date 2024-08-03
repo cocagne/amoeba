@@ -20,9 +20,10 @@ import com.ibm.amoeba.common.transaction.KeyValueUpdate.{DoesNotExist, KeyRequir
 import com.ibm.amoeba.common.util.{BackgroundTaskPool, YamlFormat}
 import com.ibm.amoeba.common.ida.IDA
 import com.ibm.amoeba.fs.FileSystem
-import com.ibm.amoeba.fs.demo.network.{ZCnCBackend, ZCnCFrontend, ZMQNetwork}
+import com.ibm.amoeba.fs.demo.network.{ZCnCBackend, ZCnCFrontend, ZMQNetwork, ZStoreTransferBackend}
 import com.ibm.amoeba.fs.impl.simple.SimpleFileSystem
 import com.ibm.amoeba.fs.nfs.AmoebaNFS
+import com.ibm.amoeba.server.cnc.TransferStore
 import com.ibm.amoeba.server.crl.simple.SimpleCRL
 import com.ibm.amoeba.server.{RegisteredTransactionFinalizerFactory, SimpleDriverRecoveryMixin, StoreManager}
 import com.ibm.amoeba.server.store.Bootstrap
@@ -238,6 +239,34 @@ object Main {
             action((x, c) => c.copy(hosts = x.toList)),
         )
 
+      cmd("transfer-store").text("Transfers a store to a new host").
+        action((_, c) => c.copy(mode = "transfer-store")).
+        children(
+          arg[File]("<log4j-config-file>").text("Log4j Configuration File").
+            action((x, c) => c.copy(log4jConfigFile = x)).
+            validate(x => if (x.exists()) success else failure(s"Log4j Config file does not exist: $x")),
+
+          arg[File]("<bootstrap-config-file>").text("Bootstrap Configuration File").
+            action((x, c) => c.copy(bootstrapConfigFile = x)).
+            validate(x => if (x.exists()) success else failure(s"Config file does not exist: $x")),
+
+          arg[String]("<store-identifier>").text("Data Store Identifier. Format is \"pool-uuid:storeNumber\"").
+            action((x, c) => c.copy(storeName = x)).
+            validate { x =>
+              val arr = x.split(":")
+              if (arr.length == 2) {
+                try {
+                  Integer.parseInt(arr(1))
+                  success
+                } catch {
+                  case _: Throwable => failure("Store name must match the format \"pool-name:storeNumber\"")
+                }
+              }
+              else failure("Store name must match the format \"pool-name:storeNumber\"")
+            },
+          arg[String]("<new-host>").text("Name of the host to receive the store").
+            action((x, c) => c.copy(host = x)),
+        )
       checkConfig( c => if (c.mode == "") failure("Invalid command") else success )
     }
 
@@ -256,6 +285,7 @@ object Main {
             case "debug" => run_debug_code(cfg.log4jConfigFile, bootstrapConfig)
             case "rebuild" => rebuild(cfg.log4jConfigFile, cfg.storeName, bootstrapConfig)
             case "new-pool" => new_pool(cfg.log4jConfigFile, bootstrapConfig, cfg.newPoolName, cfg.idaType, cfg.width, cfg.readThreshold, cfg.writeThreshold, cfg.hosts)
+            case "transfer-store" => transfer_store(cfg.log4jConfigFile, bootstrapConfig, cfg.storeName, cfg.host)
           }
         } catch {
           case e: YamlFormat.FormatError => println(s"Error loading config file: $e")
@@ -650,10 +680,17 @@ object Main {
     networkThread.start()
     storeManager.start()
 
-    val cncBackend = new ZCnCBackend(nnet,
+    val cncBackend = new ZCnCBackend(
+      nnet,
+      client,
       nodeCfg.rootDir.resolve("stores"),
       storeManager :: Nil,
       nodeCfg.endpoint.cncPort)
+
+    val transferBackend = new ZStoreTransferBackend(
+      nodeCfg.endpoint.storeTransferPort,
+      network,
+      storeManager)
 
     // Kickoff repair loop
     repair(client, storeManager)
@@ -819,7 +856,7 @@ object Main {
     implicit val ec: ExecutionContext = client.clientContext
 
     val newPoolId = PoolId(UUID.randomUUID())
-    
+
     val ida: IDA = idaType match
       case "replication" => Replication(width, writeThreshold)
       case "reed-solomon" => ReedSolomon(width, readThreshold, writeThreshold)
@@ -836,6 +873,52 @@ object Main {
       _ <- client.newStoragePool(newPoolName, frontends, ida, RocksDBType())
     yield
       println(f"New Pool Created: $newPoolId")
+  }
+
+  def transfer_store(log4jConfigFile: File,
+                     bootstrapConfig: BootstrapConfig.Config,
+                     storeName: String,
+                     hostName: String): Unit = {
+
+    setLog4jConfigFile(log4jConfigFile)
+
+    val (client, network, nucleus) = createAmoebaClient(bootstrapConfig)
+
+    val networkThread = new Thread {
+      override def run(): Unit = {
+        network.ioThread()
+      }
+    }
+    networkThread.start()
+
+    implicit val ec: ExecutionContext = client.clientContext
+
+    val storeId = StoreId(storeName)
+
+    def getNewHost: Future[Host] =
+      client.getHost(hostName).map:
+        case None => throw new Exception(f"Host name not found: $hostName")
+        case Some(host) => host
+
+    def getPool: Future[StoragePool] =
+      client.getStoragePool(storeId.poolId).map:
+        case None => throw new Exception(f"StoragePool not found ${storeId.poolId}")
+        case Some(sp) => sp
+
+    def getCurrentHost(storagePool: StoragePool): Future[Host] =
+      val curHostId = storagePool.storeHosts(storeId.poolIndex)
+      client.getHost(curHostId).map:
+        case None => throw new Exception(f"Host name not found: $curHostId")
+        case Some(host) => host
+
+    for
+      newHost <- getNewHost
+      sp <- getPool
+      currentHost <- getCurrentHost(sp)
+      zfrontend = new ZCnCFrontend(network, currentHost)
+      _ <- zfrontend.send(TransferStore(storeId, newHost.hostId))
+    yield
+      println(f"Store Transfer Initiated: Store: ${storeName} From: ${currentHost.name} To: ${hostName}")
   }
 
 }

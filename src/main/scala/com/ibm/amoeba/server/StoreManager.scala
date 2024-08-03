@@ -31,6 +31,7 @@ object StoreManager {
   case class ClientReq(msg: ClientRequest) extends Event
   case class Repair(storeId: StoreId, os: ClientObjectState, completion: Promise[Unit]) extends Event
   case class LoadStore(backend: Backend, completion: Promise[Unit]) extends Event
+  case class LoadStoreById(storeId: StoreId) extends Event
   case class Exit() extends Event
   case class RecoveryEvent() extends Event
   case class HeartbeatEvent() extends Event
@@ -67,6 +68,8 @@ class StoreManager(val rootDir: Path,
 
   protected var shutdownCalled = false
   private val shutdownPromise: Promise[Unit] = Promise()
+
+  val storesDir: Path = rootDir.resolve("stores")
 
   def start(): Unit = {
     threadPool.submit(new Runnable {
@@ -131,6 +134,9 @@ class StoreManager(val rootDir: Path,
     events.put(LoadStore(backend, p))
     p.future
   }
+
+  def loadStoreById(storeId: StoreId): Unit =
+    events.put(LoadStoreById(storeId))
 
   def receiveTransactionMessage(msg: TxMessage): Unit = {
     events.put(TransactionMessage(msg))
@@ -233,6 +239,10 @@ class StoreManager(val rootDir: Path,
             p.success(())
         else
           p.success(())
+
+      case LoadStoreById(storeId) =>
+        if ! stores.contains(storeId) then
+          loadStoreFromPath(storesDir.resolve(storeId.directoryName))
         
       case HeartbeatEvent() =>
         //logger.trace("Main loop got heartbeat event")

@@ -1,6 +1,6 @@
 package com.ibm.amoeba.common
 
-import java.io.{PrintWriter, StringWriter}
+import java.io.{File, PrintWriter, StringWriter}
 import java.nio.ByteBuffer
 import java.util.UUID
 
@@ -46,5 +46,13 @@ package object util {
   def printableArray(arr: Array[Byte]): String = {
     val enc = java.util.Base64.getEncoder
     enc.encodeToString(arr)
+  }
+
+  def deleteDirectory(directoryToBeDeleted: File): Boolean = {
+    val allContents = directoryToBeDeleted.listFiles
+    if allContents != null then
+      for (file <- allContents)
+        deleteDirectory(file)
+    directoryToBeDeleted.delete
   }
 }

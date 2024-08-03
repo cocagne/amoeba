@@ -1,5 +1,6 @@
 package com.ibm.amoeba.fs.demo.network
 
+import com.ibm.amoeba.client.{AmoebaClient, Host, HostId, StoragePool}
 import com.ibm.amoeba.codec
 import com.ibm.amoeba.common.network.Codec
 import com.ibm.amoeba.common.pool.PoolId
@@ -15,10 +16,10 @@ import java.nio.file.Path
 import java.nio.{ByteBuffer, ByteOrder}
 import java.util.concurrent.LinkedBlockingQueue
 import scala.concurrent.{Future, Promise}
-
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class ZCnCBackend(val network: ZMQNetwork,
+                  val client: AmoebaClient,
                   val storesDir: Path,
                   val storeManagers: List[StoreManager],
                   val cncPort: Int) extends Logging:
@@ -96,4 +97,30 @@ class ZCnCBackend(val network: ZMQNetwork,
       case None => completionQueue.put("")
       case Some(mgr) => mgr.closeStore(msg.storeId).foreach(_ => completionQueue.put(""))
 
-  def onTransferStore(msg: TransferStore): Future[Unit] = ???
+  def onTransferStore(msg: TransferStore): Future[Unit] =
+    storeManagers.find(_.containsStore(msg.storeId)) match
+      case None => Future.failed(new Exception(f"Store ${msg.storeId} not found"))
+      case Some(storeManager) =>
+
+        def getPool: Future[StoragePool] =
+          client.getStoragePool(msg.storeId.poolId).map:
+            case None => throw new Exception(f"Pool not found: ${msg.storeId.poolId}")
+            case Some(sp) => sp
+
+        def getHost(hostId: HostId): Future[Host] =
+          client.getHost(hostId).map:
+            case None => throw new Exception(f"Host name not found: $hostId")
+            case Some(host) => host
+
+        for
+          sp <- getPool
+          hostId = sp.storeHosts(msg.storeId.poolIndex)
+          host <- getHost(hostId)
+        yield
+          val stf = new ZStoreTransferFrontend(storeManager.storesDir, network)
+          stf.send(msg.storeId, host.address, host.storeTransferPort)
+
+
+
+
+
