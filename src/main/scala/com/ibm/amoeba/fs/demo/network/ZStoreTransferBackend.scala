@@ -1,14 +1,18 @@
 package com.ibm.amoeba.fs.demo.network
 
+import com.ibm.amoeba.client.{AmoebaClient, HostId}
 import com.ibm.amoeba.common.store.StoreId
 import com.ibm.amoeba.server.StoreManager
 import org.apache.logging.log4j.scala.Logging
 import org.zeromq.SocketType
 
 import java.nio.file.{Files, Path}
+import scala.concurrent.ExecutionContext
 
 class ZStoreTransferBackend(val transferPort: Int,
                             val net: ZMQNetwork,
+                            val hostId: HostId,
+                            val client: AmoebaClient,
                             val storeManager: StoreManager) extends Logging:
 
   val incomingDir = storeManager.storesDir.resolve("incoming")
@@ -54,6 +58,12 @@ class ZStoreTransferBackend(val transferPort: Int,
           Files.move(incomingDir.resolve(storeId.directoryName), storeDir)
           storeManager.loadStoreById(storeId)
           logger.info(s"Completed transfer of store ${storeId.directoryName}")
+
+          implicit val ec: ExecutionContext = client.clientContext
+          
+          client.updateStorageHost(storeId, hostId).foreach: _ =>
+            logger.info(s"Successfully updated Storage Pool configuration for store: ${storeId.directoryName}")
+
         else
           ps.getOutputStream.write(data)
 

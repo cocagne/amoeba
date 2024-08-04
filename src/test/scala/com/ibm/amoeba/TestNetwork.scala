@@ -121,6 +121,8 @@ object TestNetwork {
       }
     }
 
+    override def updateStorageHost(storeId: StoreId, newHostId: HostId): Future[Unit] = ???
+
     override def newStoragePool(newPoolName: String,
                        hostCncFrontends: List[CnCFrontend],
                        ida: IDA,

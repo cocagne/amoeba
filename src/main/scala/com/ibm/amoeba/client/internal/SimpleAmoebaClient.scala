@@ -2,7 +2,7 @@ package com.ibm.amoeba.client.internal
 
 import com.ibm.amoeba.client.{AmoebaClient, DataObjectState, ExponentialBackoffRetryStrategy, Host, HostId, KeyValueObjectState, ObjectAllocator, ObjectCache, RetryStrategy, StoragePool, Transaction, TransactionStatusCache, TypeRegistry}
 import com.ibm.amoeba.client.internal.allocation.{AllocationManager, SuperSimpleAllocationDriver}
-import com.ibm.amoeba.common.objects.{ByteArrayKeyOrdering, DataObjectPointer, Key, KeyValueObjectPointer, ObjectRevisionGuard, Value}
+import com.ibm.amoeba.common.objects.{ByteArrayKeyOrdering, DataObjectPointer, Insert, Key, KeyValueObjectPointer, ObjectRevisionGuard, Value}
 import com.ibm.amoeba.client.internal.network.Messenger as ClientMessenger
 import com.ibm.amoeba.client.internal.pool.SimpleStoragePool
 import com.ibm.amoeba.client.internal.read.{ReadManager, SimpleReadDriver}
@@ -11,6 +11,8 @@ import com.ibm.amoeba.client.tkvl.{KVObjectRootManager, Root, SinglePoolNodeAllo
 import com.ibm.amoeba.common.Nucleus
 import com.ibm.amoeba.common.network.{AllocateResponse, ClientId, ClientResponse, ReadResponse, TransactionCompletionResponse, TransactionFinalized, TransactionResolved}
 import com.ibm.amoeba.common.pool.PoolId
+import com.ibm.amoeba.common.store.StoreId
+import com.ibm.amoeba.common.transaction.KeyValueUpdate.{KeyRequirement, KeyRevision}
 import com.ibm.amoeba.common.util.{BackgroundTask, BackgroundTaskPool, byte2uuid, uuid2byte}
 
 import java.util.UUID
@@ -70,6 +72,34 @@ class SimpleAmoebaClient(val msngr: ClientMessenger,
       tkvl.get(Key(poolName)).flatMap:
         case None => Future.successful(None)
         case Some(poolIdBytes) => getStoragePool(PoolId(byte2uuid(poolIdBytes.value.bytes)))
+
+  override def updateStorageHost(storeId: StoreId, newHostId: HostId): Future[Unit] =
+    val root = new KVObjectRootManager(this, Nucleus.PoolTreeKey, nucleus)
+    val tkvl = new TieredKeyValueList(this, root)
+
+    implicit val tx: Transaction = newTransaction()
+    
+    def updateConfig(config: StoragePool.Config): Unit =
+      config.storeHosts(storeId.poolIndex) = newHostId
+
+    for
+      optr <- tkvl.get(Key(storeId.poolId.uuid))
+      ptrValue = optr match
+        case None => throw new Exception(s"Pool not found: ${storeId.poolId}")
+        case Some(ptrValue) => ptrValue
+      poolPtr = KeyValueObjectPointer(ptrValue.value.bytes)
+      currentKvos <- read(poolPtr)
+      keyVal = currentKvos.contents.get(StoragePool.ConfigKey) match
+        case None => throw new Exception(s"Invalid Pool Definition! Missing config key ${storeId.poolId}")
+        case Some(kr) => kr
+      poolConfig = StoragePool.Config(keyVal.value.bytes)
+      _=updateConfig(poolConfig)
+      _=tx.update(poolPtr, None, None,
+        KeyRevision(StoragePool.ConfigKey, keyVal.revision) :: Nil,
+        Insert(StoragePool.ConfigKey, poolConfig.encode()) :: Nil)
+      _ <- tx.commit()
+    yield
+      ()
 
   override protected def createStoragePool(config: StoragePool.Config): Future[StoragePool] =
     val root = new KVObjectRootManager(this, Nucleus.PoolTreeKey, nucleus)

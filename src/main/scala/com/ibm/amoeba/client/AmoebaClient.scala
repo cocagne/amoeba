@@ -38,6 +38,8 @@ trait AmoebaClient extends ObjectReader {
 
   def getStoragePool(poolName: String): Future[Option[StoragePool]]
   
+  def updateStorageHost(storeId: StoreId, newHostId: HostId): Future[Unit]
+  
   def newStoragePool(newPoolName: String, 
                      hostCncFrontends: List[CnCFrontend], 
                      ida: IDA,

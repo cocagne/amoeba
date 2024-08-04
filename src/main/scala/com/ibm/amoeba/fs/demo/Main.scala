@@ -687,10 +687,15 @@ object Main {
       storeManager :: Nil,
       nodeCfg.endpoint.cncPort)
 
-    val transferBackend = new ZStoreTransferBackend(
-      nodeCfg.endpoint.storeTransferPort,
-      network,
-      storeManager)
+    client.getHost(nodeName).foreach:
+      case None => throw new Exception(s"Invalid Host Name: $nodeName")
+      case Some(host) =>
+        val transferBackend = new ZStoreTransferBackend(
+          nodeCfg.endpoint.storeTransferPort,
+          network,
+          host.hostId,
+          client,
+          storeManager)
 
     // Kickoff repair loop
     repair(client, storeManager)
