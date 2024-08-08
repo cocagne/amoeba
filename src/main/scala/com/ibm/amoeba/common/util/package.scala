@@ -3,6 +3,7 @@ package com.ibm.amoeba.common
 import java.io.{File, PrintWriter, StringWriter}
 import java.nio.ByteBuffer
 import java.util.UUID
+import scala.concurrent.{ExecutionContext, Future}
 
 package object util {
   import scala.language.implicitConversions
@@ -55,4 +56,8 @@ package object util {
         deleteDirectory(file)
     directoryToBeDeleted.delete
   }
+  
+  def someOrThrow[U, T <: Throwable](o: Future[Option[U]], exceptionToThrow: => T)(implicit ec: ExecutionContext): Future[U] = o.map:
+    case None => throw exceptionToThrow
+    case Some(u) => u
 }

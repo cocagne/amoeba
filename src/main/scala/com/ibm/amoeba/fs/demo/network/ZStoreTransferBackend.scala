@@ -6,7 +6,7 @@ import com.ibm.amoeba.server.StoreManager
 import org.apache.logging.log4j.scala.Logging
 import org.zeromq.SocketType
 
-import java.nio.file.{Files, Path}
+import java.nio.file.Files
 import scala.concurrent.ExecutionContext
 
 class ZStoreTransferBackend(val transferPort: Int,
@@ -15,6 +15,7 @@ class ZStoreTransferBackend(val transferPort: Int,
                             val client: AmoebaClient,
                             val storeManager: StoreManager) extends Logging:
 
+  logger.info("Starting StoreTransferBackend")
   val incomingDir = storeManager.storesDir.resolve("incoming")
 
   if ! Files.exists(incomingDir) then
@@ -26,6 +27,7 @@ class ZStoreTransferBackend(val transferPort: Int,
   rthread.start()
 
   private def rcvThread(): Unit =
+    logger.info(s"Store Transfer Backend listening on tcp://*:$transferPort")
     val incomingSock = net.context.createSocket(SocketType.PULL)
 
     incomingSock.bind(s"tcp://*:$transferPort")
@@ -53,6 +55,7 @@ class ZStoreTransferBackend(val transferPort: Int,
 
         if data.isEmpty then
           ps.getOutputStream.close()
+          ps.waitFor() // Block here till process exits
           imap -= storeId
           val storeDir = storeManager.storesDir.resolve(storeId.directoryName)
           Files.move(incomingDir.resolve(storeId.directoryName), storeDir)
@@ -60,7 +63,7 @@ class ZStoreTransferBackend(val transferPort: Int,
           logger.info(s"Completed transfer of store ${storeId.directoryName}")
 
           implicit val ec: ExecutionContext = client.clientContext
-          
+
           client.updateStorageHost(storeId, hostId).foreach: _ =>
             logger.info(s"Successfully updated Storage Pool configuration for store: ${storeId.directoryName}")
 

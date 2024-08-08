@@ -114,6 +114,7 @@ class StoreManager(val rootDir: Path,
     
 
   def containsStore(storeId: StoreId): Boolean = synchronized {
+    logger.trace(s"********* CONTAINS STORE: ${storeId}: ${stores.contains(storeId)}. Stores: ${stores}")
     stores.contains(storeId)
   } 
   

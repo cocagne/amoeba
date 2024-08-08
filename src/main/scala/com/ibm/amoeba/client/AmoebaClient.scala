@@ -37,19 +37,19 @@ trait AmoebaClient extends ObjectReader {
   def getStoragePool(poolId: PoolId): Future[Option[StoragePool]]
 
   def getStoragePool(poolName: String): Future[Option[StoragePool]]
-  
+
   def updateStorageHost(storeId: StoreId, newHostId: HostId): Future[Unit]
-  
-  def newStoragePool(newPoolName: String, 
-                     hostCncFrontends: List[CnCFrontend], 
+
+  def newStoragePool(newPoolName: String,
+                     hostCncFrontends: List[CnCFrontend],
                      ida: IDA,
                      backendType: BackendType): Future[StoragePool] =
 
     implicit val ec: ExecutionContext = this.clientContext
 
     val newPoolId = PoolId(UUID.randomUUID())
-    
-    for 
+
+    for
       _ <- Future.sequence(hostCncFrontends.zipWithIndex.map { (fend, idx) =>
         fend.send(NewStore(StoreId(newPoolId, idx.toByte), backendType))
       })
@@ -59,7 +59,7 @@ trait AmoebaClient extends ObjectReader {
       newStoragePool <- createStoragePool(poolCfg)
     yield
       newStoragePool
-      
+
   protected def createStoragePool(config: StoragePool.Config): Future[StoragePool]
 
   def getHost(hostId: HostId): Future[Option[Host]]

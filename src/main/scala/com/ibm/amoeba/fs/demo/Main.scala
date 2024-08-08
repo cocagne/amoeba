@@ -17,7 +17,7 @@ import com.ibm.amoeba.common.pool.PoolId
 import com.ibm.amoeba.common.store.{StoreId, StorePointer}
 import com.ibm.amoeba.common.transaction.KeyValueUpdate
 import com.ibm.amoeba.common.transaction.KeyValueUpdate.{DoesNotExist, KeyRequirement}
-import com.ibm.amoeba.common.util.{BackgroundTaskPool, YamlFormat}
+import com.ibm.amoeba.common.util.{BackgroundTaskPool, YamlFormat, someOrThrow}
 import com.ibm.amoeba.common.ida.IDA
 import com.ibm.amoeba.fs.FileSystem
 import com.ibm.amoeba.fs.demo.network.{ZCnCBackend, ZCnCFrontend, ZMQNetwork, ZStoreTransferBackend}
@@ -280,7 +280,7 @@ object Main {
           //println(s"Config file: $config")
           cfg.mode match {
             case "bootstrap" => bootstrap(bootstrapConfig, Paths.get("local/bootstrap"))
-            case "node" => node(cfg.nodeName, bootstrapConfig, StorageNodeConfig.loadStorageNode(cfg.nodeConfigFile))
+            case "node" => node(bootstrapConfig, StorageNodeConfig.loadStorageNode(cfg.nodeConfigFile))
             case "amoeba" => amoeba_server(cfg.log4jConfigFile, bootstrapConfig)
             case "debug" => run_debug_code(cfg.log4jConfigFile, bootstrapConfig)
             case "rebuild" => rebuild(cfg.log4jConfigFile, cfg.storeName, bootstrapConfig)
@@ -304,7 +304,7 @@ object Main {
       StoreId(PoolId(new UUID(0,0)), index.toByte) -> node.name
     }.toMap
 
-    val heartbeatPeriod = Duration(5, SECONDS)
+    val heartbeatPeriod = Duration(10, SECONDS)
     (b, new ZMQNetwork(oclientId, nodes, stores, storageNode, heartbeatPeriod,
       b.onClientResponseReceived,
       b.onClientRequestReceived,
@@ -321,7 +321,7 @@ object Main {
     val (networkBridge, nnet) = onnet.getOrElse(createNetwork(cfg, None, None))
 
     val txStatusCacheDuration = Duration(10, SECONDS)
-    val initialReadDelay = Duration(5, SECONDS)
+    val initialReadDelay = Duration(10, SECONDS)
     val maxReadDelay = Duration(6, SECONDS)
     val txRetransmitDelay = Duration(1, SECONDS)
     val allocationRetransmitDelay = Duration(5, SECONDS)
@@ -621,8 +621,7 @@ object Main {
         }
 
 
-  def node(nodeName: String,
-           bootstrapCfg: BootstrapConfig.Config,
+  def node(bootstrapCfg: BootstrapConfig.Config,
            nodeCfg: StorageNodeConfig.StorageNode): Unit = {
 
     val sched = Executors.newScheduledThreadPool(3)
@@ -649,7 +648,7 @@ object Main {
     networkBridge.oclient = Some(client)
 
     val txFinalizerFactory = new RegisteredTransactionFinalizerFactory(client)
-    val txHeartbeatPeriod = Duration(1, SECONDS)
+    val txHeartbeatPeriod = Duration(5, SECONDS)
     val txRetryDelay = Duration(100, MILLISECONDS) //
     val txRetryCap = Duration(3, SECONDS)
     //val allocHeartbeatPeriod   = Duration(3, SECONDS)
@@ -687,8 +686,8 @@ object Main {
       storeManager :: Nil,
       nodeCfg.endpoint.cncPort)
 
-    client.getHost(nodeName).foreach:
-      case None => throw new Exception(s"Invalid Host Name: $nodeName")
+    client.getHost(nodeCfg.name).foreach:
+      case None => throw new Exception(s"Invalid Host Name: ${nodeCfg.name}")
       case Some(host) =>
         val transferBackend = new ZStoreTransferBackend(
           nodeCfg.endpoint.storeTransferPort,
@@ -860,8 +859,6 @@ object Main {
 
     implicit val ec: ExecutionContext = client.clientContext
 
-    val newPoolId = PoolId(UUID.randomUUID())
-
     val ida: IDA = idaType match
       case "replication" => Replication(width, writeThreshold)
       case "reed-solomon" => ReedSolomon(width, readThreshold, writeThreshold)
@@ -875,9 +872,11 @@ object Main {
     for
       hlist <- Future.sequence(hosts.map(getHost))
       frontends = hlist.map(host => new ZCnCFrontend(network, host))
-      _ <- client.newStoragePool(newPoolName, frontends, ida, RocksDBType())
+      sp <- client.newStoragePool(newPoolName, frontends, ida, RocksDBType())
     yield
-      println(f"New Pool Created: $newPoolId")
+      println("******************************************")
+      println(f"* New Pool Created: ${sp.poolId}")
+      println("******************************************")
   }
 
   def transfer_store(log4jConfigFile: File,
@@ -900,26 +899,12 @@ object Main {
 
     val storeId = StoreId(storeName)
 
-    def getNewHost: Future[Host] =
-      client.getHost(hostName).map:
-        case None => throw new Exception(f"Host name not found: $hostName")
-        case Some(host) => host
-
-    def getPool: Future[StoragePool] =
-      client.getStoragePool(storeId.poolId).map:
-        case None => throw new Exception(f"StoragePool not found ${storeId.poolId}")
-        case Some(sp) => sp
-
-    def getCurrentHost(storagePool: StoragePool): Future[Host] =
-      val curHostId = storagePool.storeHosts(storeId.poolIndex)
-      client.getHost(curHostId).map:
-        case None => throw new Exception(f"Host name not found: $curHostId")
-        case Some(host) => host
-
     for
-      newHost <- getNewHost
-      sp <- getPool
-      currentHost <- getCurrentHost(sp)
+      newHost <- someOrThrow(client.getHost(hostName), new Exception(f"Host name not found: $hostName"))
+      sp <- someOrThrow(client.getStoragePool(storeId.poolId), new Exception(f"StoragePool not found ${storeId.poolId}"))
+      curHostId = sp.storeHosts(storeId.poolIndex)
+      currentHost <- someOrThrow(client.getHost(curHostId), new Exception(f"Host name not found: $curHostId"))
+
       zfrontend = new ZCnCFrontend(network, currentHost)
       _ <- zfrontend.send(TransferStore(storeId, newHost.hostId))
     yield

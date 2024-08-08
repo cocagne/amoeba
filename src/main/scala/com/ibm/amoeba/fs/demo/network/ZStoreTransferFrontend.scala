@@ -37,7 +37,7 @@ class ZStoreTransferFrontend(val storesDir: Path, val net: ZMQNetwork) extends L
       var pos = 0
       var nread = 0
       while nread != -1 && pos < buff.length do
-        nread = stdin.read(buff, pos, buff.length)
+        nread = stdin.read(buff, pos, buff.length-pos)
         if nread != -1 then
           pos += nread
       (pos, nread == -1)
