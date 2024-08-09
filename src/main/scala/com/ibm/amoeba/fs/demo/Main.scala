@@ -614,7 +614,7 @@ object Main {
         opool <- client.getStoragePool(storeId.poolId)
         _ <- opool.get.errorTree.foreachInRange(Key(min), Key(max), repairOne(opool.get, storeId))
       yield
-        println(s"*** Repair Process Complete ***")
+        println(s"*** Repair Process Complete for Store ${storeId} ***")
         Future {
           Thread.sleep(30000)
           repair(client, storeManager)
