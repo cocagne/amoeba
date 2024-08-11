@@ -17,10 +17,10 @@ import scala.sys.process._
 lazy val root = (project in file(".")).
   settings(
 
-    name         := "amoeba",
+    name         := "aspen",
     version      := "0.1",
     scalaVersion := "3.3.3",
-    organization := "com.ibm",
+    organization := "org.aspen_ddp",
       
     scalacOptions ++= Seq("-feature", "-deprecation"), //, "-rewrite", "-source:3.0-migration"),
 
