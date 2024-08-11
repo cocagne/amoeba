@@ -1,6 +1,6 @@
 package org.aspen_ddp.aspen.fs.demo.network
 
-import org.aspen_ddp.aspen.client.{AmoebaClient, Host, HostId, StoragePool}
+import org.aspen_ddp.aspen.client.{AspenClient, Host, HostId, StoragePool}
 import org.aspen_ddp.aspen.codec
 import org.aspen_ddp.aspen.common.network.Codec
 import org.aspen_ddp.aspen.common.pool.PoolId
@@ -20,7 +20,7 @@ import scala.concurrent.{Future, Promise}
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class ZCnCBackend(val network: ZMQNetwork,
-                  val client: AmoebaClient,
+                  val client: AspenClient,
                   val storesDir: Path,
                   val storeManagers: List[StoreManager],
                   val cncPort: Int) extends Logging:

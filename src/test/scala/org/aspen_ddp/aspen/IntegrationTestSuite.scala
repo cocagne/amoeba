@@ -2,7 +2,7 @@ package org.aspen_ddp.aspen
 
 import java.util.concurrent.TimeoutException
 
-import org.aspen_ddp.aspen.client.AmoebaClient
+import org.aspen_ddp.aspen.client.AspenClient
 import org.aspen_ddp.aspen.common.objects.KeyValueObjectPointer
 import org.scalatest.{BeforeAndAfter, FutureOutcome}
 import org.scalatest.funsuite.AsyncFunSuite
@@ -13,7 +13,7 @@ import scala.concurrent.duration.{Duration, MILLISECONDS}
 
 class IntegrationTestSuite  extends AsyncFunSuite with Matchers { //with BeforeAndAfter {
   var net: TestNetwork = _
-  var client: AmoebaClient = _
+  var client: AspenClient = _
   var nucleus: KeyValueObjectPointer = _
   var testName: String = "NO_TEST"
 

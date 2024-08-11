@@ -2,7 +2,7 @@ package org.aspen_ddp.aspen.fs
 
 import java.util.UUID
 
-import org.aspen_ddp.aspen.client.{AmoebaClient, CorruptedObject, InvalidObject, ObjectAllocator, ObjectAllocatorId, RetryStrategy}
+import org.aspen_ddp.aspen.client.{AspenClient, CorruptedObject, InvalidObject, ObjectAllocator, ObjectAllocatorId, RetryStrategy}
 import org.aspen_ddp.aspen.common.objects.ObjectRevision
 import org.aspen_ddp.aspen.compute.TaskExecutor
 import org.aspen_ddp.aspen.fs.error.InvalidInode
@@ -168,7 +168,7 @@ trait FileSystem extends Logging {
   private[fs] def defaultInodeAllocator: ObjectAllocator
   private[fs] def defaultSegmentAllocator(): Future[ObjectAllocator]
   private[fs] def defaultIndexNodeAllocator(tier: Int): Future[ObjectAllocator]
-  private[fs] def client: AmoebaClient
+  private[fs] def client: AspenClient
   private[fs] def executionContext: ExecutionContext
   private[fs] def getObjectAllocator(id: ObjectAllocatorId): Future[ObjectAllocator]
   private[fs] def inodeTable: InodeTable

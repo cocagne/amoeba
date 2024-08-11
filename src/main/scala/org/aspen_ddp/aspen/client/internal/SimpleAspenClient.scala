@@ -1,6 +1,6 @@
 package org.aspen_ddp.aspen.client.internal
 
-import org.aspen_ddp.aspen.client.{AmoebaClient, DataObjectState, ExponentialBackoffRetryStrategy, Host, HostId, KeyValueObjectState, ObjectAllocator, ObjectCache, RetryStrategy, StoragePool, Transaction, TransactionStatusCache, TypeRegistry}
+import org.aspen_ddp.aspen.client.{AspenClient, DataObjectState, ExponentialBackoffRetryStrategy, Host, HostId, KeyValueObjectState, ObjectAllocator, ObjectCache, RetryStrategy, StoragePool, Transaction, TransactionStatusCache, TypeRegistry}
 import org.aspen_ddp.aspen.client.internal.allocation.{AllocationManager, SuperSimpleAllocationDriver}
 import org.aspen_ddp.aspen.common.objects.{ByteArrayKeyOrdering, DataObjectPointer, Insert, Key, KeyValueObjectPointer, ObjectRevisionGuard, Value}
 import org.aspen_ddp.aspen.client.internal.network.Messenger as ClientMessenger
@@ -19,16 +19,16 @@ import java.util.UUID
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.{Duration, FiniteDuration, MILLISECONDS}
 
-class SimpleAmoebaClient(val msngr: ClientMessenger,
-                         override val clientId: ClientId,
-                         implicit val executionContext: ExecutionContext,
-                         val nucleus: KeyValueObjectPointer,
-                         txStatusCacheDuration: FiniteDuration,
-                         initialReadDelay: Duration,
-                         maxReadDelay: Duration,
-                         txRetransmitDelay: Duration,
-                         allocationRetransmitDelay: Duration,
-                         bootstrapHosts: Map[HostId, Host]) extends AmoebaClient {
+class SimpleAspenClient(val msngr: ClientMessenger,
+                        override val clientId: ClientId,
+                        implicit val executionContext: ExecutionContext,
+                        val nucleus: KeyValueObjectPointer,
+                        txStatusCacheDuration: FiniteDuration,
+                        initialReadDelay: Duration,
+                        maxReadDelay: Duration,
+                        txRetransmitDelay: Duration,
+                        allocationRetransmitDelay: Duration,
+                        bootstrapHosts: Map[HostId, Host]) extends AspenClient {
 
   var attributes: Map[String, String] = Map()
 

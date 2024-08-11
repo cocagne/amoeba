@@ -6,7 +6,7 @@ import scala.concurrent.duration.Duration
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
 
-class ExponentialBackoffRetryStrategy(client: AmoebaClient, backoffLimit: Int = 60 * 1000, initialRetryDelay: Int = 16) extends RetryStrategy {
+class ExponentialBackoffRetryStrategy(client: AspenClient, backoffLimit: Int = 60 * 1000, initialRetryDelay: Int = 16) extends RetryStrategy {
 
   private [this] var exit = false
 

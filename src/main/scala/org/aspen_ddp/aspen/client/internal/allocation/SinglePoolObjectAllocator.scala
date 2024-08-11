@@ -1,13 +1,13 @@
 package org.aspen_ddp.aspen.client.internal.allocation
 
-import org.aspen_ddp.aspen.client.{AmoebaClient, ObjectAllocator, StoragePool, Transaction}
+import org.aspen_ddp.aspen.client.{AspenClient, ObjectAllocator, StoragePool, Transaction}
 import org.aspen_ddp.aspen.common.DataBuffer
 import org.aspen_ddp.aspen.common.ida.IDA
 import org.aspen_ddp.aspen.common.objects.{AllocationRevisionGuard, DataObjectPointer, Key, KeyValueObjectPointer, ObjectRefcount, Value}
 
 import scala.concurrent.Future
 
-class SinglePoolObjectAllocator(val client: AmoebaClient,
+class SinglePoolObjectAllocator(val client: AspenClient,
                                 val pool: StoragePool,
                                 val objectIDA: IDA,
                                 val maxObjectSize: Option[Int]) extends ObjectAllocator {

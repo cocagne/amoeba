@@ -2,7 +2,7 @@ package org.aspen_ddp.aspen.client.internal.transaction
 
 import java.util.UUID
 
-import org.aspen_ddp.aspen.client.{AmoebaClient, PostCommitTransactionModification, Transaction, TransactionAborted}
+import org.aspen_ddp.aspen.client.{AspenClient, PostCommitTransactionModification, Transaction, TransactionAborted}
 import org.aspen_ddp.aspen.common.objects._
 import org.aspen_ddp.aspen.common.store.StoreId
 import org.aspen_ddp.aspen.common.transaction.KeyValueUpdate.FullContentLock
@@ -14,13 +14,13 @@ import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
 
 object TransactionImpl {
-  def Factory(client: AmoebaClient,
+  def Factory(client: AspenClient,
               txManager: TransactionManager,
               chooseDesignatedLeader: ObjectPointer => Byte, // Uses peer online/offline knowledge to select designated leaders for transactions)
               transactionDriverStrategy: Option[ClientTransactionDriver.Factory]) = new TransactionImpl(client, txManager, chooseDesignatedLeader, transactionDriverStrategy)
 }
 
-class TransactionImpl(val client: AmoebaClient,
+class TransactionImpl(val client: AspenClient,
                       txManager: TransactionManager,
                       chooseDesignatedLeader: ObjectPointer => Byte, // Uses peer online/offline knowledge to select designated leaders for transactions)
                       transactionDriverStrategy: Option[ClientTransactionDriver.Factory]) extends Transaction with Logging {

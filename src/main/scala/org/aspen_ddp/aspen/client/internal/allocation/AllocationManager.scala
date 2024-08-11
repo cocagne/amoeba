@@ -2,7 +2,7 @@ package org.aspen_ddp.aspen.client.internal.allocation
 
 import java.util.UUID
 
-import org.aspen_ddp.aspen.client.{AllocationError, AmoebaClient, StoragePool, Transaction}
+import org.aspen_ddp.aspen.client.{AllocationError, AspenClient, StoragePool, Transaction}
 import org.aspen_ddp.aspen.common.{DataBuffer, HLCTimestamp}
 import org.aspen_ddp.aspen.common.ida.IDA
 import org.aspen_ddp.aspen.common.network.AllocateResponse
@@ -11,8 +11,8 @@ import org.aspen_ddp.aspen.server.store.{KVObjectState, ValueState}
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class AllocationManager( val client: AmoebaClient,
-                         val driverFactory: AllocationDriver.Factory) {
+class AllocationManager(val client: AspenClient,
+                        val driverFactory: AllocationDriver.Factory) {
 
   implicit val ec: ExecutionContext = client.clientContext
 
@@ -28,7 +28,7 @@ class AllocationManager( val client: AmoebaClient,
   }
 
   private def allocate[PointerType <: ObjectPointer](
-                                                      client: AmoebaClient,
+                                                      client: AspenClient,
                                                       transaction: Transaction,
                                                       pool: StoragePool,
                                                       objectSize: Option[Int],
@@ -65,7 +65,7 @@ class AllocationManager( val client: AmoebaClient,
   }
 
   def allocateDataObject(
-                          client: AmoebaClient,
+                          client: AspenClient,
                           transaction: Transaction,
                           pool: StoragePool,
                           objectSize: Option[Int],
@@ -84,7 +84,7 @@ class AllocationManager( val client: AmoebaClient,
   }
 
   def allocateKeyValueObject(
-                              client: AmoebaClient,
+                              client: AspenClient,
                               transaction: Transaction,
                               pool: StoragePool,
                               objectSize: Option[Int],

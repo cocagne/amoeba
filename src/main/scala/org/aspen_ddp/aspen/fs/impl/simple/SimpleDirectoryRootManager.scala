@@ -4,14 +4,14 @@ import java.nio.{ByteBuffer, ByteOrder}
 import java.util.UUID
 
 import org.aspen_ddp.aspen.client.tkvl._
-import org.aspen_ddp.aspen.client.{AmoebaClient, ObjectAllocator, RegisteredTypeFactory, Transaction}
+import org.aspen_ddp.aspen.client.{AspenClient, ObjectAllocator, RegisteredTypeFactory, Transaction}
 import org.aspen_ddp.aspen.common.objects._
 import org.aspen_ddp.aspen.fs.DirectoryInode
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
 
-class SimpleDirectoryRootManager(client: AmoebaClient,
+class SimpleDirectoryRootManager(client: AspenClient,
                                  inodePointer: DataObjectPointer) extends RootManager {
 
   import SimpleDirectoryRootManager._
@@ -127,11 +127,11 @@ object SimpleDirectoryRootManager extends RegisteredTypeFactory with RootManager
 
   private case class RData(root: Root, rootRevision: ObjectRevision, onode: Option[KeyValueListNode])
 
-  def apply(client: AmoebaClient, bb: ByteBuffer): SimpleDirectoryRootManager = {
+  def apply(client: AspenClient, bb: ByteBuffer): SimpleDirectoryRootManager = {
     new SimpleDirectoryRootManager(client, DataObjectPointer(bb))
   }
 
-  override def createRootManager(client: AmoebaClient, data: Array[Byte]): SimpleDirectoryRootManager = {
+  override def createRootManager(client: AspenClient, data: Array[Byte]): SimpleDirectoryRootManager = {
     val bb = ByteBuffer.wrap(data)
     bb.order(ByteOrder.BIG_ENDIAN)
     SimpleDirectoryRootManager(client, bb)

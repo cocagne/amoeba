@@ -4,7 +4,7 @@ import java.nio.{ByteBuffer, ByteOrder}
 import java.util.UUID
 import org.aspen_ddp.aspen.client.internal.allocation.SinglePoolObjectAllocator
 import org.aspen_ddp.aspen.client.tkvl.{KVObjectRootManager, TieredKeyValueList}
-import org.aspen_ddp.aspen.client.{AmoebaClient, HostId, KeyValueObjectState, ObjectAllocator, StoragePool}
+import org.aspen_ddp.aspen.client.{AspenClient, HostId, KeyValueObjectState, ObjectAllocator, StoragePool}
 import org.aspen_ddp.aspen.common.ida.IDA
 import org.aspen_ddp.aspen.common.pool.PoolId
 
@@ -20,7 +20,7 @@ object SimpleStoragePool {
 
   }
 
-  def apply(client: AmoebaClient, kvos: KeyValueObjectState): SimpleStoragePool = {
+  def apply(client: AspenClient, kvos: KeyValueObjectState): SimpleStoragePool = {
 
     val cfg = StoragePool.Config(kvos.contents(StoragePool.ConfigKey).value.bytes)
 
@@ -35,7 +35,7 @@ object SimpleStoragePool {
   }
 }
 
-class SimpleStoragePool(val client: AmoebaClient,
+class SimpleStoragePool(val client: AspenClient,
                         val poolId: PoolId,
                         val name: String,
                         val numberOfStores: Int,

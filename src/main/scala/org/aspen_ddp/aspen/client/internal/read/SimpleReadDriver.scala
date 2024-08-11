@@ -2,7 +2,7 @@ package org.aspen_ddp.aspen.client.internal.read
 
 import java.util.UUID
 
-import org.aspen_ddp.aspen.client.AmoebaClient
+import org.aspen_ddp.aspen.client.AspenClient
 import org.aspen_ddp.aspen.common.objects.ObjectPointer
 import org.aspen_ddp.aspen.common.util.BackgroundTask
 
@@ -14,7 +14,7 @@ object SimpleReadDriver {
                  val initialDelay: Duration,
                  val maxDelay: Duration){
     def apply(
-               client: AmoebaClient,
+               client: AspenClient,
                objectPointer: ObjectPointer,
                readUUID:UUID,
                comment: String,
@@ -32,7 +32,7 @@ object SimpleReadDriver {
 class SimpleReadDriver(
                         val initialDelay: Duration,
                         val maxDelay: Duration,
-                        client: AmoebaClient,
+                        client: AspenClient,
                         objectPointer: ObjectPointer,
                         readUUID:UUID,
                         comment: String,

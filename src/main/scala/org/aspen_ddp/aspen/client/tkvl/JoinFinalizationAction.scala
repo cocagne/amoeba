@@ -2,13 +2,13 @@ package org.aspen_ddp.aspen.client.tkvl
 
 import java.nio.{ByteBuffer, ByteOrder}
 import java.util.UUID
-import org.aspen_ddp.aspen.client.{AmoebaClient, FinalizationAction, FinalizationActionFactory, ObjectAllocator, RegisteredTypeFactory, Transaction}
+import org.aspen_ddp.aspen.client.{AspenClient, FinalizationAction, FinalizationActionFactory, ObjectAllocator, RegisteredTypeFactory, Transaction}
 import org.aspen_ddp.aspen.common.objects.{Key, KeyOrdering, KeyValueObjectPointer, ObjectId, Value}
 import org.aspen_ddp.aspen.common.transaction.{FinalizationActionId, TransactionDescription}
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
-class JoinFinalizationAction(val client: AmoebaClient,
+class JoinFinalizationAction(val client: AspenClient,
                              val txd: TransactionDescription,
                              val rootManager: RootManager,
                              val tier: Int,
@@ -91,8 +91,8 @@ class JoinFinalizationAction(val client: AmoebaClient,
 object JoinFinalizationAction extends RegisteredTypeFactory with FinalizationActionFactory {
   val typeUUID: UUID = UUID.fromString("C9EA4384-74A9-4044-8C64-7641D328F529")
 
-  def createFinalizationAction(client: AmoebaClient, 
-                               txd: TransactionDescription, 
+  def createFinalizationAction(client: AspenClient,
+                               txd: TransactionDescription,
                                data: Array[Byte]): FinalizationAction = {
     val bb = ByteBuffer.wrap(data)
     bb.order(ByteOrder.BIG_ENDIAN)

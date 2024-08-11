@@ -2,7 +2,7 @@ package org.aspen_ddp.aspen.client.internal.read
 
 import java.util.UUID
 
-import org.aspen_ddp.aspen.client.{AmoebaClient, ObjectState, ReadError}
+import org.aspen_ddp.aspen.client.{AspenClient, ObjectState, ReadError}
 import org.aspen_ddp.aspen.common.network.ReadResponse
 import org.aspen_ddp.aspen.common.objects.ObjectPointer
 
@@ -30,6 +30,6 @@ object ReadDriver {
     * comment: String Comment describing purpose of the read for debug/trace logs
     * disableOpportunisticRebuild: Boolean
     */
-  type Factory = (AmoebaClient, ObjectPointer, UUID, String, Boolean) => ReadDriver
+  type Factory = (AspenClient, ObjectPointer, UUID, String, Boolean) => ReadDriver
 
 }

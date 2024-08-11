@@ -5,8 +5,8 @@ import java.nio.file.{Files, Path, Paths}
 import java.util.concurrent.Executors
 import org.aspen_ddp.aspen.AmoebaError
 import org.aspen_ddp.aspen.client.KeyValueObjectState.ValueState
-import org.aspen_ddp.aspen.client.{AmoebaClient, DataObjectState, Host, HostId, KeyValueObjectState, MetadataObjectState, ObjectAllocator, ObjectState, StoragePool}
-import org.aspen_ddp.aspen.client.internal.SimpleAmoebaClient
+import org.aspen_ddp.aspen.client.{AspenClient, DataObjectState, Host, HostId, KeyValueObjectState, MetadataObjectState, ObjectAllocator, ObjectState, StoragePool}
+import org.aspen_ddp.aspen.client.internal.SimpleAspenClient
 import org.aspen_ddp.aspen.client.internal.allocation.SinglePoolObjectAllocator
 import org.aspen_ddp.aspen.client.tkvl.{KVObjectRootManager, KeyValueListNode, Root, SinglePoolNodeAllocator, TieredKeyValueList}
 import org.aspen_ddp.aspen.common.{DataBuffer, HLCTimestamp, Nucleus}
@@ -105,7 +105,7 @@ object Main {
   class ConfigError(msg: String) extends AmoebaError(msg)
 
   class NetworkBridge extends Logging {
-    var oclient: Option[AmoebaClient] = None
+    var oclient: Option[AspenClient] = None
     var onode: Option[StoreManager] = None
 
     def onClientResponseReceived(msg: ClientResponse): Unit ={
@@ -312,7 +312,7 @@ object Main {
   }
 
   def createAmoebaClient(cfg: BootstrapConfig.Config,
-                         onnet: Option[(NetworkBridge, ZMQNetwork)]=None): (AmoebaClient, ZMQNetwork, KeyValueObjectPointer) = {
+                         onnet: Option[(NetworkBridge, ZMQNetwork)]=None): (AspenClient, ZMQNetwork, KeyValueObjectPointer) = {
 
     val hosts = cfg.nodes.zipWithIndex.map { (node, index) =>
       HostId(new UUID(0, index)) -> Host(HostId(new UUID(0, index)), node.name, node.host, node.dataPort, node.cncPort, node.storeTransferPort)
@@ -332,7 +332,7 @@ object Main {
     val nucleus = KeyValueObjectPointer(Nucleus.objectId, Nucleus.poolId, None,
       cfg.bootstrapIDA, (0 until cfg.bootstrapIDA.width).map(idx => StorePointer(idx.toByte, Array())).toArray)
 
-    val ret = (new SimpleAmoebaClient(nnet.clientMessenger, nnet.clientId, ec, nucleus,
+    val ret = (new SimpleAspenClient(nnet.clientMessenger, nnet.clientId, ec, nucleus,
       txStatusCacheDuration,
       initialReadDelay,
       maxReadDelay,
@@ -345,7 +345,7 @@ object Main {
     ret
   }
 
-  def initializeAmoeba(client: AmoebaClient,
+  def initializeAmoeba(client: AspenClient,
                        nucleus: KeyValueObjectPointer,
                        numIndexNodeSegments: Int = 100,
                        fileSegmentSize:Int=1024*1024): Future[FileSystem] = {
@@ -542,7 +542,7 @@ object Main {
   }
 
 
-  def repair(client: AmoebaClient, storeManager: StoreManager): Unit =
+  def repair(client: AspenClient, storeManager: StoreManager): Unit =
 
     def deleteErrorEntry(node: KeyValueListNode, key: Key): Future[Unit] =
       val tx = client.newTransaction()

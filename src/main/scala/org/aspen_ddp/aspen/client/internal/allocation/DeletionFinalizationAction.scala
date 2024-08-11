@@ -1,14 +1,14 @@
 package org.aspen_ddp.aspen.client.internal.allocation
 import java.nio.{ByteBuffer, ByteOrder}
 import java.util.UUID
-import org.aspen_ddp.aspen.client.{AmoebaClient, FinalizationAction, FinalizationActionFactory, RegisteredTypeFactory, Transaction}
+import org.aspen_ddp.aspen.client.{AspenClient, FinalizationAction, FinalizationActionFactory, RegisteredTypeFactory, Transaction}
 import org.aspen_ddp.aspen.common.objects.{Key, ObjectPointer, Value}
 import org.aspen_ddp.aspen.common.transaction.{FinalizationActionId, SerializedFinalizationAction, TransactionDescription}
 import org.apache.logging.log4j.scala.{Logger, Logging}
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
-class DeletionFinalizationAction(val client: AmoebaClient,
+class DeletionFinalizationAction(val client: AspenClient,
                                  val txd: TransactionDescription,
                                  val deletedObject: ObjectPointer) extends FinalizationAction {
 
@@ -37,7 +37,7 @@ class DeletionFinalizationAction(val client: AmoebaClient,
 object DeletionFinalizationAction extends RegisteredTypeFactory with FinalizationActionFactory {
   val typeUUID: UUID = UUID.fromString("35A0AA38-F066-406F-9778-287F7C49012C")
 
-  def createFinalizationAction(client: AmoebaClient,
+  def createFinalizationAction(client: AspenClient,
                                txd: TransactionDescription,
                                data: Array[Byte]): FinalizationAction = {
     val bb = ByteBuffer.wrap(data)

@@ -2,7 +2,7 @@ package org.aspen_ddp.aspen.client.tkvl
 
 import java.nio.{ByteBuffer, ByteOrder}
 
-import org.aspen_ddp.aspen.client.{AmoebaClient, Transaction}
+import org.aspen_ddp.aspen.client.{AspenClient, Transaction}
 import org.aspen_ddp.aspen.common.objects.{AllocationRevisionGuard, Key, KeyOrdering, KeyValueObjectPointer, Value}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -37,7 +37,7 @@ case class Root(tier: Int,
 
 object Root {
 
-  def create(client: AmoebaClient,
+  def create(client: AspenClient,
              guard: AllocationRevisionGuard,
              ordering: KeyOrdering,
              nodeAllocator: NodeAllocator,
@@ -57,13 +57,13 @@ object Root {
     }
   }
 
-  def apply(client: AmoebaClient, arr: Array[Byte]): Root = {
+  def apply(client: AspenClient, arr: Array[Byte]): Root = {
     val bb = ByteBuffer.wrap(arr)
     bb.order(ByteOrder.BIG_ENDIAN)
     Root(client, bb)
   }
 
-  def apply(client: AmoebaClient, bb: ByteBuffer): Root = {
+  def apply(client: AspenClient, bb: ByteBuffer): Root = {
     bb.order(ByteOrder.BIG_ENDIAN)
     val tier = bb.get()
     val ordering = KeyOrdering.fromCode(bb.get())

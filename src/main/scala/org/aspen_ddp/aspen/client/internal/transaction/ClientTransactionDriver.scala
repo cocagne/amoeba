@@ -1,6 +1,6 @@
 package org.aspen_ddp.aspen.client.internal.transaction
 
-import org.aspen_ddp.aspen.client.AmoebaClient
+import org.aspen_ddp.aspen.client.AspenClient
 import org.aspen_ddp.aspen.client.internal.transaction.TransactionBuilder.TransactionData
 import org.aspen_ddp.aspen.common.HLCTimestamp
 import org.aspen_ddp.aspen.common.network.{TransactionFinalized, TransactionResolved, TxPrepare}
@@ -12,16 +12,16 @@ import org.apache.logging.log4j.scala.Logging
 import scala.concurrent.{Future, Promise}
 
 object ClientTransactionDriver {
-  type Factory = (AmoebaClient, TransactionDescription, Map[StoreId, TransactionData]) => ClientTransactionDriver
+  type Factory = (AspenClient, TransactionDescription, Map[StoreId, TransactionData]) => ClientTransactionDriver
 
   def noErrorRecoveryFactory(
-                              client: AmoebaClient,
+                              client: AspenClient,
                               txd: TransactionDescription,
                               updateData: Map[StoreId, TransactionData]): ClientTransactionDriver = new ClientTransactionDriver(client, txd, updateData)
 }
 
 class ClientTransactionDriver(
-                               val client: AmoebaClient,
+                               val client: AspenClient,
                                val txd: TransactionDescription,
                                val updateData: Map[StoreId, TransactionData]) extends Logging {
 

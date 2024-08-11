@@ -1,6 +1,6 @@
 package org.aspen_ddp.aspen.client.internal.allocation
 
-import org.aspen_ddp.aspen.client.{AllocationError, AmoebaClient}
+import org.aspen_ddp.aspen.client.{AllocationError, AspenClient}
 import org.aspen_ddp.aspen.common.{DataBuffer, HLCTimestamp}
 import org.aspen_ddp.aspen.common.ida.IDA
 import org.aspen_ddp.aspen.common.network.Allocate
@@ -13,7 +13,7 @@ import org.apache.logging.log4j.scala.Logging
 import scala.concurrent.{Future, Promise}
 
 class BaseAllocationDriver (
-                             val client: AmoebaClient,
+                             val client: AspenClient,
                              val poolId: PoolId,
                              val newObjectId: ObjectId,
                              val objectSize: Option[Int],
@@ -85,7 +85,7 @@ class BaseAllocationDriver (
 object BaseAllocationDriver {
 
   object Factory extends AllocationDriver.Factory {
-    def create(client: AmoebaClient,
+    def create(client: AspenClient,
                poolId: PoolId,
                newObjectId: ObjectId,
                objectSize: Option[Int],

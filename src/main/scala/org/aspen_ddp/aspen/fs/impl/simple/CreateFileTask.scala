@@ -4,7 +4,7 @@ import java.nio.charset.StandardCharsets
 import java.util.UUID
 
 import org.aspen_ddp.aspen.client.tkvl.TieredKeyValueList
-import org.aspen_ddp.aspen.client.{AmoebaClient, KeyValueObjectState, Transaction}
+import org.aspen_ddp.aspen.client.{AspenClient, KeyValueObjectState, Transaction}
 import org.aspen_ddp.aspen.common.objects.{Insert, Key, KeyRevisionGuard, ObjectRevision, Value}
 import org.aspen_ddp.aspen.common.transaction.KeyValueUpdate.KeyRevision
 import org.aspen_ddp.aspen.compute.{DurableTask, DurableTaskPointer, DurableTaskType, TaskExecutor}
@@ -24,7 +24,7 @@ object CreateFileTask extends DurableTaskType {
   private val NewFilePointerKey  = Key(5)
   private val StepKey            = Key(6)
 
-  def createTask(client: AmoebaClient,
+  def createTask(client: AspenClient,
                  pointer: DurableTaskPointer,
                  revision: ObjectRevision,
                  state: Map[Key, KeyValueObjectState.ValueState]): DurableTask = {

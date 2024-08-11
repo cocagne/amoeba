@@ -1,6 +1,6 @@
 package org.aspen_ddp.aspen.client.internal.transaction
 
-import org.aspen_ddp.aspen.client.AmoebaClient
+import org.aspen_ddp.aspen.client.AspenClient
 import org.aspen_ddp.aspen.client.internal.transaction.TransactionBuilder.TransactionData
 import org.aspen_ddp.aspen.common.store.StoreId
 import org.aspen_ddp.aspen.common.transaction.TransactionDescription
@@ -13,7 +13,7 @@ object SimpleClientTransactionDriver {
 
   def factory(retransmitDelay: Duration): ClientTransactionDriver.Factory = {
     def f(
-           client: AmoebaClient,
+           client: AspenClient,
            txd: TransactionDescription,
            updateData: Map[StoreId, TransactionData]): ClientTransactionDriver = new SimpleClientTransactionDriver(retransmitDelay, client, txd, updateData)
 
@@ -24,7 +24,7 @@ object SimpleClientTransactionDriver {
 
 class SimpleClientTransactionDriver(
                                      val retransmitDelay: Duration,
-                                     client: AmoebaClient,
+                                     client: AspenClient,
                                      txd: TransactionDescription,
                                      updateData: Map[StoreId, TransactionData])
     extends ClientTransactionDriver(client, txd, updateData) with Logging {

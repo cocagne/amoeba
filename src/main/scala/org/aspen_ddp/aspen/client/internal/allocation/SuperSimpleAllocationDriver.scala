@@ -1,6 +1,6 @@
 package org.aspen_ddp.aspen.client.internal.allocation
 
-import org.aspen_ddp.aspen.client.AmoebaClient
+import org.aspen_ddp.aspen.client.AspenClient
 import org.aspen_ddp.aspen.common.{DataBuffer, HLCTimestamp}
 import org.aspen_ddp.aspen.common.ida.IDA
 import org.aspen_ddp.aspen.common.objects.{AllocationRevisionGuard, ObjectId, ObjectRefcount, ObjectType}
@@ -15,7 +15,7 @@ object SuperSimpleAllocationDriver {
 
   def factory(retransmitDelay: Duration): AllocationDriver.Factory = {
     new AllocationDriver.Factory {
-      def create(client: AmoebaClient,
+      def create(client: AspenClient,
                  poolId: PoolId,
                  newObjectId: ObjectId,
                  objectSize: Option[Int],
@@ -35,7 +35,7 @@ object SuperSimpleAllocationDriver {
 }
 
 class SuperSimpleAllocationDriver(retransmitDelay: Duration,
-                                  client: AmoebaClient,
+                                  client: AspenClient,
                                   poolId: PoolId,
                                   newObjectId: ObjectId,
                                   objectSize: Option[Int],

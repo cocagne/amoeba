@@ -3,7 +3,7 @@ package org.aspen_ddp.aspen.client.tkvl
 import java.nio.ByteBuffer
 import java.util.UUID
 
-import org.aspen_ddp.aspen.client.{AmoebaClient, ObjectAllocator}
+import org.aspen_ddp.aspen.client.{AspenClient, ObjectAllocator}
 import org.aspen_ddp.aspen.client.internal.allocation.SinglePoolObjectAllocator
 import org.aspen_ddp.aspen.common.Nucleus
 import org.aspen_ddp.aspen.common.pool.PoolId
@@ -21,7 +21,7 @@ sealed abstract class NodeAllocator {
 }
 
 object NodeAllocator {
-  def apply(client: AmoebaClient, bb: ByteBuffer): NodeAllocator = {
+  def apply(client: AspenClient, bb: ByteBuffer): NodeAllocator = {
     bb.get() match {
       case 0 =>
         val msb = bb.getLong()
@@ -54,7 +54,7 @@ object BootstrapPoolNodeAllocator extends NodeAllocator {
 }
 
 
-class SinglePoolNodeAllocator(val client:AmoebaClient, val poolId: PoolId) extends NodeAllocator {
+class SinglePoolNodeAllocator(val client:AspenClient, val poolId: PoolId) extends NodeAllocator {
 
   implicit val ec: ExecutionContext = client.clientContext
 

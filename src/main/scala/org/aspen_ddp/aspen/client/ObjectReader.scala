@@ -6,7 +6,7 @@ import scala.concurrent.Future
 
 trait ObjectReader {
 
-  def client: AmoebaClient
+  def client: AspenClient
 
   def read(pointer: DataObjectPointer): Future[DataObjectState] = read(pointer, "")
 

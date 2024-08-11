@@ -2,7 +2,7 @@ package org.aspen_ddp.aspen.client.internal.read
 
 import java.util.UUID
 
-import org.aspen_ddp.aspen.client.{AmoebaClient, DataObjectState, KeyValueObjectState, MetadataObjectState, ObjectState, ReadError}
+import org.aspen_ddp.aspen.client.{AspenClient, DataObjectState, KeyValueObjectState, MetadataObjectState, ObjectState, ReadError}
 import org.aspen_ddp.aspen.common.HLCTimestamp
 import org.aspen_ddp.aspen.common.network.{OpportunisticRebuild, Read, ReadResponse}
 import org.aspen_ddp.aspen.common.objects.{DataObjectPointer, FullObject, KeyValueObjectPointer, MetadataOnly, ObjectPointer, ReadType}
@@ -14,11 +14,11 @@ import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.concurrent.duration.{Duration, SECONDS}
 
 abstract class BaseReadDriver(
-                      val client: AmoebaClient,
-                      val objectPointer: ObjectPointer,
-                      val readUUID:UUID,
-                      val comment: String,
-                      val disableOpportunisticRebuild: Boolean = false
+                               val client: AspenClient,
+                               val objectPointer: ObjectPointer,
+                               val readUUID:UUID,
+                               val comment: String,
+                               val disableOpportunisticRebuild: Boolean = false
                     ) extends ReadDriver with Logging {
 
   implicit protected val ec: ExecutionContext
@@ -174,11 +174,11 @@ abstract class BaseReadDriver(
 object BaseReadDriver {
 
   def noErrorRecoveryReadDriver(
-    client: AmoebaClient,
-    objectPointer: ObjectPointer,
-    readUUID:UUID,
-    comment: String,
-    disableOpportunisticRebuild: Boolean): ReadDriver = {
+                                 client: AspenClient,
+                                 objectPointer: ObjectPointer,
+                                 readUUID:UUID,
+                                 comment: String,
+                                 disableOpportunisticRebuild: Boolean): ReadDriver = {
 
     new BaseReadDriver(client, objectPointer, readUUID, comment) {
 

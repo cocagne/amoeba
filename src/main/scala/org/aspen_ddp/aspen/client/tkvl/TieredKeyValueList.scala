@@ -1,6 +1,6 @@
 package org.aspen_ddp.aspen.client.tkvl
 
-import org.aspen_ddp.aspen.client.{AmoebaClient, Transaction}
+import org.aspen_ddp.aspen.client.{AspenClient, Transaction}
 import org.aspen_ddp.aspen.client.KeyValueObjectState.ValueState
 import org.aspen_ddp.aspen.common.objects.{Key, KeyOrdering, KeyValueObjectPointer, ObjectId, ObjectRevision, ObjectRevisionGuard, Value}
 import org.aspen_ddp.aspen.common.transaction.KeyValueUpdate
@@ -9,7 +9,7 @@ import org.apache.logging.log4j.scala.Logging
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
 
-class TieredKeyValueList(val client: AmoebaClient,
+class TieredKeyValueList(val client: AspenClient,
                          val rootManager: RootManager) extends Logging {
 
   implicit val ec: ExecutionContext = client.clientContext
@@ -206,13 +206,13 @@ class TieredKeyValueList(val client: AmoebaClient,
 
 object TieredKeyValueList {
 
-  private[tkvl] def fetchContainingNode(client: AmoebaClient,
-                          currentTier: Int,
-                          targetTier: Int,
-                          ordering: KeyOrdering,
-                          target: Key,
-                          currentNode: KeyValueListNode,
-                          initialBlacklist: Set[ObjectId]): Future[Either[Set[ObjectId], KeyValueListNode]] = {
+  private[tkvl] def fetchContainingNode(client: AspenClient,
+                                        currentTier: Int,
+                                        targetTier: Int,
+                                        ordering: KeyOrdering,
+                                        target: Key,
+                                        currentNode: KeyValueListNode,
+                                        initialBlacklist: Set[ObjectId]): Future[Either[Set[ObjectId], KeyValueListNode]] = {
 
     implicit val ec: ExecutionContext = client.clientContext
 
@@ -254,7 +254,7 @@ object TieredKeyValueList {
 
   }
 
-  private def fetchNode(client: AmoebaClient,
+  private def fetchNode(client: AspenClient,
                         ordering: KeyOrdering,
                         targetTier: Int,
                         minimum: Key,

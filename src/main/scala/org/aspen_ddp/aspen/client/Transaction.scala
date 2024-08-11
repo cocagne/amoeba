@@ -10,7 +10,7 @@ import scala.concurrent.Future
 
 trait Transaction {
 
-  def client: AmoebaClient
+  def client: AspenClient
 
   val id: TransactionId
 

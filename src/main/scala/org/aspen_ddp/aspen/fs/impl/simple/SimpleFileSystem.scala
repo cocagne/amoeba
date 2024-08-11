@@ -4,7 +4,7 @@ import java.util.UUID
 import java.util.concurrent.{Executors, TimeUnit}
 import org.aspen_ddp.aspen.client.internal.allocation.SinglePoolObjectAllocator
 import org.aspen_ddp.aspen.client.tkvl.{KVObjectRootManager, NodeAllocator, Root, SinglePoolNodeAllocator}
-import org.aspen_ddp.aspen.client.{AmoebaClient, ExponentialBackoffRetryStrategy, KeyValueObjectState, ObjectAllocator, ObjectAllocatorId, Transaction}
+import org.aspen_ddp.aspen.client.{AspenClient, ExponentialBackoffRetryStrategy, KeyValueObjectState, ObjectAllocator, ObjectAllocatorId, Transaction}
 import org.aspen_ddp.aspen.common.objects.{AllocationRevisionGuard, Insert, IntegerKeyOrdering, Key, KeyValueObjectPointer, KeyValueOperation, LexicalKeyOrdering, Value}
 import org.aspen_ddp.aspen.common.transaction.KeyValueUpdate
 import org.aspen_ddp.aspen.common.util.{byte2uuid, uuid2byte}
@@ -20,7 +20,7 @@ object SimpleFileSystem {
   private val TaskExecutorRootKey  = Key(2)
   private val InodeTableRootKey    = Key(3)
 
-  def bootstrap(client: AmoebaClient,
+  def bootstrap(client: AspenClient,
                 guard: AllocationRevisionGuard,
                 allocator: ObjectAllocator,
                 hostingObject: KeyValueObjectPointer,
@@ -58,7 +58,7 @@ object SimpleFileSystem {
     }
   }
 
-  def load(client: AmoebaClient,
+  def load(client: AspenClient,
            fsRoot: KeyValueObjectPointer,
            numContextThreads: Int): Future[SimpleFileSystem] = {
     implicit val ec: ExecutionContext = client.clientContext
@@ -75,7 +75,7 @@ object SimpleFileSystem {
 
   }
 }
-class SimpleFileSystem(aclient: AmoebaClient,
+class SimpleFileSystem(aclient: AspenClient,
                        fsRoot: KeyValueObjectState,
                        defaultAllocator: ObjectAllocator,
                        executor: TaskExecutor,

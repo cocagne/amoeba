@@ -2,7 +2,7 @@ package org.aspen_ddp.aspen.client.internal.transaction
 
 import java.nio.{ByteBuffer, ByteOrder}
 import java.util.UUID
-import org.aspen_ddp.aspen.client.{AmoebaClient, FinalizationAction, FinalizationActionFactory, RegisteredTypeFactory, StopRetrying, Transaction, UnknownStoragePool}
+import org.aspen_ddp.aspen.client.{AspenClient, FinalizationAction, FinalizationActionFactory, RegisteredTypeFactory, StopRetrying, Transaction, UnknownStoragePool}
 import org.aspen_ddp.aspen.common.objects.{Key, ObjectId, ObjectPointer, Value}
 import org.aspen_ddp.aspen.common.store.StoreId
 import org.aspen_ddp.aspen.common.transaction.{FinalizationActionId, SerializedFinalizationAction, TransactionDescription}
@@ -11,7 +11,7 @@ import org.aspen_ddp.aspen.common.util.BackgroundTask.ScheduledTask
 import scala.concurrent.duration.{Duration, MILLISECONDS}
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
-class MissedUpdateFinalizationAction(val client: AmoebaClient,
+class MissedUpdateFinalizationAction(val client: AspenClient,
                                      val txd: TransactionDescription) extends FinalizationAction {
 
   implicit val ec: ExecutionContext = client.clientContext
@@ -99,7 +99,7 @@ object MissedUpdateFinalizationAction extends RegisteredTypeFactory with Finaliz
 
   var errorTimeout = Duration(250, MILLISECONDS)
 
-  def createFinalizationAction(client: AmoebaClient,
+  def createFinalizationAction(client: AspenClient,
                                txd: TransactionDescription,
                                data: Array[Byte]): FinalizationAction = {
 

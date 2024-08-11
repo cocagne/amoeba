@@ -1,6 +1,6 @@
 package org.aspen_ddp.aspen.client.internal.transaction
 
-import org.aspen_ddp.aspen.client.AmoebaClient
+import org.aspen_ddp.aspen.client.AspenClient
 import org.aspen_ddp.aspen.client.internal.transaction.TransactionBuilder.TransactionData
 import org.aspen_ddp.aspen.common.network.{TransactionFinalized, TransactionResolved}
 import org.aspen_ddp.aspen.common.store.StoreId
@@ -8,7 +8,7 @@ import org.aspen_ddp.aspen.common.transaction.{TransactionDescription, Transacti
 
 import scala.concurrent.Future
 
-class TransactionManager(val client: AmoebaClient,
+class TransactionManager(val client: AspenClient,
                          defaultDriverFactory: ClientTransactionDriver.Factory) {
 
   private[this] var transactions = Map[TransactionId, ClientTransactionDriver]()

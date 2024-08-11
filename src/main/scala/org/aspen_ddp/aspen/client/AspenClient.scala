@@ -16,7 +16,7 @@ import org.aspen_ddp.aspen.server.store.backend.BackendType
 import java.util.UUID
 import scala.concurrent.{ExecutionContext, Future}
 
-trait AmoebaClient extends ObjectReader {
+trait AspenClient extends ObjectReader {
 
   val clientId: ClientId
 
@@ -24,7 +24,7 @@ trait AmoebaClient extends ObjectReader {
 
   val typeRegistry: TypeRegistry
 
-  def client: AmoebaClient = this
+  def client: AspenClient = this
 
   def shutdown(): Unit = ()
 

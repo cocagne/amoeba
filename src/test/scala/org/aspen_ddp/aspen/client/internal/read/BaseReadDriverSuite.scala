@@ -4,7 +4,7 @@ import java.util.UUID
 import org.aspen_ddp.aspen.client.internal.OpportunisticRebuildManager
 import org.aspen_ddp.aspen.client.internal.allocation.AllocationManager
 import org.aspen_ddp.aspen.client.internal.network.Messenger
-import org.aspen_ddp.aspen.client.{AmoebaClient, CorruptedObject, DataObjectState, Host, HostId, InvalidObject, KeyValueObjectState, ObjectCache, RetryStrategy, StoragePool, Transaction, TransactionStatusCache, TypeRegistry}
+import org.aspen_ddp.aspen.client.{AspenClient, CorruptedObject, DataObjectState, Host, HostId, InvalidObject, KeyValueObjectState, ObjectCache, RetryStrategy, StoragePool, Transaction, TransactionStatusCache, TypeRegistry}
 import org.aspen_ddp.aspen.common.network.{ClientId, ClientResponse, ReadResponse}
 import org.aspen_ddp.aspen.common.{DataBuffer, HLCTimestamp}
 import org.aspen_ddp.aspen.common.ida.Replication
@@ -51,7 +51,7 @@ object BaseReadDriverSuite {
 
   val client = ClientId(cliUUID)
 
-  class TClient(override val clientId: ClientId) extends AmoebaClient {
+  class TClient(override val clientId: ClientId) extends AspenClient {
 
     val txStatusCache: TransactionStatusCache = TransactionStatusCache.NoCache
 
@@ -107,7 +107,7 @@ class BaseReadDriverSuite  extends AsyncFunSuite with Matchers {
   import BaseReadDriverSuite._
 
 
-  def mkReader(client: AmoebaClient,
+  def mkReader(client: AspenClient,
                objectPointer: ObjectPointer = ptr,
                readUUID:UUID = readUUID,
                comment: String = "",

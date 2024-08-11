@@ -2,7 +2,7 @@ package org.aspen_ddp.aspen.fs.impl.simple
 
 import java.util.UUID
 
-import org.aspen_ddp.aspen.client.{AmoebaClient, KeyValueObjectState, Transaction}
+import org.aspen_ddp.aspen.client.{AspenClient, KeyValueObjectState, Transaction}
 import org.aspen_ddp.aspen.common.objects.{Insert, Key, ObjectRefcount, ObjectRevision}
 import org.aspen_ddp.aspen.common.transaction.KeyValueUpdate.KeyRevision
 import org.aspen_ddp.aspen.compute.{DurableTask, DurableTaskPointer, DurableTaskType, TaskExecutor}
@@ -19,7 +19,7 @@ object UnlinkFileTask extends DurableTaskType {
   private val InodePointerKey   = Key(2)
   private val StepKey           = Key(3)
 
-  def createTask(client: AmoebaClient,
+  def createTask(client: AspenClient,
                  pointer: DurableTaskPointer,
                  revision: ObjectRevision,
                  state: Map[Key, KeyValueObjectState.ValueState]): DurableTask = {

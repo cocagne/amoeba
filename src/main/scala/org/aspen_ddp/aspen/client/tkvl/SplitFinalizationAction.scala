@@ -10,7 +10,7 @@ import org.aspen_ddp.aspen.common.transaction.{FinalizationActionId, Transaction
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
 
-class SplitFinalizationAction(val client: AmoebaClient,
+class SplitFinalizationAction(val client: AspenClient,
                               val txd: TransactionDescription,
                               val rootManager: RootManager,
                               val tier: Int,
@@ -101,7 +101,7 @@ class SplitFinalizationAction(val client: AmoebaClient,
 object SplitFinalizationAction extends RegisteredTypeFactory with FinalizationActionFactory {
   val typeUUID: UUID = UUID.fromString("68C3D242-CEA0-49D7-AA14-AB8E16D32FAD")
 
-  def createFinalizationAction(client: AmoebaClient,
+  def createFinalizationAction(client: AspenClient,
                                txd: TransactionDescription,
                                data: Array[Byte]): FinalizationAction = {
     val bb = ByteBuffer.wrap(data)

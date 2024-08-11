@@ -3,7 +3,7 @@ package org.aspen_ddp.aspen.fs
 import java.nio.{ByteBuffer, ByteOrder}
 import java.nio.charset.StandardCharsets
 
-import org.aspen_ddp.aspen.client.AmoebaClient
+import org.aspen_ddp.aspen.client.AspenClient
 import org.aspen_ddp.aspen.client.tkvl.{Root, RootManager}
 import org.aspen_ddp.aspen.common.DataBuffer
 import org.aspen_ddp.aspen.common.objects.{DataObjectPointer, KeyValueObjectPointer}
@@ -13,8 +13,8 @@ import org.apache.logging.log4j.scala.Logging
 
 object Inode {
 
-  def apply( client: AmoebaClient,
-             content: DataBuffer): Inode = {
+  def apply(client: AspenClient,
+            content: DataBuffer): Inode = {
     val bb: ByteBuffer = content
     bb.position(1 + 8)
     val mode = bb.getInt()
@@ -115,7 +115,7 @@ object DirectoryInode {
       parentDirectory, contents)
   }
 
-  def apply(client: AmoebaClient, content: DataBuffer): DirectoryInode = {
+  def apply(client: AspenClient, content: DataBuffer): DirectoryInode = {
     val bb = content.asReadOnlyBuffer()
     val (_, inodeNumber, mode, uid, gid, links, ctime, mtime, atime, oxattrs) = Inode.decode(bb)
     val mask = bb.get()

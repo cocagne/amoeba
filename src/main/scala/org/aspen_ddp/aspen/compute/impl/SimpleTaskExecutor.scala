@@ -2,7 +2,7 @@ package org.aspen_ddp.aspen.compute.impl
 
 import java.util.UUID
 
-import org.aspen_ddp.aspen.client.{AmoebaClient, KeyValueObjectState, ObjectAllocator, Transaction}
+import org.aspen_ddp.aspen.client.{AspenClient, KeyValueObjectState, ObjectAllocator, Transaction}
 import org.aspen_ddp.aspen.common.objects.{AllocationRevisionGuard, Delete, Insert, Key, KeyValueObjectPointer, ObjectRevision, ObjectRevisionGuard}
 import org.aspen_ddp.aspen.common.transaction.KeyValueUpdate
 import org.aspen_ddp.aspen.compute.{DurableTaskPointer, DurableTaskType, TaskExecutor}
@@ -14,7 +14,7 @@ object SimpleTaskExecutor {
 
   val TaskTypeKey = new Key(Array(0xFF.asInstanceOf[Byte]))
 
-  def apply(client: AmoebaClient,
+  def apply(client: AspenClient,
             registeredTasks: Map[UUID, DurableTaskType],
             taskStateAllocator: ObjectAllocator,
             executorObject: KeyValueObjectPointer): Future[SimpleTaskExecutor] = {
@@ -24,7 +24,7 @@ object SimpleTaskExecutor {
     client.read(executorObject).map( kvos => new SimpleTaskExecutor(client, registeredTasks, taskStateAllocator, kvos))
   }
 
-  def createNewExecutor(client: AmoebaClient,
+  def createNewExecutor(client: AspenClient,
                         registeredTasks: Map[UUID, DurableTaskType],
                         executorAllocator: ObjectAllocator,
                         taskStateAllocator: ObjectAllocator,
@@ -42,7 +42,7 @@ object SimpleTaskExecutor {
   }
 }
 
-class SimpleTaskExecutor(val client: AmoebaClient,
+class SimpleTaskExecutor(val client: AspenClient,
                          val registeredTasks: Map[UUID, DurableTaskType],
                          val taskStateAllocator: ObjectAllocator,
                          kvos: KeyValueObjectState) extends TaskExecutor {

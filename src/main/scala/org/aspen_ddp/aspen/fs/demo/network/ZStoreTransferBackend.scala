@@ -1,6 +1,6 @@
 package org.aspen_ddp.aspen.fs.demo.network
 
-import org.aspen_ddp.aspen.client.{AmoebaClient, HostId}
+import org.aspen_ddp.aspen.client.{AspenClient, HostId}
 import org.aspen_ddp.aspen.common.store.StoreId
 import org.aspen_ddp.aspen.server.StoreManager
 import org.apache.logging.log4j.scala.Logging
@@ -12,7 +12,7 @@ import scala.concurrent.ExecutionContext
 class ZStoreTransferBackend(val transferPort: Int,
                             val net: ZMQNetwork,
                             val hostId: HostId,
-                            val client: AmoebaClient,
+                            val client: AspenClient,
                             val storeManager: StoreManager) extends Logging:
 
   logger.info("Starting StoreTransferBackend")

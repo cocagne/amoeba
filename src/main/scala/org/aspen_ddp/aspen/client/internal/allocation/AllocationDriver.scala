@@ -1,6 +1,6 @@
 package org.aspen_ddp.aspen.client.internal.allocation
 
-import org.aspen_ddp.aspen.client.AmoebaClient
+import org.aspen_ddp.aspen.client.AspenClient
 import org.aspen_ddp.aspen.common.ida.IDA
 import org.aspen_ddp.aspen.common.objects.{AllocationRevisionGuard, ObjectId, ObjectPointer, ObjectRefcount, ObjectType}
 import org.aspen_ddp.aspen.common.pool.PoolId
@@ -27,7 +27,7 @@ trait AllocationDriver {
 
 object AllocationDriver {
   trait Factory {
-    def create(client: AmoebaClient,
+    def create(client: AspenClient,
                poolId: PoolId,
                newObjectId: ObjectId,
                objectSize: Option[Int],

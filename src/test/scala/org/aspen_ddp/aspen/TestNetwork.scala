@@ -4,7 +4,7 @@ import java.util.UUID
 import org.aspen_ddp.aspen
 import org.aspen_ddp.aspen.client.internal.{OpportunisticRebuildManager, StaticTypeRegistry}
 import org.aspen_ddp.aspen.client.internal.allocation.{AllocationManager, BaseAllocationDriver}
-import org.aspen_ddp.aspen.client.{AmoebaClient, DataObjectState, ExponentialBackoffRetryStrategy, Host, HostId, KeyValueObjectState, ObjectCache, RetryStrategy, StoragePool, Transaction, TransactionStatusCache, TypeRegistry}
+import org.aspen_ddp.aspen.client.{AspenClient, DataObjectState, ExponentialBackoffRetryStrategy, Host, HostId, KeyValueObjectState, ObjectCache, RetryStrategy, StoragePool, Transaction, TransactionStatusCache, TypeRegistry}
 import org.aspen_ddp.aspen.client.internal.network.Messenger as ClientMessenger
 import org.aspen_ddp.aspen.client.internal.pool.SimpleStoragePool
 import org.aspen_ddp.aspen.client.internal.read.{BaseReadDriver, ReadManager}
@@ -80,7 +80,7 @@ object TestNetwork {
   }
   */
 
-  class TClient(msngr: ClientMessenger, val nucleus: KeyValueObjectPointer) extends AmoebaClient {
+  class TClient(msngr: ClientMessenger, val nucleus: KeyValueObjectPointer) extends AspenClient {
 
     import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -193,7 +193,7 @@ class TestNetwork extends ServerMessenger {
   MissedUpdateFinalizationAction.errorTimeout = Duration(50, MILLISECONDS)
 
   object FinalizerFactory extends TransactionFinalizer.Factory {
-    var client: AmoebaClient = null
+    var client: AspenClient = null
 
     def create(txd: TransactionDescription, messenger: ServerMessenger): TransactionFinalizer = {
       val rfa = new RegisteredTransactionFinalizerFactory(client)

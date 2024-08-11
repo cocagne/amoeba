@@ -4,7 +4,7 @@ import java.nio.ByteBuffer
 import java.util.UUID
 
 import com.github.blemale.scaffeine.{Cache, Scaffeine}
-import org.aspen_ddp.aspen.client.{AmoebaClient, DataObjectState, InvalidObject, KeyValueObjectState, Transaction}
+import org.aspen_ddp.aspen.client.{AspenClient, DataObjectState, InvalidObject, KeyValueObjectState, Transaction}
 import org.aspen_ddp.aspen.common.DataBuffer
 import org.aspen_ddp.aspen.common.objects.{DataObjectPointer, Key, ObjectId, ObjectPointer, ObjectRevision, ObjectRevisionGuard}
 import org.aspen_ddp.aspen.common.util.Varint
@@ -648,7 +648,7 @@ object IndexedFileContent {
 
       val typeUUID: UUID = UUID.fromString("c1fb782f-7f13-4921-8ddf-155123445730")
 
-      override def createTask(client: AmoebaClient,
+      override def createTask(client: AspenClient,
                               pointer: DurableTaskPointer,
                               revision: ObjectRevision,
                               state: Map[Key, KeyValueObjectState.ValueState]): DurableTask = new DeleteIndexTask(client, pointer, revision, state)
@@ -670,7 +670,7 @@ object IndexedFileContent {
   /** Deletes an index. Note this this implementation is NOT for indicies with shared data. That would require
     *  exactly-once reference count decrements which this implementation does not currently enforce.
     */
-  class DeleteIndexTask private (client: AmoebaClient,
+  class DeleteIndexTask private (client: AspenClient,
                                  val taskPointer: DurableTaskPointer,
                                  revision: ObjectRevision,
                                  initialState: Map[Key, KeyValueObjectState.ValueState])

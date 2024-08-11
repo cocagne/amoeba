@@ -1,7 +1,7 @@
 package org.aspen_ddp.aspen.client.internal
 
 import com.github.blemale.scaffeine.Scaffeine
-import org.aspen_ddp.aspen.client.{AmoebaClient, ObjectState}
+import org.aspen_ddp.aspen.client.{AspenClient, ObjectState}
 import org.aspen_ddp.aspen.common.objects.{Metadata, ObjectId, ObjectPointer}
 import org.aspen_ddp.aspen.common.store.StoreId
 import org.aspen_ddp.aspen.common.transaction.PreTransactionOpportunisticRebuild
@@ -9,7 +9,7 @@ import org.aspen_ddp.aspen.common.transaction.PreTransactionOpportunisticRebuild
 import scala.concurrent.duration._
 import scala.concurrent.duration.Duration
 
-class SimpleOpportunisticRebuildManager(system: AmoebaClient) extends OpportunisticRebuildManager {
+class SimpleOpportunisticRebuildManager(system: AspenClient) extends OpportunisticRebuildManager {
 
   private[this] val repairCache = Scaffeine().expireAfterWrite(Duration(10, SECONDS))
     .maximumSize(5000)

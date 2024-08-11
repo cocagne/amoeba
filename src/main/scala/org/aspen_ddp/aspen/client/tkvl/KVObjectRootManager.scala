@@ -3,14 +3,14 @@ package org.aspen_ddp.aspen.client.tkvl
 import java.nio.{ByteBuffer, ByteOrder}
 import java.util.UUID
 
-import org.aspen_ddp.aspen.client.{AmoebaClient, ObjectAllocator, RegisteredTypeFactory, Transaction}
+import org.aspen_ddp.aspen.client.{AspenClient, ObjectAllocator, RegisteredTypeFactory, Transaction}
 import org.aspen_ddp.aspen.common.objects.{AllocationRevisionGuard, Insert, Key, KeyOrdering, KeyRevisionGuard, KeyValueObjectPointer, ObjectRevision, ObjectRevisionGuard, Value}
 import org.aspen_ddp.aspen.common.transaction.KeyValueUpdate
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
 
-class KVObjectRootManager(val client: AmoebaClient,
+class KVObjectRootManager(val client: AspenClient,
                           val treeKey: Key,
                           val pointer: KeyValueObjectPointer) extends RootManager {
 
@@ -127,7 +127,7 @@ object KVObjectRootManager extends RegisteredTypeFactory with RootManagerFactory
 
   val typeUUID: UUID = UUID.fromString("CE36789D-42F1-43F9-9464-E9B44419D8C4")
 
-  def createRootManager(client: AmoebaClient, data: Array[Byte]): KVObjectRootManager = {
+  def createRootManager(client: AspenClient, data: Array[Byte]): KVObjectRootManager = {
     val bb = ByteBuffer.wrap(data)
     bb.order(ByteOrder.BIG_ENDIAN)
     val klen = bb.getInt()
@@ -142,7 +142,7 @@ object KVObjectRootManager extends RegisteredTypeFactory with RootManagerFactory
     *
     * Note that the key must not already exist within the object
     */
-  def createNewTree(client: AmoebaClient,
+  def createNewTree(client: AspenClient,
                     pointer: KeyValueObjectPointer,
                     key: Key,
                     ordering: KeyOrdering,

@@ -2,7 +2,7 @@ package org.aspen_ddp.aspen.client.internal.read
 
 import java.util.UUID
 
-import org.aspen_ddp.aspen.client.{AmoebaClient, ObjectState}
+import org.aspen_ddp.aspen.client.{AspenClient, ObjectState}
 import org.aspen_ddp.aspen.common.network.{ReadResponse, TransactionCompletionQuery, TransactionCompletionResponse}
 import org.aspen_ddp.aspen.common.objects.ObjectPointer
 import org.aspen_ddp.aspen.common.store.StoreId
@@ -13,7 +13,7 @@ import org.apache.logging.log4j.scala.Logging
 import scala.concurrent.duration.{Duration, MINUTES, SECONDS}
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
-class ReadManager(val client: AmoebaClient, val driverFactory: ReadDriver.Factory) extends Logging {
+class ReadManager(val client: AspenClient, val driverFactory: ReadDriver.Factory) extends Logging {
 
   implicit val ec: ExecutionContext = client.clientContext
 
