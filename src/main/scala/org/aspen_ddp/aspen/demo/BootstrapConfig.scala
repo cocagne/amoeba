@@ -1,4 +1,4 @@
-package org.aspen_ddp.aspen.amoebafs.demo
+package org.aspen_ddp.aspen.demo
 
 import java.io.{File, FileInputStream}
 import java.util.UUID

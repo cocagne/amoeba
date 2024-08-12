@@ -1,4 +1,4 @@
-package org.aspen_ddp.aspen.amoebafs.demo
+package org.aspen_ddp.aspen.demo
 
 import org.apache.logging.log4j.scala.Logging
 import org.aspen_ddp.aspen.common.pool.PoolId

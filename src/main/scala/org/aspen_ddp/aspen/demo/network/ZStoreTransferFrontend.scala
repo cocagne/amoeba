@@ -1,4 +1,4 @@
-package org.aspen_ddp.aspen.amoebafs.demo.network
+package org.aspen_ddp.aspen.demo.network
 
 import org.aspen_ddp.aspen.common.store.StoreId
 import org.aspen_ddp.aspen.common.util.deleteDirectory

@@ -1,4 +1,4 @@
-package org.aspen_ddp.aspen.amoebafs.demo
+package org.aspen_ddp.aspen.demo
 
 import java.io.{File, StringReader}
 import java.nio.file.{Files, Path, Paths}
@@ -20,7 +20,7 @@ import org.aspen_ddp.aspen.common.transaction.KeyValueUpdate.{DoesNotExist, KeyR
 import org.aspen_ddp.aspen.common.util.{BackgroundTaskPool, YamlFormat, someOrThrow}
 import org.aspen_ddp.aspen.common.ida.IDA
 import org.aspen_ddp.aspen.amoebafs.FileSystem
-import org.aspen_ddp.aspen.amoebafs.demo.network.{ZCnCBackend, ZCnCFrontend, ZMQNetwork, ZStoreTransferBackend}
+import org.aspen_ddp.aspen.demo.network.{ZCnCBackend, ZCnCFrontend, ZMQNetwork, ZStoreTransferBackend}
 import org.aspen_ddp.aspen.amoebafs.impl.simple.SimpleFileSystem
 import org.aspen_ddp.aspen.amoebafs.nfs.AmoebaNFS
 import org.aspen_ddp.aspen.server.cnc.TransferStore

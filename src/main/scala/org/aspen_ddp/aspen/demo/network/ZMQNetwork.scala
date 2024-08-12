@@ -1,4 +1,4 @@
-package org.aspen_ddp.aspen.amoebafs.demo.network
+package org.aspen_ddp.aspen.demo.network
 
 import java.nio.{ByteBuffer, ByteOrder}
 import java.util.UUID
