@@ -8,12 +8,11 @@ import org.aspen_ddp.aspen.common.pool.PoolId
 import org.aspen_ddp.aspen.common.store.StoreId
 import org.aspen_ddp.aspen.common.transaction.TransactionStatus
 import org.aspen_ddp.aspen.common.util.BackgroundTask
-import org.aspen_ddp.aspen.amoebafs.demo.{StorageNodeConfig, StoreConfig}
 import org.aspen_ddp.aspen.server.crl.{CrashRecoveryLog, CrashRecoveryLogFactory}
 import org.aspen_ddp.aspen.server.network.Messenger
 import org.aspen_ddp.aspen.server.store.backend.{Backend, Completion, CompletionHandler}
 import org.aspen_ddp.aspen.server.store.cache.ObjectCache
-import org.aspen_ddp.aspen.server.store.{Frontend, Store}
+import org.aspen_ddp.aspen.server.store.{BackendStoreLoader, Frontend, Store}
 import org.aspen_ddp.aspen.server.transaction.{TransactionDriver, TransactionFinalizer, TransactionStatusCache}
 import org.apache.logging.log4j.scala.Logging
 import org.aspen_ddp.aspen.server.store.backend.{Backend, RocksDBBackend}
@@ -53,6 +52,7 @@ class StoreManager(val rootDir: Path,
                    crlFactory: CrashRecoveryLogFactory,
                    val finalizerFactory: TransactionFinalizer.Factory,
                    val txDriverFactory: TransactionDriver.Factory,
+                   val storeLoader: BackendStoreLoader,
                    val heartbeatPeriod: Duration) extends Logging {
   import StoreManager._
 
@@ -100,18 +100,11 @@ class StoreManager(val rootDir: Path,
       loadStoreFromPath(fn.toPath)
   
   protected def loadStoreFromPath(storePath: Path): Unit =
-    logger.info(s"Loading store $storePath")
-    val cfg = StoreConfig.loadStore(storePath.resolve("store_config.yaml").toFile)
-
-    val storeId = StoreId(PoolId(cfg.poolUuid), cfg.index.asInstanceOf[Byte])
-
-    val backend = cfg.backend match {
-      case b: StoreConfig.RocksDB =>
-        new RocksDBBackend(storePath, storeId, ec)
-    }
-    
-    loadStore(backend)
-    
+    storeLoader.loadStoreFromPath(storePath) match
+      case None => logger.info(s"Skipping non-store directory: ${storePath}")
+      case Some(backend) =>
+        logger.info(s"Loading store $storePath")
+        loadStore(backend)
 
   def containsStore(storeId: StoreId): Boolean = synchronized {
     logger.trace(s"********* CONTAINS STORE: ${storeId}: ${stores.contains(storeId)}. Stores: ${stores}")

@@ -21,11 +21,10 @@ import org.aspen_ddp.aspen.common.util.{BackgroundTask, BackgroundTaskPool}
 import org.aspen_ddp.aspen.server.{RegisteredTransactionFinalizerFactory, StoreManager, transaction}
 import org.aspen_ddp.aspen.server.crl.{AllocationRecoveryState, CrashRecoveryLog, CrashRecoveryLogFactory, TransactionRecoveryState}
 import org.aspen_ddp.aspen.server.network.Messenger as ServerMessenger
-import org.aspen_ddp.aspen.server.store.Bootstrap
-import org.aspen_ddp.aspen.server.store.backend.MapBackend
+import org.aspen_ddp.aspen.server.store.{BackendStoreLoader, Bootstrap}
+import org.aspen_ddp.aspen.server.store.backend.{Backend, BackendType, MapBackend}
 import org.aspen_ddp.aspen.server.store.cache.SimpleLRUObjectCache
 import org.aspen_ddp.aspen.server.transaction.{TransactionDriver, TransactionFinalizer}
-import org.aspen_ddp.aspen.server.store.backend.BackendType
 import org.aspen_ddp.aspen.server.cnc.{CnCFrontend, NewStore}
 import org.aspen_ddp.aspen.common.ida.IDA
 
@@ -200,11 +199,16 @@ class TestNetwork extends ServerMessenger {
       rfa.create(txd, messenger)
     }
   }
+  
+  val storeLoader = new BackendStoreLoader {
+    override def loadStoreFromPath(storePath: Path)(implicit ec: ExecutionContext): Option[Backend] = ???
+  }
 
   val smgr = new StoreManager(Path.of("/"),
     scala.concurrent.ExecutionContext.Implicits.global,
     objectCacheFactory, this, BackgroundTask.NoBackgroundTasks,
     TestCRL, FinalizerFactory, TransactionDriver.noErrorRecoveryFactory,
+    storeLoader,
     Duration(5, SECONDS))
   
   smgr.loadStore(store0)

@@ -3,6 +3,7 @@ package org.aspen_ddp.aspen.server
 import org.aspen_ddp.aspen.common.util.BackgroundTask
 import org.aspen_ddp.aspen.server.crl.CrashRecoveryLogFactory
 import org.aspen_ddp.aspen.server.network.Messenger
+import org.aspen_ddp.aspen.server.store.BackendStoreLoader
 import org.aspen_ddp.aspen.server.store.backend.Backend
 import org.aspen_ddp.aspen.server.store.cache.ObjectCache
 import org.aspen_ddp.aspen.server.transaction.{TransactionDriver, TransactionFinalizer}
@@ -18,8 +19,9 @@ class SingleThreadedStoreManager(rootDir: Path,
                                  crlFactory: CrashRecoveryLogFactory,
                                  finalizerFactory: TransactionFinalizer.Factory,
                                  txDriverFactory: TransactionDriver.Factory,
+                                 storeLoader: BackendStoreLoader,
                                  heartbeatPeriod: Duration) extends StoreManager(rootDir, ec, objectCacheFactory,
-  net, backgroundTasks, crlFactory, finalizerFactory, txDriverFactory,  heartbeatPeriod){
+  net, backgroundTasks, crlFactory, finalizerFactory, txDriverFactory, storeLoader, heartbeatPeriod){
 
   private val managerThread = new Thread {
     override def run(): Unit = {
