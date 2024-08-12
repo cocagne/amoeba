@@ -5,7 +5,7 @@ import java.util.UUID
 import org.aspen_ddp.aspen.common.objects.{Key, ObjectId, ObjectType}
 import org.aspen_ddp.aspen.common.pool.PoolId
 
-object Nucleus {
+object Radicle {
   val objectId: ObjectId = ObjectId(new UUID(0, 0))
 
   val objectType: ObjectType.Value = ObjectType.KeyValue

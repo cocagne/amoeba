@@ -4,7 +4,7 @@ import java.util.UUID
 import org.aspen_ddp.aspen.client.{Host, HostId, StoragePool}
 import org.aspen_ddp.aspen.client.internal.pool.SimpleStoragePool
 import org.aspen_ddp.aspen.client.tkvl.{BootstrapPoolNodeAllocator, Root}
-import org.aspen_ddp.aspen.common.{HLCTimestamp, Nucleus}
+import org.aspen_ddp.aspen.common.{HLCTimestamp, Radicle}
 import org.aspen_ddp.aspen.common.ida.IDA
 import org.aspen_ddp.aspen.common.objects.{ByteArrayKeyOrdering, Insert, Key, KeyValueObjectPointer, KeyValueOperation, LexicalKeyOrdering, Metadata, ObjectId, ObjectRefcount, ObjectRevision, ObjectType, Value}
 import org.aspen_ddp.aspen.common.transaction.TransactionId
@@ -40,7 +40,7 @@ object Bootstrap {
           store.bootstrapAllocate(oid, ObjectType.KeyValue, bootstrapMetadata, storeData)
         }
 
-        KeyValueObjectPointer(oid, Nucleus.poolId, None, ida, storePointers)
+        KeyValueObjectPointer(oid, Radicle.poolId, None, ida, storePointers)
       }
 
       def overwrite(pointer: KeyValueObjectPointer,
@@ -62,7 +62,7 @@ object Bootstrap {
 
       val storeHosts = (0 until ida.width).map(idx => HostId(new UUID(0,idx))).toArray
 
-      val poolConfig = SimpleStoragePool.encode(Nucleus.poolId, "bootstrap", ida.width, ida, storeHosts, None)
+      val poolConfig = SimpleStoragePool.encode(Radicle.poolId, "bootstrap", ida.width, ida, storeHosts, None)
       val errorTree = Root(0, ByteArrayKeyOrdering, Some(errTreeRoot), BootstrapPoolNodeAllocator).encode()
       val allocTree = Root(0, ByteArrayKeyOrdering, Some(allocTreeRoot), BootstrapPoolNodeAllocator).encode()
 
@@ -70,7 +70,7 @@ object Bootstrap {
                                StoragePool.ErrorTreeKey -> errorTree,
                                StoragePool.AllocationTreeKey -> allocTree))
 
-      val poolTreeRoot = allocate(List(Key(Nucleus.poolId.uuid) -> pool.toArray))
+      val poolTreeRoot = allocate(List(Key(Radicle.poolId.uuid) -> pool.toArray))
       val poolTree = Root(0,
         ByteArrayKeyOrdering,
         Some(poolTreeRoot),
@@ -99,13 +99,13 @@ object Bootstrap {
         Some(hostsNameTreeRootObj),
         BootstrapPoolNodeAllocator)
 
-      val nucleusContent: List[(Key, Array[Byte])] = List(
-        Nucleus.PoolTreeKey -> poolTree.encode(),
-        Nucleus.PoolNameTreeKey -> poolNameTree.encode(),
-        Nucleus.HostsTreeKey -> hostsTree.encode(),
-        Nucleus.HostsNameTreeKey -> hostsNameTree.encode())
+      val radicleContent: List[(Key, Array[Byte])] = List(
+        Radicle.PoolTreeKey -> poolTree.encode(),
+        Radicle.PoolNameTreeKey -> poolNameTree.encode(),
+        Radicle.HostsTreeKey -> hostsTree.encode(),
+        Radicle.HostsNameTreeKey -> hostsNameTree.encode())
 
-      val nucleus = allocate(nucleusContent, Some(Nucleus.objectId))
+      val radicle = allocate(radicleContent, Some(Radicle.objectId))
 
       overwrite(allocTreeRoot, List(
         Key(errTreeRoot.id.uuid) -> errTreeRoot.toArray,
@@ -115,17 +115,17 @@ object Bootstrap {
         Key(poolNameTreeRootObj.id.uuid) -> poolNameTreeRootObj.toArray,
         Key(hostsTreeRootObj.id.uuid) -> hostsTreeRootObj.toArray,
         Key(hostsNameTreeRootObj.id.uuid) -> hostsNameTreeRootObj.toArray,
-        Key(nucleus.id.uuid) -> nucleus.toArray
+        Key(radicle.id.uuid) -> radicle.toArray
       ))
 
       if false then
         println(s"ErrorTreeRoot: ${errTreeRoot.id.uuid}")
         println(s"AllocTreeRoot: ${allocTreeRoot.id.uuid}")
-        println(s"Nucleus Pool : ${pool.id.uuid}")
+        println(s"Radicle Pool : ${pool.id.uuid}")
         println(s"PoolTreeRoot : ${poolTreeRoot.id.uuid}")
-        println(s"Nucleus      : ${nucleus.id.uuid}")
+        println(s"Radicle      : ${radicle.id.uuid}")
 
-      nucleus
+      radicle
     }
 
 

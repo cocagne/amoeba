@@ -5,7 +5,7 @@ import java.util.UUID
 
 import org.aspen_ddp.aspen.client.{AspenClient, ObjectAllocator}
 import org.aspen_ddp.aspen.client.internal.allocation.SinglePoolObjectAllocator
-import org.aspen_ddp.aspen.common.Nucleus
+import org.aspen_ddp.aspen.common.Radicle
 import org.aspen_ddp.aspen.common.pool.PoolId
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -37,7 +37,7 @@ object NodeAllocator {
 
 object BootstrapPoolNodeAllocator extends NodeAllocator {
 
-  val poolId: PoolId = Nucleus.poolId
+  val poolId: PoolId = Radicle.poolId
 
   override val code: Int = 0
   override val encodedSize = 17

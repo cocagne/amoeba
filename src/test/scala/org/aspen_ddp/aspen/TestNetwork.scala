@@ -10,7 +10,7 @@ import org.aspen_ddp.aspen.client.internal.pool.SimpleStoragePool
 import org.aspen_ddp.aspen.client.internal.read.{BaseReadDriver, ReadManager}
 import org.aspen_ddp.aspen.client.internal.transaction.{ClientTransactionDriver, MissedUpdateFinalizationAction, TransactionImpl, TransactionManager}
 import org.aspen_ddp.aspen.client.tkvl.{KVObjectRootManager, TieredKeyValueList}
-import org.aspen_ddp.aspen.common.Nucleus
+import org.aspen_ddp.aspen.common.Radicle
 import org.aspen_ddp.aspen.common.ida.Replication
 import org.aspen_ddp.aspen.common.network.{AllocateResponse, ClientId, ClientRequest, ClientResponse, ReadResponse, TransactionCompletionResponse, TransactionFinalized, TransactionResolved, TxMessage}
 import org.aspen_ddp.aspen.common.objects.{DataObjectPointer, Key, KeyValueObjectPointer, ObjectId}
@@ -79,7 +79,7 @@ object TestNetwork {
   }
   */
 
-  class TClient(msngr: ClientMessenger, val nucleus: KeyValueObjectPointer) extends AspenClient {
+  class TClient(msngr: ClientMessenger, val radicle: KeyValueObjectPointer) extends AspenClient {
 
     import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -110,7 +110,7 @@ object TestNetwork {
     def getStoragePool(poolName: String): Future[Option[StoragePool]] = ???
 
     def getStoragePool(poolId: PoolId): Future[Option[StoragePool]] = {
-      val root = new KVObjectRootManager(this, Nucleus.PoolTreeKey, nucleus)
+      val root = new KVObjectRootManager(this, Radicle.PoolTreeKey, radicle)
       val tkvl = new TieredKeyValueList(this, root)
       for {
         poolPtr <- tkvl.get(Key(poolId.uuid))
@@ -169,9 +169,9 @@ class TestNetwork extends ServerMessenger {
 
   val objectCacheFactory: () => SimpleLRUObjectCache = () => new SimpleLRUObjectCache(1000)
 
-  val storeId0 = StoreId(Nucleus.poolId, 0)
-  val storeId1 = StoreId(Nucleus.poolId, 1)
-  val storeId2 = StoreId(Nucleus.poolId, 2)
+  val storeId0 = StoreId(Radicle.poolId, 0)
+  val storeId1 = StoreId(Radicle.poolId, 1)
+  val storeId2 = StoreId(Radicle.poolId, 2)
 
   val store0 = new MapBackend(storeId0)
   val store1 = new MapBackend(storeId1)
@@ -181,7 +181,7 @@ class TestNetwork extends ServerMessenger {
 
   var handleDepth = 0
 
-  val nucleus: KeyValueObjectPointer = Bootstrap.initialize(ida, 
+  val radicle: KeyValueObjectPointer = Bootstrap.initialize(ida,
     List(store0, store1, store2), List(
       ("node1", new UUID(0,0)),
       ("node2", new UUID(0,1)),
@@ -236,7 +236,7 @@ class TestNetwork extends ServerMessenger {
     def sendTransactionMessages(msg: List[TxMessage]): Unit = msg.foreach(sendTransactionMessage)
   }
 
-  val client = new TClient(cliMessenger, nucleus)
+  val client = new TClient(cliMessenger, radicle)
 
   FinalizerFactory.client = client
 

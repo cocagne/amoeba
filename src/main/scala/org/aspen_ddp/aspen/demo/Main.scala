@@ -9,7 +9,7 @@ import org.aspen_ddp.aspen.client.{AspenClient, DataObjectState, Host, HostId, K
 import org.aspen_ddp.aspen.client.internal.SimpleAspenClient
 import org.aspen_ddp.aspen.client.internal.allocation.SinglePoolObjectAllocator
 import org.aspen_ddp.aspen.client.tkvl.{KVObjectRootManager, KeyValueListNode, Root, SinglePoolNodeAllocator, TieredKeyValueList}
-import org.aspen_ddp.aspen.common.{DataBuffer, HLCTimestamp, Nucleus}
+import org.aspen_ddp.aspen.common.{DataBuffer, HLCTimestamp, Radicle}
 import org.aspen_ddp.aspen.common.ida.{ReedSolomon, Replication}
 import org.aspen_ddp.aspen.common.network.{ClientId, ClientRequest, ClientResponse, TxMessage}
 import org.aspen_ddp.aspen.common.objects.{ByteArrayKeyOrdering, DataObjectPointer, Insert, Key, KeyValueObjectPointer, LexicalKeyOrdering, Metadata, ObjectId, ObjectPointer, ObjectRevisionGuard, ObjectType, Value}
@@ -329,16 +329,16 @@ object Main {
     val sched = Executors.newScheduledThreadPool(3)
     val ec: ExecutionContext = ExecutionContext.fromExecutorService(sched)
 
-    val nucleus = KeyValueObjectPointer(Nucleus.objectId, Nucleus.poolId, None,
+    val radicle = KeyValueObjectPointer(Radicle.objectId, Radicle.poolId, None,
       cfg.bootstrapIDA, (0 until cfg.bootstrapIDA.width).map(idx => StorePointer(idx.toByte, Array())).toArray)
 
-    val ret = (new SimpleAspenClient(nnet.clientMessenger, nnet.clientId, ec, nucleus,
+    val ret = (new SimpleAspenClient(nnet.clientMessenger, nnet.clientId, ec, radicle,
       txStatusCacheDuration,
       initialReadDelay,
       maxReadDelay,
       txRetransmitDelay,
       allocationRetransmitDelay,
-      hosts),  nnet, nucleus)
+      hosts),  nnet, radicle)
 
     networkBridge.oclient = Some(ret._1)
 
@@ -346,7 +346,7 @@ object Main {
   }
 
   def initializeAmoeba(client: AspenClient,
-                       nucleus: KeyValueObjectPointer,
+                       radicle: KeyValueObjectPointer,
                        numIndexNodeSegments: Int = 100,
                        fileSegmentSize:Int=1024*1024): Future[FileSystem] = {
 
@@ -366,14 +366,14 @@ object Main {
         }
     }
 
-    client.read(nucleus).flatMap(loadFileSystem)
+    client.read(radicle).flatMap(loadFileSystem)
   }
 
   def OLD_run_debug_code(log4jConfigFile: File, cfg: BootstrapConfig.Config): Unit = {
     println(s"LOG4J CONFIG $log4jConfigFile")
     setLog4jConfigFile(log4jConfigFile)
 
-    val (client, network, nucleus) = createAmoebaClient(cfg)
+    val (client, network, radicle) = createAmoebaClient(cfg)
 
     val networkThread = new Thread {
       override def run(): Unit = {
@@ -384,9 +384,9 @@ object Main {
 
     implicit val ec: ExecutionContext = client.clientContext
 
-    println("------------ Reading Nucleus ---------------")
+    println("------------ Reading Radicle ---------------")
     for
-      kvos <- client.read(nucleus)
+      kvos <- client.read(radicle)
       _=println("------------ Getting Storage Pool---------------")
       pool <- client.getStoragePool(kvos.pointer.poolId)
       _=println("------------ New Transaction---------------")
@@ -426,7 +426,7 @@ object Main {
     println(s"LOG4J CONFIG $log4jConfigFile")
     setLog4jConfigFile(log4jConfigFile)
 
-    val (client, network, nucleus) = createAmoebaClient(cfg)
+    val (client, network, radicle) = createAmoebaClient(cfg)
 
     val networkThread = new Thread {
       override def run(): Unit = {
@@ -465,9 +465,9 @@ object Main {
             ptr
 
 
-    println("------------ Reading Nucleus ---------------")
+    println("------------ Reading Radicle ---------------")
     for
-      kvos <- client.read(nucleus)
+      kvos <- client.read(radicle)
       _ = println("------------ Getting Storage Pool---------------")
       pool <- client.getStoragePool(kvos.pointer.poolId)
       alloc = pool.get.createAllocator(Replication(3,2))
@@ -490,7 +490,7 @@ object Main {
     println(s"LOG4J CONFIG $log4jConfigFile")
     setLog4jConfigFile(log4jConfigFile)
 
-    val (client, network, nucleus) = createAmoebaClient(cfg)
+    val (client, network, radicle) = createAmoebaClient(cfg)
 
     val networkThread = new Thread {
       override def run(): Unit = {
@@ -499,7 +499,7 @@ object Main {
     }
     networkThread.start()
 
-    val f = initializeAmoeba(client, nucleus)
+    val f = initializeAmoeba(client, radicle)
 
     val fs = Await.result(f, Duration(10000, MILLISECONDS))
 
@@ -729,18 +729,18 @@ object Main {
           |""".stripMargin)
       new RocksDBBackend(storeRoot, dataStoreId, ec)
 
-    val nucleus = Bootstrap.initialize(cfg.bootstrapIDA,
+    val radicle = Bootstrap.initialize(cfg.bootstrapIDA,
       bootstrapStores,
       cfg.nodes.zipWithIndex.map((n, idx) => (n.name, new UUID(0, idx))))
 
     // Print yaml representation of Radicle Pointer
     println("# NHucleus Pointer Definition")
     println("radicle:")
-    println(s"    uuid:      ${nucleus.id}")
-    println(s"    pool-uuid: ${nucleus.poolId}")
-    nucleus.size.foreach(size => println(s"    size:      $size"))
+    println(s"    uuid:      ${radicle.id}")
+    println(s"    pool-uuid: ${radicle.poolId}")
+    radicle.size.foreach(size => println(s"    size:      $size"))
     println("    ida:")
-    nucleus.ida match {
+    radicle.ida match {
       case ida: Replication =>
         println(s"        type:            replication")
         println(s"        width:           ${ida.width}")
@@ -749,7 +749,7 @@ object Main {
       case _: ReedSolomon => throw new NotImplementedError
     }
     println("    store-pointers:")
-    nucleus.storePointers.foreach { sp =>
+    radicle.storePointers.foreach { sp =>
       println(s"        - pool-index: ${sp.poolIndex}")
       if (sp.data.length > 0)
         println(s"          data: ${java.util.Base64.getEncoder.encodeToString(sp.data)}")
@@ -761,7 +761,7 @@ object Main {
 
     setLog4jConfigFile(log4jConfigFile)
 
-    val (client, network, nucleus) = createAmoebaClient(cfg)
+    val (client, network, radicle) = createAmoebaClient(cfg)
 
     val networkThread = new Thread {
       override def run(): Unit = {
@@ -849,7 +849,7 @@ object Main {
 
     setLog4jConfigFile(log4jConfigFile)
 
-    val (client, network, nucleus) = createAmoebaClient(bootstrapConfig)
+    val (client, network, radicle) = createAmoebaClient(bootstrapConfig)
 
     val networkThread = new Thread {
       override def run(): Unit = {
@@ -887,7 +887,7 @@ object Main {
 
     setLog4jConfigFile(log4jConfigFile)
 
-    val (client, network, nucleus) = createAmoebaClient(bootstrapConfig)
+    val (client, network, radicle) = createAmoebaClient(bootstrapConfig)
 
     val networkThread = new Thread {
       override def run(): Unit = {

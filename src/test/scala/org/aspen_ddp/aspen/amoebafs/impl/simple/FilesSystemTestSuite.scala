@@ -15,11 +15,11 @@ class FilesSystemTestSuite  extends IntegrationTestSuite {
   //override def subFixtureSetup(): Unit = {
   def bootstrap(): Future[FileSystem] = {
     for {
-      kvos <- client.read(nucleus)
+      kvos <- client.read(radicle)
       rootPool <- client.getStoragePool(kvos.pointer.poolId)
-      allocator = new SinglePoolObjectAllocator(client, rootPool.get, nucleus.ida, None )
+      allocator = new SinglePoolObjectAllocator(client, rootPool.get, radicle.ida, None )
       fs <- SimpleFileSystem.bootstrap(client,
-        ObjectRevisionGuard(nucleus, kvos.revision),
+        ObjectRevisionGuard(radicle, kvos.revision),
         allocator,
         kvos.pointer,
         Key(100))

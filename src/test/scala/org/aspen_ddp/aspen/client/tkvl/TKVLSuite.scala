@@ -2,7 +2,7 @@ package org.aspen_ddp.aspen.client.tkvl
 
 import org.aspen_ddp.aspen.IntegrationTestSuite
 import org.aspen_ddp.aspen.client.Transaction
-import org.aspen_ddp.aspen.common.Nucleus
+import org.aspen_ddp.aspen.common.Radicle
 import org.aspen_ddp.aspen.common.ida.Replication
 import org.aspen_ddp.aspen.common.objects.{ByteArrayKeyOrdering, Key, ObjectRevisionGuard, Value}
 
@@ -15,13 +15,13 @@ class TKVLSuite extends IntegrationTestSuite {
     implicit val tx1: Transaction = client.newTransaction()
 
     for {
-      ikvos <- client.read(nucleus)
-      pool <- client.getStoragePool(Nucleus.poolId)
+      ikvos <- client.read(radicle)
+      pool <- client.getStoragePool(Radicle.poolId)
       alloc = pool.get.createAllocator(Replication(3,2))
 
-      ptr <- alloc.allocateKeyValueObject(ObjectRevisionGuard(nucleus, ikvos.revision), Map(), None, None, None)
+      ptr <- alloc.allocateKeyValueObject(ObjectRevisionGuard(radicle, ikvos.revision), Map(), None, None, None)
 
-      nodeAllocator = new SinglePoolNodeAllocator(client, Nucleus.poolId)
+      nodeAllocator = new SinglePoolNodeAllocator(client, Radicle.poolId)
 
       froot <- KVObjectRootManager.createNewTree(client, ptr, treeKey, ByteArrayKeyOrdering, nodeAllocator, Map(key -> value))
 
@@ -53,13 +53,13 @@ class TKVLSuite extends IntegrationTestSuite {
     implicit val tx1: Transaction = client.newTransaction()
 
     for {
-      ikvos <- client.read(nucleus)
-      pool <- client.getStoragePool(Nucleus.poolId)
+      ikvos <- client.read(radicle)
+      pool <- client.getStoragePool(Radicle.poolId)
       alloc = pool.get.createAllocator(Replication(3,2))
 
-      ptr <- alloc.allocateKeyValueObject(ObjectRevisionGuard(nucleus, ikvos.revision), Map(), None, None, None)
+      ptr <- alloc.allocateKeyValueObject(ObjectRevisionGuard(radicle, ikvos.revision), Map(), None, None, None)
 
-      nodeAllocator = new SinglePoolNodeAllocator(client, Nucleus.poolId)
+      nodeAllocator = new SinglePoolNodeAllocator(client, Radicle.poolId)
 
       froot <- KVObjectRootManager.createNewTree(client, ptr, treeKey, ByteArrayKeyOrdering, nodeAllocator, Map(key -> value))
 
@@ -97,14 +97,14 @@ class TKVLSuite extends IntegrationTestSuite {
     implicit val tx1: Transaction = client.newTransaction()
 
     for {
-      ikvos <- client.read(nucleus)
+      ikvos <- client.read(radicle)
 
-      pool <- client.getStoragePool(Nucleus.poolId)
+      pool <- client.getStoragePool(Radicle.poolId)
       alloc = pool.get.createAllocator(Replication(3,2))
 
-      ptr <- alloc.allocateKeyValueObject(ObjectRevisionGuard(nucleus, ikvos.revision), Map(), None, None, None)
+      ptr <- alloc.allocateKeyValueObject(ObjectRevisionGuard(radicle, ikvos.revision), Map(), None, None, None)
 
-      nodeAllocator = new SinglePoolNodeAllocator(client, Nucleus.poolId)
+      nodeAllocator = new SinglePoolNodeAllocator(client, Radicle.poolId)
 
       froot <- KVObjectRootManager.createNewTree(client, ptr, treeKey, ByteArrayKeyOrdering, nodeAllocator, Map(key -> value))
 
@@ -151,13 +151,13 @@ class TKVLSuite extends IntegrationTestSuite {
     implicit val tx1: Transaction = client.newTransaction()
 
     for {
-      ikvos <- client.read(nucleus)
-      pool <- client.getStoragePool(Nucleus.poolId)
+      ikvos <- client.read(radicle)
+      pool <- client.getStoragePool(Radicle.poolId)
       alloc = pool.get.createAllocator(Replication(3,2))
 
-      ptr <- alloc.allocateKeyValueObject(ObjectRevisionGuard(nucleus, ikvos.revision), Map(), None, None, None)
+      ptr <- alloc.allocateKeyValueObject(ObjectRevisionGuard(radicle, ikvos.revision), Map(), None, None, None)
 
-      nodeAllocator = new SinglePoolNodeAllocator(client, Nucleus.poolId)
+      nodeAllocator = new SinglePoolNodeAllocator(client, Radicle.poolId)
 
       froot <- KVObjectRootManager.createNewTree(client, ptr, treeKey, ByteArrayKeyOrdering, nodeAllocator, Map(key -> value))
 

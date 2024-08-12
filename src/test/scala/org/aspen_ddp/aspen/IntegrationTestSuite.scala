@@ -14,7 +14,7 @@ import scala.concurrent.duration.{Duration, MILLISECONDS}
 class IntegrationTestSuite  extends AsyncFunSuite with Matchers { //with BeforeAndAfter {
   var net: TestNetwork = _
   var client: AspenClient = _
-  var nucleus: KeyValueObjectPointer = _
+  var radicle: KeyValueObjectPointer = _
   var testName: String = "NO_TEST"
 
   /*
@@ -30,7 +30,7 @@ class IntegrationTestSuite  extends AsyncFunSuite with Matchers { //with BeforeA
 
     net = null
     client = null
-    nucleus = null
+    radicle = null
     testName = "NO_TEST"
   }*/
   def subFixtureSetup(): Unit = {}
@@ -40,7 +40,7 @@ class IntegrationTestSuite  extends AsyncFunSuite with Matchers { //with BeforeA
     net = new TestNetwork
     client = net.client
     testName = test.name
-    nucleus = net.nucleus
+    radicle = net.radicle
     client.setSystemAttribute("unittest.name", test.name)
 
     subFixtureSetup()
@@ -62,7 +62,7 @@ class IntegrationTestSuite  extends AsyncFunSuite with Matchers { //with BeforeA
 
       net = null
       client = null
-      nucleus = null
+      radicle = null
       testName = "NO_TEST"
     }
   }

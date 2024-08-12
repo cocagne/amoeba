@@ -8,7 +8,7 @@ import org.aspen_ddp.aspen.client.internal.pool.SimpleStoragePool
 import org.aspen_ddp.aspen.client.internal.read.{ReadManager, SimpleReadDriver}
 import org.aspen_ddp.aspen.client.internal.transaction.{SimpleClientTransactionDriver, TransactionImpl, TransactionManager}
 import org.aspen_ddp.aspen.client.tkvl.{KVObjectRootManager, Root, SinglePoolNodeAllocator, TieredKeyValueList}
-import org.aspen_ddp.aspen.common.Nucleus
+import org.aspen_ddp.aspen.common.Radicle
 import org.aspen_ddp.aspen.common.network.{AllocateResponse, ClientId, ClientResponse, ReadResponse, TransactionCompletionResponse, TransactionFinalized, TransactionResolved}
 import org.aspen_ddp.aspen.common.pool.PoolId
 import org.aspen_ddp.aspen.common.store.StoreId
@@ -22,7 +22,7 @@ import scala.concurrent.duration.{Duration, FiniteDuration, MILLISECONDS}
 class SimpleAspenClient(val msngr: ClientMessenger,
                         override val clientId: ClientId,
                         implicit val executionContext: ExecutionContext,
-                        val nucleus: KeyValueObjectPointer,
+                        val radicle: KeyValueObjectPointer,
                         txStatusCacheDuration: FiniteDuration,
                         initialReadDelay: Duration,
                         maxReadDelay: Duration,
@@ -54,7 +54,7 @@ class SimpleAspenClient(val msngr: ClientMessenger,
   }
 
   def getStoragePool(poolId: PoolId): Future[Option[StoragePool]] =
-    val root = new KVObjectRootManager(this, Nucleus.PoolTreeKey, nucleus)
+    val root = new KVObjectRootManager(this, Radicle.PoolTreeKey, radicle)
     val tkvl = new TieredKeyValueList(this, root)
 
     tkvl.get(Key(poolId.uuid)).flatMap:
@@ -66,7 +66,7 @@ class SimpleAspenClient(val msngr: ClientMessenger,
     if poolName.toLowerCase == "bootstrap" then
       getStoragePool(PoolId(new UUID(0,0)))
     else
-      val root = new KVObjectRootManager(this, Nucleus.PoolTreeKey, nucleus)
+      val root = new KVObjectRootManager(this, Radicle.PoolTreeKey, radicle)
       val tkvl = new TieredKeyValueList(this, root)
 
       tkvl.get(Key(poolName)).flatMap:
@@ -74,7 +74,7 @@ class SimpleAspenClient(val msngr: ClientMessenger,
         case Some(poolIdBytes) => getStoragePool(PoolId(byte2uuid(poolIdBytes.value.bytes)))
 
   override def updateStorageHost(storeId: StoreId, newHostId: HostId): Future[Unit] =
-    val root = new KVObjectRootManager(this, Nucleus.PoolTreeKey, nucleus)
+    val root = new KVObjectRootManager(this, Radicle.PoolTreeKey, radicle)
     val tkvl = new TieredKeyValueList(this, root)
 
     implicit val tx: Transaction = newTransaction()
@@ -102,23 +102,23 @@ class SimpleAspenClient(val msngr: ClientMessenger,
       ()
 
   override protected def createStoragePool(config: StoragePool.Config): Future[StoragePool] =
-    val root = new KVObjectRootManager(this, Nucleus.PoolTreeKey, nucleus)
+    val root = new KVObjectRootManager(this, Radicle.PoolTreeKey, radicle)
     val tkvl = new TieredKeyValueList(this, root)
-    val nameRoot = new KVObjectRootManager(this, Nucleus.PoolNameTreeKey, nucleus)
+    val nameRoot = new KVObjectRootManager(this, Radicle.PoolNameTreeKey, radicle)
     val nameTkvl = new TieredKeyValueList(this, nameRoot)
 
     implicit val tx: Transaction = newTransaction()
 
     def createPoolObj(alloc: ObjectAllocator): Future[KeyValueObjectPointer] =
       for
-        nucleusKvos <- read(nucleus)
+        radicleKvos <- read(radicle)
         
-        revisionGuard = ObjectRevisionGuard(nucleusKvos.pointer, nucleusKvos.revision)
+        revisionGuard = ObjectRevisionGuard(radicleKvos.pointer, radicleKvos.revision)
         
         errTreeRoot <- alloc.allocateKeyValueObject(revisionGuard, Map())
         allocTreeRoot <- alloc.allocateKeyValueObject(revisionGuard, Map())
         
-        nodeAllocator = SinglePoolNodeAllocator(this, nucleus.poolId)
+        nodeAllocator = SinglePoolNodeAllocator(this, radicle.poolId)
 
         poolConfig = config.encode()
         errorTree = Root(0, ByteArrayKeyOrdering, Some(errTreeRoot), nodeAllocator).encode()
@@ -147,7 +147,7 @@ class SimpleAspenClient(val msngr: ClientMessenger,
       case Some(host) => return Future.successful(Some(host))
       case None =>
 
-    val root = new KVObjectRootManager(this, Nucleus.HostsTreeKey, nucleus)
+    val root = new KVObjectRootManager(this, Radicle.HostsTreeKey, radicle)
     val tkvl = new TieredKeyValueList(this, root)
     for
       ohostValue <- tkvl.get(Key(hostId.uuid))
@@ -157,7 +157,7 @@ class SimpleAspenClient(val msngr: ClientMessenger,
         case None => None
 
   def getHost(hostName: String): Future[Option[Host]] =
-    val root = new KVObjectRootManager(this, Nucleus.HostsNameTreeKey, nucleus)
+    val root = new KVObjectRootManager(this, Radicle.HostsNameTreeKey, radicle)
     val tkvl = new TieredKeyValueList(this, root)
     tkvl.get(Key(hostName)).flatMap {
         case Some(uuid) => getHost(HostId(byte2uuid(uuid.value.bytes)))
