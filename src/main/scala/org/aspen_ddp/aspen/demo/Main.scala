@@ -256,13 +256,14 @@ object Main {
               val arr = x.split(":")
               if (arr.length == 2) {
                 try {
+                  UUID.fromString(arr(0))
                   Integer.parseInt(arr(1))
                   success
                 } catch {
-                  case _: Throwable => failure("Store name must match the format \"pool-name:storeNumber\"")
+                  case _: Throwable => failure("Store name must match the format \"pool-uuid:storeNumber\"")
                 }
               }
-              else failure("Store name must match the format \"pool-name:storeNumber\"")
+              else failure("Store name must match the format \"pool-uuid:storeNumber\"")
             },
           arg[String]("<new-host>").text("Name of the host to receive the store").
             action((x, c) => c.copy(host = x)),
