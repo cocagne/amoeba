@@ -549,8 +549,8 @@ object Main {
       val tx = client.newTransaction()
       val fdelete = node.delete(key)(tx)
       for
-        _ <- tx.commit()
         _ <- fdelete
+        _ <- tx.commit()
       yield ()
 
     def deleteErrorEntryByTimestamp(timestamp: HLCTimestamp,
