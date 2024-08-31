@@ -2,10 +2,11 @@ package org.aspen_ddp.aspen.client.internal.allocation
 
 import java.nio.{ByteBuffer, ByteOrder}
 import java.util.UUID
-import org.aspen_ddp.aspen.client.{AspenClient, FinalizationAction, FinalizationActionFactory, RegisteredTypeFactory, Transaction}
+import org.aspen_ddp.aspen.client.{AspenClient, FinalizationAction, FinalizationActionFactory, RegisteredTypeFactory, StopRetrying, Transaction}
 import org.aspen_ddp.aspen.common.objects.{Key, ObjectPointer, Value}
 import org.aspen_ddp.aspen.common.transaction.{FinalizationActionId, TransactionDescription}
 import org.apache.logging.log4j.scala.Logging
+import org.aspen_ddp.aspen.common.util.someOrThrow
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
@@ -22,9 +23,9 @@ class AllocationFinalizationAction(val client: AspenClient,
 
   def execute(): Unit = client.retryStrategy.retryUntilSuccessful {
     for {
-      pool <- client.getStoragePool(newObject.poolId)
+      pool <- someOrThrow(client.getStoragePool(newObject.poolId), StopRetrying(new Exception("Storage Pool Does Not Exist")))
       tx = client.newTransaction()
-      _ <- pool.get.allocationTree.set(Key(newObject.id.toBytes), Value(newObject.toArray))(tx)
+      _ <- pool.allocationTree.set(Key(newObject.id.toBytes), Value(newObject.toArray))(tx)
       _ <- tx.commit()
     } yield {
       logger.debug(s"AllocationFA Completed Successfully for Tx ${txd.transactionId}, Object ${newObject.id}")
