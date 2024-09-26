@@ -10,23 +10,36 @@
 # Run single test. Where "min/max" identifies a test containing this substring
 sbt 'testOnly *KeyValueObjectReaderSuite -- -z min/max'
 
-# New testing approach
+# Testing commands
 
-sbt compile; rm -r local/node_*
 ./t bootstrap local/cfg.yaml
+
+./t node local/bootstrap_config.yaml local/node_a.yaml
+./t node local/bootstrap_config.yaml local/node_b.yaml
+./t node local/bootstrap_config.yaml local/node_c.yaml
 
 sudo launchctl start com.apple.rpcbind
 ./t nfs local/cfg.yaml local/log4j-conf.xml
+
+On Client:
+    ssh rakis@192.168.64.2
+    sudo
+    umount -f /mnt; mount -v -t nfs4 -o "vers=4.1" 192.168.56.1:/ /mnt
+
+./t new-pool local/log4j-conf.xml local/bootstrap_config.yaml new_pool_name replication 3 2 2 node_a,node_b,node_c
+
+./t transfer-store local/log4j-conf.xml local/bootstrap_config.yaml 3f1ca5f7-74be-405d-aa48-739fc23651a4:2 node_a
+
+
+-------------------------------------------------------------------------------
+- Old Testing Commands
+-------------------------------------------------------------------------------
 
 # Building for demo appliction
 # run "sbt pack"
 # then invoke ./target/pack/bin/demo
 
 sbt compile && rm -r local/node_* && ./t bootstrap local/cfg.yaml
-
-./t node local/bootstrap_config.yaml local/node_a.yaml
-
-./t  nfs local/t.yaml local/amoeba-log4j.yaml
 
 Bootstrap Procedure:
     sbt pack
@@ -43,12 +56,6 @@ Bootstrap Procedure:
     ssh rakis@192.168.64.2
     sudo
     umount -f /mnt; mount -v -t nfs4 -o "vers=4.1" 192.168.56.1:/ /mnt
-
-
-./t new-pool local/log4j-conf.xml local/bootstrap_config.yaml new_pool_name replication 3 2 2 node_a,node_b,node_c
-
-./t transfer-store local/log4j-conf.xml local/bootstrap_config.yaml 3f1ca5f7-74be-405d-aa48-739fc23651a4:2 node_a
-
 
 NFS Cache Clearing:
   # To free pagecache
